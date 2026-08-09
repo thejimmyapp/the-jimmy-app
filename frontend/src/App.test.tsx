@@ -3,13 +3,15 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import replayFixtures from "./fixtures/guest-match-replays.json";
 import { GUEST_PROGRESS_KEY } from "./guestProgress";
 import { useCoachStore } from "./store";
-import type { GamePayload, NormalizedMatch } from "./types";
+import type { CallbackReplayBoard, GamePayload, NormalizedMatch } from "./types";
 
 const apiMock = vi.hoisted(() => ({
   games: vi.fn(),
   guestMatchups: vi.fn(),
+  chessComMatchReplay: vi.fn(),
   game: vi.fn(),
   resolveGame: vi.fn(),
   connectChessCom: vi.fn(),
@@ -122,6 +124,14 @@ describe("URL-first exact review", () => {
       seed_source: "leaderboard_top_50",
       cached: false,
     });
+    const fixture = replayFixtures.matches[0].boards;
+    apiMock.chessComMatchReplay.mockResolvedValue({
+      match: guestMatch,
+      boards: {
+        A: { ...fixture.A, id: guestMatch.game_ids.A } as CallbackReplayBoard,
+        B: { ...fixture.B, id: guestMatch.game_ids.B } as CallbackReplayBoard,
+      },
+    });
     apiMock.game.mockResolvedValue(completeGame);
     apiMock.resolveGame.mockResolvedValue({
       status: "resolved",
@@ -168,8 +178,10 @@ describe("URL-first exact review", () => {
     const list = await screen.findByRole("listbox", { name: "Guest matchups" });
     fireEvent.keyDown(list, { key: "Enter" });
 
-    expect(useCoachStore.getState().guestMatch).toEqual(guestMatch);
-    expect(screen.getByText("Select a Bughouse game")).toBeTruthy();
+    await waitFor(() => expect(useCoachStore.getState().guestMatch).toEqual(guestMatch));
+    expect(useCoachStore.getState().game?.timeline.length).toBeGreaterThan(100);
+    expect(screen.getByText("BOARD A · GUEST MATCH")).toBeTruthy();
+    expect(screen.getByText("BOARD B · PARTNER BOARD")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Review" }) as HTMLButtonElement).disabled).toBe(false);
     expect(statistics.disabled).toBe(true);
     const stored = JSON.parse(localStorage.getItem(GUEST_PROGRESS_KEY) ?? "{}") as { capabilities?: Record<string, string> };
@@ -177,6 +189,7 @@ describe("URL-first exact review", () => {
     expect(stored.capabilities?.dock_review).toBe("unlocked");
     expect(stored.capabilities?.rail_statistics).toBe("locked");
     expect(apiMock.guestMatchups).toHaveBeenCalledOnce();
+    expect(apiMock.chessComMatchReplay).toHaveBeenCalledWith(guestMatch.game_ids.A);
     expect(apiMock.resolveGame).not.toHaveBeenCalled();
     expect(apiMock.connectChessCom).not.toHaveBeenCalled();
   });

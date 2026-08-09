@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api";
+import { MoveListDecodeError } from "../bughouseDecoder";
 import type { NormalizedMatch } from "../types";
 import { GuestMatchupList } from "./GuestMatchupList";
 
@@ -61,5 +62,15 @@ describe("guest matchup list", () => {
     fireEvent.keyDown(screen.getByRole("region", { name: "Choose a guest matchup" }), { key: "Enter" });
     expect(await screen.findByRole("listbox", { name: "Guest matchups" })).toBeTruthy();
     expect(api.guestMatchups).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps an unverifiable selection out of the workspace", async () => {
+    vi.mocked(api.guestMatchups).mockResolvedValue({ matches, examined: 5, excluded: 0, exclusion_counts: {}, players_sampled: ["one", "two", "three"], players_represented: ["one", "two", "three"], seed_source: "leaderboard_top_50", cached: false });
+    const onSelect = vi.fn().mockRejectedValue(new MoveListDecodeError("unknown_symbol", "unknown callback symbol"));
+    renderList(<GuestMatchupList onSelect={onSelect} />);
+    const list = await screen.findByRole("listbox", { name: "Guest matchups" });
+    fireEvent.keyDown(list, { key: "Enter" });
+    expect((await screen.findByRole("alert")).textContent).toContain("decoder cannot verify");
+    expect(onSelect).toHaveBeenCalledOnce();
   });
 });
