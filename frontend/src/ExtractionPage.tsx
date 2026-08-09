@@ -8,6 +8,11 @@ import {
 } from "./extractionData";
 import type { MatchSeat, NormalizedMatch, PublicPlayer } from "./extractionData";
 import {
+  buildExtractionSnapshot,
+  downloadExtractionSnapshot,
+} from "./extractionDownload";
+import type { ExtractionDownloadFormat } from "./extractionDownload";
+import {
   extractionSharePath,
   isMoveAddress,
   parseExtractionInput,
@@ -66,6 +71,7 @@ export function ExtractionPage() {
   const [moveError, setMoveError] = useState<string | null>(null);
   const [sharePath, setSharePath] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
   const matchRequest = useRef(0);
   const playerRequest = useRef(0);
 
@@ -140,6 +146,7 @@ export function ExtractionPage() {
     setInputError(null);
     setSharePath(null);
     setCopyStatus(null);
+    setDownloadStatus(null);
     const recognized = parseExtractionInput(input);
 
     if (recognized.kind === "game") {
@@ -201,6 +208,21 @@ export function ExtractionPage() {
     }
   };
 
+  const handleDownload = (format: ExtractionDownloadFormat) => {
+    if (!match && !player) return;
+    const snapshot = buildExtractionSnapshot({
+      sourceInput: input,
+      origin: window.location.origin,
+      match,
+      loadedGameId,
+      moveAddress,
+      sharePath,
+      player,
+    });
+    downloadExtractionSnapshot(snapshot, format);
+    setDownloadStatus(`Prepared the complete .${format} download.`);
+  };
+
   return (
     <main className="extraction-page">
       <section className="extraction-page__content" aria-labelledby="extraction-title">
@@ -210,20 +232,34 @@ export function ExtractionPage() {
           <p>Inspect a normalized Bughouse match or a Chess.com public profile. No position decoding is performed here.</p>
         </header>
 
-        <form className="extraction-search" onSubmit={handleSubmit}>
-          <label htmlFor="extraction-input">Username, game URL, viewer URL, or numeric game id</label>
-          <div className="extraction-search__row">
-            <input
-              id="extraction-input"
-              autoFocus
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="e.g. https://www.chess.com/game/live/180443871315 or vjbaker"
-              type="text"
-              value={input}
-            />
-            <button type="submit">Extract</button>
-          </div>
-        </form>
+        <section className="extraction-t-chart" aria-label="Input and download everything">
+          <form className="extraction-search" onSubmit={handleSubmit}>
+            <span className="extraction-t-chart__label">EXISTING INPUT</span>
+            <label htmlFor="extraction-input">Username, game URL, viewer URL, or numeric game id</label>
+            <div className="extraction-search__row">
+              <input
+                id="extraction-input"
+                autoFocus
+                onChange={(event) => setInput(event.target.value)}
+                placeholder="e.g. https://www.chess.com/game/live/180443871315 or vjbaker"
+                type="text"
+                value={input}
+              />
+              <button type="submit">Extract</button>
+            </div>
+          </form>
+          <aside className="extraction-download" aria-labelledby="download-everything-heading">
+            <span className="extraction-t-chart__label">DOWNLOAD EVERYTHING</span>
+            <h2 id="download-everything-heading">Keep every available fact</h2>
+            <p>Normalized match, seats, ratings, results, ply counts, moment URL, and public profile/stats.</p>
+            <p className="extraction-capability"><strong>moves:</strong> pending decoder</p>
+            <div className="extraction-download__buttons">
+              <button type="button" disabled={!match && !player} onClick={() => handleDownload("json")}>Download .json</button>
+              <button type="button" disabled={!match && !player} onClick={() => handleDownload("txt")}>Download .txt</button>
+            </div>
+            {downloadStatus && <p className="extraction-download__status" role="status">{downloadStatus}</p>}
+          </aside>
+        </section>
         {inputError && <p className="extraction-message is-error" role="alert">{inputError}</p>}
         {matchLoading && <p className="extraction-message" role="status">Loading normalized match…</p>}
         {playerLoading && <p className="extraction-message" role="status">Loading Chess.com profile and stats…</p>}

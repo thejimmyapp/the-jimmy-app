@@ -25,6 +25,9 @@ export interface PublicPlayer {
   archivesUrl: string;
   bughouseRating: number | null;
   bughouseRatingPath: "live_bughouse[].score" | null;
+  profileData: Record<string, unknown>;
+  statsData: Record<string, unknown>;
+  bughouseLeaderboardEntry: Record<string, unknown> | null;
 }
 
 const BOARD_IDS = ["A", "B"] as const;
@@ -175,6 +178,9 @@ export async function fetchPublicPlayer(username: string): Promise<PublicPlayer>
     archivesUrl: `https://api.chess.com/pub/player/${encodeURIComponent(profileUsername.toLowerCase())}/games/archives`,
     bughouseRating: leaderboardRating,
     bughouseRatingPath: leaderboardRating !== null ? "live_bughouse[].score" : null,
+    profileData: profileValue,
+    statsData: statsValue,
+    bughouseLeaderboardEntry: isRecord(leaderboardEntry) ? leaderboardEntry : null,
   };
 }
 
