@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>thejimmyapp — UI Building Blocks</title>
+<style>
+  :root{
+    --bg:#0d1420; --bg2:#111a29; --panel:#0a0f18; --card:#141f31;
+    --line:#22304a; --cyan:#35c8e8; --cyan-dim:#1b6d80;
+    --txt:#e8eef6; --txt2:#8fa1b8; --txt3:#54657e;
+    --green:#7fc663; --red:#e0656a; --lock:#2a3950;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:15px/1.5 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:40px 48px 80px}
+  a{color:var(--cyan);text-underline-offset:2px}
+  a:hover{color:#76ddf2}
+  h1{font-size:22px;letter-spacing:.02em;margin-bottom:4px}
+  .sub{color:var(--txt2);font-size:13px;margin-bottom:36px;max-width:720px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:28px}
+  section{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px}
+  section h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--cyan)}
+  .meta{font-size:12px;color:var(--txt2);border-top:1px solid var(--line);padding-top:10px;margin-top:auto}
+  .meta b{color:var(--txt)}
+  .meta .tag{display:inline-block;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-family:var(--mono);font-size:11px;color:var(--cyan);margin-right:4px}
+  .demo{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;align-items:center;justify-content:center;min-height:110px}
+
+  /* RAIL */
+  .rail{display:flex;flex-direction:column;gap:6px;background:#0a0e15;border:1px solid var(--line);border-radius:8px;padding:10px 8px;width:52px;align-items:center}
+  .ric{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:default;background:transparent}
+  .ric.on{background:var(--card);outline:1px solid var(--cyan);color:var(--cyan)}
+  .ric.ok{color:var(--txt2)}
+  .ric.lk{color:var(--txt3);opacity:.42;filter:grayscale(1)}
+  .rail .gap{height:14px}
+  .rail .chev{color:var(--txt3);font-size:12px}
+
+  /* DOCK tabs */
+  .dock{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .tabs{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line)}
+  .tab{padding:10px 4px;text-align:center;font-size:11px;color:var(--txt3);display:flex;flex-direction:column;gap:4px;align-items:center;opacity:.45}
+  .tab .i{font-size:15px}
+  .tab.on{color:var(--txt);opacity:1;box-shadow:inset 0 -2px 0 var(--cyan)}
+  .tab.ok{color:var(--txt2);opacity:1}
+  .subtabs{display:flex;gap:18px;padding:9px 14px;font-size:12px;color:var(--txt3)}
+  .subtabs .on{color:var(--txt);border-bottom:2px solid var(--cyan);padding-bottom:3px}
+  .subtabs .lk{opacity:.42}
+
+  /* modal */
+  .modal{width:100%;max-width:380px;background:#0b1524;border:1px solid var(--line);border-top:2px solid var(--cyan);border-radius:6px;padding:20px;position:relative}
+  .modal .x{position:absolute;top:10px;right:14px;color:var(--txt3);font-size:14px}
+  .kicker{color:var(--cyan);font-size:11px;letter-spacing:.06em;font-weight:600;margin-bottom:2px}
+  .modal h3{font-size:18px;margin-bottom:16px}
+  .fl{font-size:11px;font-weight:700;color:var(--txt2);letter-spacing:.03em;margin-bottom:5px}
+  .inp{width:100%;background:#0a1220;border:1px solid var(--line);border-radius:4px;padding:10px 12px;color:var(--txt3);font-size:13px;font-style:italic}
+  .inp.focus{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan-dim)}
+  .keys{margin-top:12px;font-size:11px;color:var(--txt3);font-family:var(--mono)}
+  .keys b{color:var(--txt2);background:var(--card);border:1px solid var(--line);border-radius:3px;padding:0 5px;font-weight:500}
+
+  /* spawn cta */
+  .spawn{width:100%;max-width:340px;background:linear-gradient(100deg,#0e1a2b 60%,#16283f);border:1px solid var(--line);clip-path:polygon(3% 0,100% 6%,97% 100%,0 94%);padding:16px 20px}
+  .spawn .in{border-left:3px solid var(--cyan);padding-left:12px}
+  .spawn .k{color:var(--cyan);font-size:10px;letter-spacing:.14em;font-weight:700}
+  .spawn .t{font-size:19px;font-weight:600}
+
+  /* matchup card */
+  .mrow{width:100%;max-width:400px;display:flex;flex-direction:column;gap:8px}
+  .mc{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12.5px}
+  .mc.sel{border-color:var(--cyan);background:#16283c}
+  .mc .res.w{color:var(--green);font-weight:700}
+  .mc .res.l{color:var(--red);font-weight:700}
+  .mc .why{color:var(--txt3)}
+  .mc .arrow{margin-left:auto;color:var(--cyan);font-size:11px}
+
+  /* player bar */
+  .pbar{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;gap:10px;padding:7px 10px}
+  .av{width:26px;height:26px;border-radius:4px;background:#233650;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .pbar .nm{font-size:13px;font-weight:600}
+  .pbar .rt{color:var(--txt2);font-size:12px}
+  .clock{margin-left:auto;font-family:var(--mono);font-size:14px;background:#0a1220;border:1px solid var(--line);border-radius:4px;padding:3px 9px;color:var(--txt)}
+  .clock.low{color:var(--red);border-color:var(--red)}
+  .pocket{display:flex;gap:3px;font-size:14px;opacity:.85}
+
+  /* moves */
+  .mv{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:12.5px;color:var(--txt2);display:grid;grid-template-columns:28px 1fr 1fr;row-gap:4px}
+  .mv .n{color:var(--txt3)}
+  .mv .cur{background:var(--cyan-dim);color:#fff;border-radius:3px;padding:0 5px}
+  .mv .drop{color:var(--cyan)}
+
+  /* locked card */
+  .lcard{width:150px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 12px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;opacity:.55;filter:grayscale(.4)}
+  .lcard .doc{width:44px;height:52px;border:2px solid var(--cyan-dim);border-radius:4px;display:flex;flex-direction:column;gap:4px;padding:8px 6px}
+  .lcard .doc i{height:3px;background:var(--cyan-dim);border-radius:2px;display:block}
+  .lcard .badge{position:absolute;bottom:-10px;width:26px;height:26px;border-radius:50%;background:#39424f;border:2px solid var(--bg2);display:flex;align-items:center;justify-content:center;font-size:12px}
+  .lcard .nm2{font-size:11px;color:var(--txt3)}
+
+  /* progression */
+  .prog{display:flex;align-items:center;gap:0;padding:10px 0}
+  .node{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;border:2px solid var(--line);background:var(--card);color:var(--txt3);z-index:1}
+  .node.done{border-color:var(--cyan);color:var(--cyan)}
+  .node.cur{border-color:var(--cyan);background:var(--cyan);color:#06202b;box-shadow:0 0 0 4px rgba(53,200,232,.18)}
+  .edge{width:56px;height:4px;background:var(--line);border-radius:2px}
+  .edge.done{background:var(--cyan-dim)}
+
+  /* buttons */
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn{border-radius:5px;padding:9px 18px;font-size:13px;font-weight:600;border:1px solid transparent}
+  .btn.pri{background:var(--cyan);color:#06202b}
+  .btn.sec{background:transparent;border-color:var(--line);color:var(--txt2)}
+  .btn.lk{background:var(--card);color:var(--txt3);opacity:.45}
+
+  /* tokens */
+  .tok{display:flex;gap:8px;flex-wrap:wrap}
+  .sw{width:84px;border:1px solid var(--line);border-radius:6px;overflow:hidden;font-size:10px;font-family:var(--mono)}
+  .sw i{display:block;height:34px}
+  .sw span{display:block;padding:4px 6px;color:var(--txt2);background:var(--panel)}
+  .sources{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin-bottom:28px}
+  .sources h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--cyan);margin-bottom:8px}
+  .sources ul{list-style:none;font-size:12.5px;color:var(--txt2);line-height:1.8}
+  .sources b{color:var(--txt)}
+  .sources .note{font-size:11.5px;color:var(--txt3);margin-top:6px}
+  .specimen-section{grid-column:1/-1;border-color:#7a5a1e}
+  .specimen-section>h2{color:#e8b93c}
+  .specimen-intro{font-size:12px;color:var(--txt2);max-width:920px}
+  .specimen-list{display:flex;flex-direction:column;gap:20px;margin-top:2px}
+  .specimen{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+  .specimen-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:10px}
+  .specimen-title{font-size:13px;color:var(--cyan);font-weight:650}
+  .temporary{flex:0 0 auto;color:#e8b93c;border:1px solid #7a5a1e;border-radius:999px;padding:2px 8px;font:10px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.06em}
+  .specimen-copy{font-size:12px;color:var(--txt2);margin-bottom:10px;max-width:980px}
+  .specimen img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:6px;background:#fff}
+  .specimen-window{max-height:760px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#080d16}
+  .specimen-window img{border:0;border-radius:0}
+  .specimen-meta{font-size:11px;color:var(--txt3);margin-top:9px}
+  @media (max-width:680px){
+    body{padding:24px 16px 56px}
+    .grid{grid-template-columns:minmax(0,1fr);gap:18px}
+    section{padding:16px}
+    .specimen-head{display:block}
+    .temporary{display:inline-block;margin-top:7px}
+  }
+</style>
+</head>
+<body>
+<h1>thejimmyapp — UI building blocks</h1>
+<p class="sub">The chess.com patterns we borrow, redrawn in our own skin (dark navy + cyan, per the wireframe). Skeleton imitated, assets not copied. Each block notes its chess.com analog, its zone (RAIL / STAGE / DOCK), and its lock behavior in the capability map.</p>
+
+<aside class="sources" aria-labelledby="inspiration-sources">
+  <h2 id="inspiration-sources">Inspiration sources — the reference set</h2>
+  <ul>
+    <li>· <b>chess.com member profile</b> — <a href="https://www.chess.com/member/beemoor">chess.com/member/beemoor</a> (profile/stats data shapes)</li>
+    <li>· <b>chess.com games archive</b> — <a href="https://www.chess.com/member/beemoor/games?activeTab=live">chess.com/member/beemoor/games?activeTab=live</a> (row anatomy → block 5)</li>
+    <li>· <b>chess.com live game URLs</b> — <a href="https://www.chess.com/game/live/180616071971?username=beemoor">chess.com/game/live/180616071971?username=beemoor</a> (id + perspective param)</li>
+    <li>· <b>bmacho bughouse-viewer</b> — <a href="https://bmacho.github.io/bughouse-viewer/view.html">bmacho.github.io/bughouse-viewer/view.html</a> (+ <code>?game_id=…&amp;move=23b</code> deep links; hy.js is MIT — audit: <code>docs/bughouse-viewer-audit.md</code>)</li>
+    <li>· <b>bughouse-viewer source</b> — <a href="https://github.com/bmacho/bughouse-viewer">github.com/bmacho/bughouse-viewer</a> (callback API technique, TCN decoding, BPGN export)</li>
+    <li>· <b>dropchess Fairy-Stockfish</b> — <a href="https://online-dropchess-stockfish.onrender.com/analysis.html">online-dropchess-stockfish.onrender.com/analysis.html</a> (BFEN handoff; eval rows → block 12)</li>
+    <li>· <b>RyanTime blog puzzle embed</b> — Chess.com blog study embed supplied by the owner (annotated study card → block 13, the flashcard model)</li>
+  </ul>
+  <div class="note">This page is the vocabulary + spec sheet. Third-party screenshots below are temporary visual evidence only; they are never app-component assets.</div>
+</aside>
+
+<div class="grid">
+
+<section>
+  <h2>1 · Rail — icon-only nav</h2>
+  <div class="demo"><div class="rail">
+    <div class="ric on">◈</div>
+    <div class="ric ok">♟</div>
+    <div class="ric lk">📊</div>
+    <div class="ric lk">⚙</div>
+    <div class="ric lk">🔗</div>
+    <div class="chev">▾</div>
+    <div class="gap"></div>
+    <div class="ric lk">🔍</div>
+    <div class="ric lk">✉</div>
+  </div></div>
+  <div class="meta"><span class="tag">RAIL</span><b>chess.com analog:</b> left sidebar collapsed state. Three states: <b>active</b> (cyan outline), <b>unlocked</b>, <b>locked</b> (greyed, <code>inert</code>, absent from a11y tree). Legal lives behind the ▾ overflow — never a top-level icon.</div>
+</section>
+
+<section>
+  <h2>2 · Dock tab row + sub-tabs</h2>
+  <div class="demo"><div class="dock">
+    <div class="tabs">
+      <div class="tab on"><span class="i">🔬</span>Analysis</div>
+      <div class="tab"><span class="i">＋</span>New Game</div>
+      <div class="tab"><span class="i">▦</span>Games</div>
+      <div class="tab"><span class="i">👥</span>Players</div>
+    </div>
+    <div class="subtabs"><span class="ok">Moves</span><span class="on">Partner</span><span class="lk">Info</span><span class="lk">Openings</span></div>
+  </div></div>
+  <div class="meta"><span class="tag">DOCK</span><b>chess.com analog:</b> the analysis side panel's tab strip. Locked tabs render greyed as teasers, not hidden. Known issue on record: 8 tabs in 2 rows is a taxonomy problem, deferred — do not let styling "solve" it.</div>
+</section>
+
+<section>
+  <h2>3 · Onboarding capture modal</h2>
+  <div class="demo"><div class="modal">
+    <div class="x">✕</div>
+    <div class="kicker">GREETINGS PUNY HUMAN</div>
+    <h3>Review what I command you to review</h3>
+    <div class="fl">CHESS.COM USERNAME</div>
+    <div class="inp focus">enter username or bughouse game url…</div>
+    <div class="keys"><b>↑↓</b> switch node &nbsp; <b>⏎</b> commit &nbsp; no pointer targets</div>
+  </div></div>
+  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> their dark modal cards (game-over / trial dialogs) — top accent line, kicker, heavy title. Keyboard-only: focus-trapped, everything outside is <code>inert</code>. Kicker copy is placeholder — flagged for the copy pass.</div>
+</section>
+
+<section>
+  <h2>4 · Guest Spawn CTA</h2>
+  <div class="demo"><div class="spawn"><div class="in">
+    <div class="k">GUEST SPAWN</div>
+    <div class="t">Start</div>
+  </div></div></div>
+  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> the big green "Play" CTA panel — theirs is green + skewed banner, ours is cyan + angled clip. Entry node A, default-focused on load. Commits to the guest pipeline (Thread A, Task 4b).</div>
+</section>
+
+<section>
+  <h2>5 · Matchup card (guest list)</h2>
+  <div class="demo"><div class="mrow">
+    <div class="mc sel"><span>Acurat<span style="color:var(--txt3)">(2124)</span></span><span class="res w">WON</span><span class="why">— diag oppo resigned</span><span class="arrow">⏎ review</span></div>
+    <div class="mc"><span>RyanTime<span style="color:var(--txt3)">(2124)</span></span><span class="res l">LOST</span><span class="why">— partner resigned</span></div>
+    <div class="mc"><span>bugmaster7<span style="color:var(--txt3)">(1987)</span></span><span class="res w">WON</span><span class="why">— oppo flagged</span></div>
+  </div></div>
+  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> game-archive row. Your spec verbatim: <code>[{highest-rated}({rating}) WON|LOST — {seat} {action}]</code>. Silent filter: ≥10 moves on both boards. Arrow-select, Enter opens review.</div>
+</section>
+
+<section>
+  <h2>6 · Player bar + pocket + clock</h2>
+  <div class="demo"><div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:400px">
+    <div class="pbar"><div class="av">🐸</div><span class="nm">fearingforfreddy</span><span class="rt">(1843)</span><div class="pocket">♙♙♗</div><div class="clock">1:47</div></div>
+    <div class="pbar"><div class="av">🦀</div><span class="nm">Acurat</span><span class="rt">(2124)</span><div class="pocket">♞</div><div class="clock low">0:09</div></div>
+  </div></div>
+  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> board player strip — avatar, name, rating, clock. Bughouse addition: the <b>pocket</b> (pieces in hand) sits inline. Board A internals are Thread A no-touch territory until further notice.</div>
+</section>
+
+<section>
+  <h2>7 · Move list w/ drops</h2>
+  <div class="demo"><div class="mv">
+    <span class="n">12.</span><span>Nxe5</span><span class="drop">N@f3+</span>
+    <span class="n">13.</span><span class="cur">Kg1</span><span class="drop">P@h3</span>
+    <span class="n">14.</span><span>gxh3</span><span>Qg5+</span>
+  </div></div>
+  <div class="meta"><span class="tag">DOCK · Moves</span><b>chess.com analog:</b> analysis move list. Drops (<code>@</code>) get the cyan accent — they're the bughouse-specific vocabulary. First unlock for guests: Moves tab only. Global arrow-key nav stays mounted regardless of tab (Task 2 ruling).</div>
+</section>
+
+<section>
+  <h2>8 · Locked feature card</h2>
+  <div class="demo" style="gap:20px;display:flex">
+    <div class="lcard"><div class="doc"><i></i><i></i><i style="width:60%"></i></div><div class="nm2">Flashcards</div><div class="badge">🔒</div></div>
+    <div class="lcard"><div class="doc"><i></i><i></i><i style="width:60%"></i></div><div class="nm2">Top 12 Victories</div><div class="badge">🔒</div></div>
+  </div>
+  <div class="meta"><span class="tag">DOCK</span><b>chess.com analog:</b> locked-lesson / premium teaser cards. The visible-but-locked doctrine: chrome for future features ships day one, greyed with lock badge, and un-greys live when the capability map flips.</div>
+</section>
+
+<section>
+  <h2>9 · Progression nodes</h2>
+  <div class="demo"><div class="prog">
+    <div class="node done">S</div><div class="edge done"></div>
+    <div class="node cur">1</div><div class="edge"></div>
+    <div class="node">2</div><div class="edge"></div>
+    <div class="node">🔒</div>
+  </div></div>
+  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> lessons path / puzzle-journey trail. S = spawn, numbered milestones drive capability unlocks. Current node gets the glow. The map artwork around it is the onboarding STAGE surface.</div>
+</section>
+
+<section>
+  <h2>10 · Buttons — three states</h2>
+  <div class="demo"><div class="btnrow">
+    <button class="btn pri">Start Review</button>
+    <button class="btn sec">Export BPGN</button>
+    <button class="btn lk">🔒 Queue Engine</button>
+  </div></div>
+  <div class="meta"><span class="tag">shared</span><b>chess.com analog:</b> primary green CTA → our cyan; ghost secondary; locked state matches the capability-map treatment everywhere. "Queue Engine" ships locked until Fairy-Stockfish feasibility (Thread B, item 7) clears.</div>
+</section>
+
+<section>
+  <h2>11 · Tokens</h2>
+  <div class="demo"><div class="tok">
+    <div class="sw"><i style="background:#0d1420"></i><span>bg</span></div>
+    <div class="sw"><i style="background:#141f31"></i><span>card</span></div>
+    <div class="sw"><i style="background:#22304a"></i><span>line</span></div>
+    <div class="sw"><i style="background:#35c8e8"></i><span>cyan</span></div>
+    <div class="sw"><i style="background:#7fc663"></i><span>won</span></div>
+    <div class="sw"><i style="background:#e0656a"></i><span>lost</span></div>
+    <div class="sw"><i style="background:#54657e"></i><span>locked</span></div>
+  </div></div>
+  <div class="meta"><span class="tag">skin task</span>One accent (cyan), one surface ramp, semantic green/red for results only. This is the placeholder skin until Task 7; the skin task swaps values here, not per-component.</div>
+</section>
+
+<section class="specimen-section" aria-labelledby="temporary-specimens">
+  <h2 id="temporary-specimens">12–16 · Screenshot specimens — temporary reference (R24)</h2>
+  <p class="specimen-intro">Captured third-party UI is retained here only as a build target. These pixels never migrate into app components. Each specimen is replaced by an original component in the project token system, then removed.</p>
+
+  <div class="specimen-list">
+    <figure class="specimen">
+      <figcaption class="specimen-head">
+        <span class="specimen-title">12 · Engine eval-line row</span>
+        <span class="temporary">Temporary reference</span>
+      </figcaption>
+      <p class="specimen-copy">Ranked line, engine identity, depth, expand affordance, enable toggle, and a variation written in drop notation. Target: the Queue Engine result card in a grouped DOCK stack.</p>
+      <img src="./specimens/specimen-12-eval-row.jpg" width="2504" height="454" loading="lazy" alt="Fairy-Stockfish analysis row with rank, depth, expand control, toggle, and drop-notation principal variation">
+      <p class="specimen-meta">Source: <a href="https://online-dropchess-stockfish.onrender.com/analysis.html">online-dropchess-stockfish</a> · Owner-supplied capture · Do not migrate this asset.</p>
+    </figure>
+
+    <figure class="specimen">
+      <figcaption class="specimen-head">
+        <span class="specimen-title">13 · Flashcard / study card</span>
+        <span class="temporary">Temporary reference</span>
+      </figcaption>
+      <p class="specimen-copy">Board, numbered moves, personal prose annotation, replay controls, and share affordance. Target: a saved moment card combining a moment address, position, and the user's own written insight.</p>
+      <img src="./specimens/specimen-13-flashcard.jpg" width="1560" height="854" loading="lazy" alt="Chess study embed with board, numbered moves, prose annotation, navigation controls, and share control">
+      <p class="specimen-meta">Source: ChessTempo-style study embed from the owner's Chess.com blog · Owner-supplied capture · Do not migrate this asset.</p>
+    </figure>
+
+    <figure class="specimen">
+      <figcaption class="specimen-head">
+        <span class="specimen-title">14 · Lichess analysis module</span>
+        <span class="temporary">Temporary reference</span>
+      </figcaption>
+      <p class="specimen-copy">UI of interest: a narrow, self-contained analysis column with pocket rails, engine status and controls, a deep content well, and compact bottom navigation. The structural lesson is modular stacking beside a primary board, not Lichess's graphics or skin.</p>
+      <div class="specimen-window"><img src="./specimens/specimen-14-lichess-analysis.png" width="1440" height="1000" loading="lazy" alt="Public Lichess Crazyhouse analysis page showing a chessboard and the modular engine and pocket column at right"></div>
+      <p class="specimen-meta">Source: <a href="https://lichess.org/analysis/crazyhouse">lichess.org/analysis/crazyhouse</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
+    </figure>
+
+    <figure class="specimen">
+      <figcaption class="specimen-head">
+        <span class="specimen-title">15 · Chess.com notification settings patterns</span>
+        <span class="temporary">Temporary reference</span>
+      </figcaption>
+      <p class="specimen-copy">UI of interest: notification categories as collapsible rows, one expanded category, global and per-event toggles, and explicit delivery-channel checkboxes. The reference is for hierarchy and state density only; icons, palette, type, and controls must be redrawn.</p>
+      <div class="specimen-window"><img src="./specimens/specimen-15-chesscom-notification-settings.png" width="1099" height="1647" loading="lazy" alt="Chess.com notification settings with category accordions, toggles, and web, mobile, and email channel checkboxes"></div>
+      <p class="specimen-meta">Source: <a href="https://support.chess.com/en/articles/8618508-how-do-i-manage-my-notifications">Chess.com Help Center — How do I manage my notifications?</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
+    </figure>
+
+    <figure class="specimen">
+      <figcaption class="specimen-head">
+        <span class="specimen-title">16 · Typography hierarchy — H1 / H2</span>
+        <span class="temporary">Temporary reference</span>
+      </figcaption>
+      <p class="specimen-copy">UI of interest: a light, sentence-case page H1 with generous separation from body copy, followed by a similarly weighted but smaller H2. Target: a restrained content hierarchy for reference and settings pages, rebuilt with project tokens.</p>
+      <div class="specimen-window"><img src="./specimens/specimen-16-lichess-typography-h1-h2.png" width="1280" height="900" loading="lazy" alt="Lichess About page showing the About lichess.org H1 and Press Kit H2 hierarchy"></div>
+      <p class="specimen-meta">Source: <a href="https://lichess.org/about">lichess.org/about</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
+    </figure>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
