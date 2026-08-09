@@ -201,6 +201,14 @@ async def chesscom_match(game_id: int) -> dict[str, object]:
         raise _matchup_http_error(exc) from exc
 
 
+@app.get("/api/chesscom/matches/{game_id}/replay")
+async def chesscom_match_replay(game_id: int) -> dict[str, object]:
+    try:
+        return await chesscom_matchups.replay_source(game_id)
+    except (MatchProxyDisabledError, MatchExcludedError, MatchUpstreamError) as exc:
+        raise _matchup_http_error(exc) from exc
+
+
 @app.get("/api/chesscom/guest-matchups")
 async def chesscom_guest_matchups() -> dict[str, object]:
     try:

@@ -4,7 +4,7 @@ import { api } from "../api";
 import type { NormalizedMatch } from "../types";
 
 interface Props {
-  onSelect: (match: NormalizedMatch) => void;
+  onSelect: (match: NormalizedMatch) => void | Promise<void>;
 }
 
 const cardText = (match: NormalizedMatch) => {
@@ -17,6 +17,8 @@ export function GuestMatchupList({ onSelect }: Props) {
   const surfaceRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [selecting, setSelecting] = useState(false);
+  const [selectionError, setSelectionError] = useState("");
   const query = useQuery({ queryKey: ["guest-matchups"], queryFn: api.guestMatchups, retry: false });
   const matches = query.data?.matches ?? [];
 
@@ -45,9 +47,16 @@ export function GuestMatchupList({ onSelect }: Props) {
       setActiveIndex((current) => (current + direction + matches.length) % matches.length);
       return;
     }
-    if (event.key === "Enter" && matches[activeIndex]) {
+    if (event.key === "Enter" && matches[activeIndex] && !selecting) {
       event.preventDefault();
-      onSelect(matches[activeIndex]);
+      setSelecting(true);
+      setSelectionError("");
+      void Promise.resolve(onSelect(matches[activeIndex])).catch((error: unknown) => {
+        const typedDecoderFailure = error instanceof Error && (error.name === "MoveListDecodeError" || error.name === "MatchReconstructionError");
+        setSelectionError(typedDecoderFailure
+          ? "This match uses replay data the decoder cannot verify. It was refused."
+          : "This match could not be loaded. Press Enter to try again.");
+      }).finally(() => setSelecting(false));
     }
   };
 
@@ -74,6 +83,8 @@ export function GuestMatchupList({ onSelect }: Props) {
       </div>
       {query.isPending && <div className="guest-matchup-status" role="status">Loading matchups…</div>}
       {query.isError && <div className="guest-matchup-status guest-matchup-error" role="alert">Matchups unavailable. Press Enter to retry.</div>}
+      {selecting && <div className="guest-matchup-status" role="status">Verifying both boards…</div>}
+      {selectionError && <div className="guest-matchup-status guest-matchup-error" role="alert">{selectionError}</div>}
       {matches.length > 0 && (
         <div
           ref={listRef}
