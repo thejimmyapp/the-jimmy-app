@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SavedLesson } from "../guestProgress";
+import { initialCapabilityMap, type SavedLesson } from "../guestProgress";
 import { useCoachStore } from "../store";
 import { SidePanel } from "./SidePanel";
 
@@ -33,6 +33,13 @@ const renderPanel = (overrides: Partial<Parameters<typeof SidePanel>[0]> = {}) =
     onOpenSavedLesson: vi.fn().mockResolvedValue(true),
     onRemoveSavedLesson: vi.fn(),
     onMap: vi.fn(),
+    capabilities: {
+      ...initialCapabilityMap(),
+      dock_review: "unlocked",
+      dock_games: "unlocked",
+      dock_library: "unlocked",
+      dock_collaborate: "unlocked",
+    },
     ...overrides,
   };
   render(<SidePanel {...props} />);

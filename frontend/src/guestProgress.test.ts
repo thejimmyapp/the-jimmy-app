@@ -42,6 +42,15 @@ describe("versioned guest progress", () => {
     expect(loadGuestProgress()).toEqual(emptyGuestProgress());
   });
 
+  it("hydrates a complete locked capability map for legacy progress", () => {
+    localStorage.setItem(GUEST_PROGRESS_KEY, JSON.stringify({ version: 1, firstGameOpened: false, mapNode: "start", savedLessons: [] }));
+    const progress = loadGuestProgress();
+    expect(progress.capabilities.rail_onboarding).toBe("unlocked");
+    expect(progress.capabilities.rail_statistics).toBe("locked");
+    expect(progress.capabilities.dock_review).toBe("locked");
+    expect(Object.keys(progress.capabilities)).toHaveLength(9);
+  });
+
   it("counts qualifying distinct games without over-counting duplicates", () => {
     const first = savedLessonFrom(10, lesson(), "2026-01-01T00:00:00Z")!;
     const sameGame = savedLessonFrom(10, lesson({ id: "mistake-2" }))!;

@@ -5,6 +5,7 @@ import App from "./App";
 import { LegalPage } from "./components/LegalPage";
 import { PuzzlePlayer } from "./components/PuzzlePlayer";
 import { setCanonicalUrl } from "./publicUrl";
+import { legalPageFromPath } from "./routes";
 import "./styles.css";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } });
@@ -12,11 +13,7 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30
 setCanonicalUrl(location.pathname);
 
 const puzzleMatch = location.pathname.match(/^\/puzzle\/([a-f0-9]{40})\/?$/i);
-const legalPage = location.pathname.replace(/\/+$/, "") === "/privacy"
-  ? "privacy"
-  : location.pathname.replace(/\/+$/, "") === "/terms"
-    ? "terms"
-    : null;
+const legalPage = legalPageFromPath(location.pathname);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

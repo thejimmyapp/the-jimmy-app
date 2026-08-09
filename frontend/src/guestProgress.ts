@@ -7,6 +7,36 @@ export const ANALYSIS_ACKNOWLEDGEMENT_VERSION = "analysis-limits-2026-08-06";
 
 export type MapNodeId = "start" | "analyze" | "library" | "partner";
 
+export const capabilityKeys = [
+  "rail_onboarding",
+  "rail_review",
+  "rail_statistics",
+  "rail_settings",
+  "rail_chesscom",
+  "dock_review",
+  "dock_games",
+  "dock_library",
+  "dock_collaborate",
+] as const;
+
+export type CapabilityKey = (typeof capabilityKeys)[number];
+export type CapabilityState = "locked" | "unlocked";
+export type CapabilityMap = Record<CapabilityKey, CapabilityState>;
+
+export const initialCapabilityMap = (): CapabilityMap => ({
+  rail_onboarding: "unlocked",
+  rail_review: "locked",
+  rail_statistics: "locked",
+  rail_settings: "locked",
+  rail_chesscom: "locked",
+  dock_review: "locked",
+  dock_games: "locked",
+  dock_library: "locked",
+  dock_collaborate: "locked",
+});
+
+export const isCapabilityLocked = (capabilities: CapabilityMap, key: CapabilityKey) => capabilities[key] === "locked";
+
 export interface SavedLesson {
   id: string;
   gameId: number;
@@ -30,6 +60,7 @@ export interface GuestProgress {
   firstGameOpened: boolean;
   mapNode: MapNodeId;
   savedLessons: SavedLesson[];
+  capabilities: CapabilityMap;
 }
 
 export const emptyGuestProgress = (): GuestProgress => ({
@@ -37,9 +68,16 @@ export const emptyGuestProgress = (): GuestProgress => ({
   firstGameOpened: false,
   mapNode: "start",
   savedLessons: [],
+  capabilities: initialCapabilityMap(),
 });
 
 const mapNodes = new Set<MapNodeId>(["start", "analyze", "library", "partner"]);
+const loadCapabilities = (value: unknown): CapabilityMap => {
+  const initial = initialCapabilityMap();
+  if (!value || typeof value !== "object") return initial;
+  const stored = value as Partial<Record<CapabilityKey, unknown>>;
+  return Object.fromEntries(capabilityKeys.map((key) => [key, stored[key] === "unlocked" ? "unlocked" : initial[key]])) as CapabilityMap;
+};
 
 const isSavedLesson = (value: unknown): value is SavedLesson => {
   if (!value || typeof value !== "object") return false;
@@ -68,6 +106,7 @@ export const loadGuestProgress = (): GuestProgress => {
       firstGameOpened: parsed.firstGameOpened === true,
       mapNode: mapNodes.has(parsed.mapNode as MapNodeId) ? parsed.mapNode as MapNodeId : "start",
       savedLessons: Array.isArray(parsed.savedLessons) ? parsed.savedLessons.filter(isSavedLesson) : [],
+      capabilities: loadCapabilities(parsed.capabilities),
     };
   } catch {
     return emptyGuestProgress();

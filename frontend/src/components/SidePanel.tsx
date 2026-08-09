@@ -1,6 +1,6 @@
-import { Bell, BookOpen, Home, Search, Send, Trash2 } from "lucide-react";
+import { Bell, BookOpen, Home, LockKeyhole, Search, Send, Trash2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import type { SavedLesson } from "../guestProgress";
+import { isCapabilityLocked, type CapabilityKey, type CapabilityMap, type SavedLesson } from "../guestProgress";
 import { sendRoomEvent } from "../socket";
 import { useCoachStore } from "../store";
 import type { GameSummary } from "../types";
@@ -23,9 +23,17 @@ interface Props {
   initialTab?: PrimaryTab;
   dockActions?: ReactNode;
   dockPanel?: ReactNode;
+  capabilities: CapabilityMap;
 }
 
-export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review", dockActions, dockPanel }: Props) {
+const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
+  review: "dock_review",
+  games: "dock_games",
+  library: "dock_library",
+  collaborate: "dock_collaborate",
+};
+
+export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review", dockActions, dockPanel, capabilities }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
   const [reviewTab, setReviewTab] = useState<ReviewTab>("partner");
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
@@ -97,10 +105,13 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
   };
 
   return (
-    <aside className="side-panel utility-panel" aria-label="Review utility panel">
+    <aside className={`side-panel utility-panel ${isCapabilityLocked(capabilities, primaryCapability[primaryTab]) ? "capability-locked" : ""}`} aria-label="Review utility panel">
       <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><div className="utility-titlebar-actions">{dockActions}<button type="button" onClick={onMap}><Home size={13} /> Map</button></div></div>
       <div className="utility-primary-tabs" role="tablist" aria-label="Review tools">
-        {(["review", "games", "library", "collaborate"] as PrimaryTab[]).map((tab) => <button key={tab} role="tab" aria-selected={primaryTab === tab} className={primaryTab === tab ? "active" : ""} onClick={() => choosePrimary(tab)}>{tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</> : tab[0].toUpperCase() + tab.slice(1)}</button>)}
+        {(["review", "games", "library", "collaborate"] as PrimaryTab[]).map((tab) => {
+          const locked = isCapabilityLocked(capabilities, primaryCapability[tab]);
+          return <button key={tab} role="tab" aria-selected={primaryTab === tab} disabled={locked} className={`${primaryTab === tab ? "active" : ""} ${locked ? "capability-locked" : ""}`} onClick={() => choosePrimary(tab)}>{tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</> : tab[0].toUpperCase() + tab.slice(1)}{locked && <LockKeyhole className="capability-lock-badge" size={11} aria-hidden="true" />}</button>;
+        })}
       </div>
 
       {primaryTab === "review" && <div className="utility-secondary-tabs" role="tablist" aria-label="Review views">

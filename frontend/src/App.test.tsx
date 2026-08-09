@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { ApiError } from "./api";
+import { GUEST_PROGRESS_KEY } from "./guestProgress";
 import { useCoachStore } from "./store";
 import type { GamePayload } from "./types";
 
@@ -80,8 +80,6 @@ const renderApp = () => {
   return render(<QueryClientProvider client={queryClient}><App /></QueryClientProvider>);
 };
 
-const openAnalyzeNode = () => fireEvent.click(screen.getAllByRole("button", { name: "Analyze a game" })[0]);
-
 afterEach(() => {
   cleanup();
   useCoachStore.setState({ username: "", game: null, games: [], roomId: null });
@@ -109,27 +107,18 @@ describe("URL-first exact review", () => {
     apiMock.enrichChessCom.mockResolvedValue({ checked: 0, enriched: 0, remaining_without_second_board: 0, credentials_stored: false });
   });
 
-  it("makes the exact Chess.com URL the primary empty-state action and opens it directly", async () => {
-    renderApp();
-
-    openAnalyzeNode();
-    expect(screen.getByRole("heading", { name: "Review the game you just played." })).toBeTruthy();
-    expect(screen.queryByText("Games panel")).toBeNull();
-    fireEvent.change(screen.getByRole("textbox", { name: "Paste Chess.com game URL" }), {
-      target: { value: "https://www.chess.com/game/live/123456789?move=0" },
-    });
-    fireEvent.change(screen.getByRole("textbox", { name: /Chess.com username needed/ }), {
-      target: { value: "FixtureUser" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Review this game" }));
-
-    await waitFor(() => expect(apiMock.resolveGame).toHaveBeenCalledWith(
-      "https://www.chess.com/game/live/123456789?move=0",
-      "FixtureUser",
-    ));
-    expect(await screen.findByText("BOARD A · YOUR BOARD")).toBeTruthy();
-    expect(screen.getByText("BOARD B · PARTNER BOARD")).toBeTruthy();
-    expect(new URLSearchParams(location.search).get("game")).toBe("42");
+  it("renders RAIL and DOCK inert and keeps them out of the accessibility tree during onboarding", () => {
+    const { container } = renderApp();
+    const rail = container.querySelector(".app-rail");
+    const dock = container.querySelector(".app-dock");
+    expect(rail?.hasAttribute("inert")).toBe(true);
+    expect(dock?.hasAttribute("inert")).toBe(true);
+    expect(rail?.getAttribute("aria-hidden")).toBe("true");
+    expect(dock?.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.queryByRole("navigation", { name: "Main views" })).toBeNull();
+    expect(screen.queryByRole("complementary", { name: "Task tools" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Privacy" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /Guest Spawn/ }));
   });
 
   it("restores a standalone exact review from the browser URL on reload", async () => {
@@ -141,15 +130,18 @@ describe("URL-first exact review", () => {
     expect(new URLSearchParams(location.search).get("game")).toBe("42");
   });
 
-  it("unlocks the learning-library map stop after the first successfully opened exact game", async () => {
+  it("persists and live-renders the proof-of-concept capability unlock without calling an API", () => {
     renderApp();
-    openAnalyzeNode();
-    fireEvent.change(screen.getByRole("textbox", { name: "Paste Chess.com game URL" }), { target: { value: "https://www.chess.com/game/live/123456789" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review this game" }));
-    expect(await screen.findByText("BOARD A · YOUR BOARD")).toBeTruthy();
-    fireEvent.click(screen.getByTitle("Return to onboarding map"));
-    const libraryButtons = screen.getAllByRole("button", { name: "Learning library" }) as HTMLButtonElement[];
-    expect(libraryButtons.every((button) => !button.disabled)).toBe(true);
+    const statistics = screen.getByRole("button", { name: "Statistics", hidden: true }) as HTMLButtonElement;
+    expect(statistics.disabled).toBe(true);
+    expect(statistics.classList.contains("capability-locked")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Guest Spawn/ }));
+    expect(statistics.disabled).toBe(false);
+    expect(statistics.classList.contains("capability-locked")).toBe(false);
+    const stored = JSON.parse(localStorage.getItem(GUEST_PROGRESS_KEY) ?? "{}") as { capabilities?: Record<string, string> };
+    expect(stored.capabilities?.rail_statistics).toBe("unlocked");
+    expect(apiMock.resolveGame).not.toHaveBeenCalled();
+    expect(apiMock.connectChessCom).not.toHaveBeenCalled();
   });
 
   it("requires and persists the versioned acknowledgement only when analysis is requested", async () => {
@@ -176,56 +168,15 @@ describe("URL-first exact review", () => {
     expect(screen.queryByRole("heading", { name: "Review the game you just played." })).toBeNull();
   });
 
-  it("opens a successful two-PGN import instead of returning the user to the archive", async () => {
+  it("validates and commits the username stub without network activity", () => {
     renderApp();
-    openAnalyzeNode();
-    fireEvent.click(screen.getByRole("button", { name: "Import both board PGNs" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Chess.com username" }), { target: { value: "FixtureUser" } });
-    fireEvent.change(screen.getByRole("textbox", { name: "Board A PGN" }), { target: { value: '[Variant "Bughouse"]\n[Result "1-0"]\n\n1. e4 1-0' } });
-    fireEvent.change(screen.getByRole("textbox", { name: "Board B PGN" }), { target: { value: '[Variant "Bughouse"]\n[Result "0-1"]\n\n1. d4 0-1' } });
-    fireEvent.click(screen.getByRole("button", { name: "Import complete game" }));
-
-    await waitFor(() => expect(apiMock.importPgn).toHaveBeenCalled());
-    await waitFor(() => expect(apiMock.game).toHaveBeenCalledWith(42));
-    expect(await screen.findByText("BOARD B · PARTNER BOARD")).toBeTruthy();
-    expect(new URLSearchParams(location.search).get("game")).toBe("42");
-    await waitFor(() => expect(apiMock.games.mock.calls.length).toBeGreaterThan(1));
-  });
-
-  it("keeps pgn-info enrichment as an advanced optional connector", async () => {
-    renderApp();
-    openAnalyzeNode();
-    fireEvent.click(screen.getByRole("button", { name: "Import both board PGNs" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Chess.com username" }), { target: { value: "FixtureUser" } });
-    fireEvent.click(screen.getByRole("button", { name: "Advanced pgn-info enrichment" }));
-
-    expect(screen.getByText("Recover partner boards from Chess.com pgn-info")).toBeTruthy();
-    expect(screen.getByRole("textbox", { name: "Codex setup prompt" })).toBeTruthy();
-    fireEvent.click(screen.getByText("Paste pgn-info cURL"));
-    fireEvent.change(screen.getByPlaceholderText("Paste the pgn-info cURL request"), {
-      target: { value: "curl 'https://www.chess.com/callback/game/pgn-info' -b 'session=fake' --data-raw '{\"_token\":\"fake\"}'" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Enrich existing games" }));
-
-    await waitFor(() => expect(apiMock.enrichChessCom).toHaveBeenCalledWith("FixtureUser", expect.stringContaining("pgn-info")));
-    expect(await screen.findByText("Checked 0 games. Enriched 0. Credentials stored: no.")).toBeTruthy();
-  });
-
-  it("keeps an exact not-found result in the entry state with a whitelisted fallback", async () => {
-    apiMock.resolveGame.mockRejectedValue(new ApiError(404, "That exact completed Bughouse game was not found in the available data.", {
-      code: "game_not_found",
-      external_game_id: "123456789",
-    }));
-    renderApp();
-    openAnalyzeNode();
-    fireEvent.change(screen.getByRole("textbox", { name: "Paste Chess.com game URL" }), {
-      target: { value: "https://www.chess.com/live/game/123456789" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Review this game" }));
-
-    expect(await screen.findByText("We could not open that exact game.")).toBeTruthy();
-    const fallback = screen.getByRole("link", { name: /Open this game in bMacho/ });
-    expect(fallback.getAttribute("href")).toBe("https://bmacho.github.io/bughouse-viewer/view.html?game_id=123456789");
-    expect(screen.queryByText("BOARD A · YOUR BOARD")).toBeNull();
+    const username = screen.getByRole("textbox", { name: /Username/ });
+    fireEvent.change(username, { target: { value: "Jimmy_42" } });
+    fireEvent.keyDown(username, { key: "Enter" });
+    const stored = JSON.parse(localStorage.getItem(GUEST_PROGRESS_KEY) ?? "{}") as { capabilities?: Record<string, string> };
+    expect(stored.capabilities?.rail_statistics).toBe("unlocked");
+    expect(apiMock.resolveGame).not.toHaveBeenCalled();
+    expect(apiMock.connectChessCom).not.toHaveBeenCalled();
+    expect(apiMock.importPgn).not.toHaveBeenCalled();
   });
 });
