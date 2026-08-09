@@ -161,7 +161,9 @@ def test_guest_list_filters_short_match_logs_counts_and_reuses_assembled_cache()
             payload = {"live_bughouse": [{"username": "Alpha"}, {"username": "Beta"}, {"username": "Gamma"}]}
         elif path.endswith("/games/archives"):
             username = path.split("/")[3]
-            payload = {"archives": [f"https://api.chess.com/pub/player/{username}/games/2026/08"]}
+            if username == "missing":
+                return httpx.Response(404, json={"code": 0, "message": "User not found"}, request=request)
+            payload = {"archives": [] if username == "nogames" else [f"https://api.chess.com/pub/player/{username}/games/2026/08"]}
         elif path.endswith("/games/2026/08"):
             username = path.split("/")[3]
             payload = {"games": [
@@ -173,6 +175,7 @@ def test_guest_list_filters_short_match_logs_counts_and_reuses_assembled_cache()
         return httpx.Response(200, json=payload, request=request)
 
     settings = Settings(
+        chesscom_players_of_interest="Missing, NoGames, Alpha, Beta",
         chesscom_guest_max_archives_per_player=1,
         chesscom_guest_max_matches_examined=10,
     )
@@ -185,9 +188,9 @@ def test_guest_list_filters_short_match_logs_counts_and_reuses_assembled_cache()
     assert first["examined"] == 6
     assert first["excluded"] == 1
     assert first["exclusion_counts"] == {"under_20_plies": 1}
-    assert first["players_sampled"] == ["Alpha", "Beta", "Gamma"]
+    assert first["players_sampled"] == ["Missing", "NoGames", "Alpha", "Beta", "Gamma"]
     assert first["players_represented"] == ["Alpha", "Beta", "Gamma"]
-    assert first["seed_source"] == "leaderboard_top_50"
+    assert first["seed_source"] == "players_of_interest_then_leaderboard_top_50"
     assert sum(1 for match in first["matches"] if match["game_ids"]["A"] in games_by_player["alpha"]) == 2
     assert sum(1 for match in first["matches"] if match["game_ids"]["A"] in games_by_player["beta"]) == 2
     assert sum(1 for match in first["matches"] if match["game_ids"]["A"] in games_by_player["gamma"]) == 1
@@ -196,19 +199,12 @@ def test_guest_list_filters_short_match_logs_counts_and_reuses_assembled_cache()
     assert len(requests) == request_count
 
 
-def test_configured_players_of_interest_skip_leaderboard() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        raise AssertionError(f"Unexpected network request: {request.url}")
-
+def test_configured_players_of_interest_preserve_priority_order() -> None:
     service = ChessComMatchupService(
         Settings(chesscom_players_of_interest="Gamma, Alpha, Beta"),
-        transport=httpx.MockTransport(handler),
     )
 
-    usernames, source = asyncio.run(service._seed_usernames())
-
-    assert usernames == ["Gamma", "Alpha", "Beta"]
-    assert source == "players_of_interest"
+    assert service._configured_seed_usernames() == ["Gamma", "Alpha", "Beta"]
 
 
 def test_kill_switch_disables_match_and_guest_routes_before_network_access() -> None:

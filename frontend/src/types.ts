@@ -25,7 +25,7 @@ export interface GuestMatchupList {
   exclusion_counts: Record<string, number>;
   players_sampled: string[];
   players_represented: string[];
-  seed_source: "players_of_interest" | "leaderboard_top_50";
+  seed_source: "players_of_interest" | "leaderboard_top_50" | "players_of_interest_then_leaderboard_top_50";
   cached: boolean;
 }
 

@@ -143,7 +143,10 @@ class ChessComMatchupService:
         return cached
 
     async def _build_guest_matchups(self) -> dict[str, Any]:
-        usernames, seed_source = await self._seed_usernames()
+        usernames = self._configured_seed_usernames()
+        configured_count = len(usernames)
+        leaderboard_loaded = False
+        seed_source = "players_of_interest" if usernames else "leaderboard_top_50"
 
         matches: list[dict[str, Any]] = []
         examined = 0
@@ -153,12 +156,28 @@ class ChessComMatchupService:
         players_sampled: list[str] = []
         players_represented: list[str] = []
 
-        for username in usernames:
+        candidate_index = 0
+        while len(matches) < 5 and examined < self.settings.chesscom_guest_max_matches_examined:
+            if candidate_index >= len(usernames):
+                if leaderboard_loaded:
+                    break
+                leaderboard_usernames = await self._leaderboard_seed_usernames()
+                leaderboard_loaded = True
+                known = {username.lower() for username in usernames}
+                usernames.extend(username for username in leaderboard_usernames if username.lower() not in known)
+                seed_source = "players_of_interest_then_leaderboard_top_50" if configured_count else "leaderboard_top_50"
+                if candidate_index >= len(usernames):
+                    break
+            username = usernames[candidate_index]
+            candidate_index += 1
             players_sampled.append(username)
             qualifying_for_player = 0
-            archive_index = await self._get_json(
-                f"https://api.chess.com/pub/player/{username.lower()}/games/archives"
-            )
+            try:
+                archive_index = await self._get_json(
+                    f"https://api.chess.com/pub/player/{username.lower()}/games/archives"
+                )
+            except MatchUpstreamError:
+                continue
             archive_urls = archive_index.get("archives")
             if not isinstance(archive_urls, list):
                 _count(excluded, "archive_shape")
@@ -172,7 +191,10 @@ class ChessComMatchupService:
                 if not _official_archive_url(archive_url, username):
                     _count(excluded, "archive_url")
                     continue
-                archive = await self._get_json(archive_url)
+                try:
+                    archive = await self._get_json(archive_url)
+                except MatchUpstreamError:
+                    continue
                 games = archive.get("games")
                 if not isinstance(games, list):
                     _count(excluded, "archive_shape")
@@ -244,16 +266,14 @@ class ChessComMatchupService:
             "cached": False,
         }
 
-    async def _seed_usernames(self) -> tuple[list[str], str]:
+    def _configured_seed_usernames(self) -> list[str]:
         configured = self.settings.chesscom_players_of_interest_list
-        if configured:
-            usernames = _unique_valid_usernames(configured)
-            if len(usernames) != len(configured):
-                raise MatchUpstreamError("Configured Chess.com players of interest are invalid or duplicated")
-            if len(usernames) < _MIN_REPRESENTED_SEED_PLAYERS:
-                raise MatchUpstreamError("At least three Chess.com players of interest are required")
-            return usernames, "players_of_interest"
+        usernames = _unique_valid_usernames(configured)
+        if len(usernames) != len(configured):
+            raise MatchUpstreamError("Configured Chess.com players of interest are invalid or duplicated")
+        return usernames
 
+    async def _leaderboard_seed_usernames(self) -> list[str]:
         leaderboard = await self._get_json(LEADERBOARD_URL)
         entries = leaderboard.get("live_bughouse")
         if not isinstance(entries, list):
@@ -265,7 +285,7 @@ class ChessComMatchupService:
         )
         if len(usernames) < _MIN_REPRESENTED_SEED_PLAYERS:
             raise MatchUpstreamError("Chess.com live bughouse leaderboard did not provide enough players")
-        return usernames, "leaderboard_top_50"
+        return usernames
 
     async def _callback(self, identifier: str) -> dict[str, Any]:
         if not (identifier.isdigit() or _UUID_RE.fullmatch(identifier)):

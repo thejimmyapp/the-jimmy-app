@@ -11,6 +11,41 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
+DEFAULT_CHESSCOM_PLAYERS_OF_INTEREST = ",".join((
+    "RyanTime",
+    "sassystacks30",
+    "Wakatakakagi",
+    "salodavid",
+    "NikhilDhalla",
+    "OldStar357",
+    "Elaina_defense",
+    "Ronaldo7899",
+    "tickeroftime",
+    "Knight-m4re",
+    "mcbcflute",
+    "josh_leonard",
+    "DontKno",
+    "partyrock45",
+    "TopGunSac",
+    "LollyWen",
+    "al388",
+    "Kengyry",
+    "Ziordl",
+    "Rafael_Ventura",
+    "shexman",
+    "dedefave",
+    "1038tjc9wtg",
+    "JarlCarlander",
+    "111Michael",
+    "AllenChiverson",
+    "nimzoman13",
+    "SuperAwesomeSarthak",
+    "Dielie",
+    "Thebluetime",
+    "XxElproxX2nd",
+    "chessexclam",
+))
+
 
 def _runtime_data_dir() -> Path:
     mount = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
@@ -42,7 +77,7 @@ class Settings(BaseSettings):
     chesscom_match_proxy_enabled: bool = True
     chesscom_match_timeout_seconds: float = Field(default=12.0, ge=1, le=30)
     chesscom_match_cache_ttl_seconds: int = Field(default=900, ge=60, le=86_400)
-    chesscom_players_of_interest: str = ""
+    chesscom_players_of_interest: str = DEFAULT_CHESSCOM_PLAYERS_OF_INTEREST
     chesscom_guest_max_archives_per_player: int = Field(default=2, ge=1, le=6)
     chesscom_guest_max_matches_examined: int = Field(default=40, ge=5, le=200)
     chesscom_oauth_callback_url: str = (
