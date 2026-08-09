@@ -1,0 +1,388 @@
+.extraction-page {
+  --extraction-accent: #55e6ff;
+  --extraction-accent-soft: rgb(85 230 255 / 14%);
+  --extraction-bg: #080b10;
+  --extraction-border: #27313d;
+  --extraction-error: #ff8c9d;
+  --extraction-muted: #8e9aa8;
+  --extraction-panel: #10161e;
+  --extraction-panel-raised: #151d27;
+  --extraction-text: #edf8fc;
+  background:
+    radial-gradient(circle at 50% -20%, rgb(36 126 148 / 30%), transparent 46%),
+    var(--extraction-bg);
+  color: var(--extraction-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 100vh;
+  padding: 64px 24px 96px;
+}
+
+.extraction-page *,
+.extraction-page *::before,
+.extraction-page *::after {
+  box-sizing: border-box;
+}
+
+.extraction-page button,
+.extraction-page input {
+  font: inherit;
+}
+
+.extraction-page button,
+.extraction-player__links a {
+  background: var(--extraction-accent);
+  border: 1px solid var(--extraction-accent);
+  border-radius: 8px;
+  color: #041015;
+  cursor: pointer;
+  font-weight: 750;
+  padding: 12px 18px;
+  text-decoration: none;
+}
+
+.extraction-page button:hover,
+.extraction-player__links a:hover {
+  filter: brightness(1.1);
+}
+
+.extraction-page button:focus-visible,
+.extraction-page input:focus-visible,
+.extraction-page summary:focus-visible,
+.extraction-page a:focus-visible {
+  outline: 3px solid rgb(85 230 255 / 42%);
+  outline-offset: 3px;
+}
+
+.extraction-page__content {
+  margin: 0 auto;
+  max-width: 1080px;
+}
+
+.extraction-hero {
+  margin: 0 auto 36px;
+  max-width: 780px;
+  text-align: center;
+}
+
+.extraction-kicker,
+.extraction-section-heading > span,
+.extraction-moment > div > span {
+  color: var(--extraction-accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.extraction-hero h1 {
+  font-size: clamp(2rem, 6vw, 4.5rem);
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  margin: 16px 0 18px;
+}
+
+.extraction-hero p,
+.extraction-section-heading p,
+.extraction-moment p {
+  color: var(--extraction-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.extraction-search,
+.extraction-result {
+  background: rgb(16 22 30 / 92%);
+  border: 1px solid var(--extraction-border);
+  border-radius: 16px;
+  box-shadow: 0 30px 70px rgb(0 0 0 / 25%);
+}
+
+.extraction-search {
+  margin: 0 auto;
+  max-width: 900px;
+  padding: 20px;
+}
+
+.extraction-search label,
+.extraction-moment label,
+.extraction-share label {
+  color: var(--extraction-muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.extraction-search__row,
+.extraction-moment__row,
+.extraction-share__row {
+  display: flex;
+  gap: 10px;
+}
+
+.extraction-page input {
+  background: #080c12;
+  border: 1px solid #344252;
+  border-radius: 8px;
+  color: var(--extraction-text);
+  min-width: 0;
+  padding: 13px 15px;
+  width: 100%;
+}
+
+.extraction-page input::placeholder {
+  color: #697685;
+  opacity: 1;
+}
+
+.extraction-message {
+  background: var(--extraction-accent-soft);
+  border: 1px solid rgb(85 230 255 / 28%);
+  border-radius: 10px;
+  color: var(--extraction-text);
+  margin: 16px auto 0;
+  max-width: 900px;
+  padding: 12px 14px;
+}
+
+.extraction-message.is-error {
+  background: rgb(255 140 157 / 9%);
+  border-color: rgb(255 140 157 / 35%);
+  color: var(--extraction-error);
+}
+
+.extraction-result {
+  margin-top: 28px;
+  padding: clamp(22px, 4vw, 40px);
+}
+
+.extraction-section-heading h2 {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  letter-spacing: -0.035em;
+  margin: 8px 0 0;
+}
+
+.extraction-matchup-card {
+  background: linear-gradient(135deg, var(--extraction-accent-soft), transparent 70%);
+  border: 1px solid rgb(85 230 255 / 45%);
+  border-radius: 12px;
+  color: var(--extraction-text);
+  font-size: clamp(1rem, 2.4vw, 1.35rem);
+  font-weight: 800;
+  margin-top: 28px;
+  padding: 20px;
+}
+
+.extraction-teams {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.extraction-team {
+  background: var(--extraction-panel-raised);
+  border: 1px solid var(--extraction-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.extraction-team h3 {
+  color: var(--extraction-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 12px;
+  text-transform: uppercase;
+}
+
+.extraction-team__seats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.extraction-seat {
+  background: #0b1017;
+  border: 1px solid #202a35;
+  border-radius: 9px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 13px;
+}
+
+.extraction-seat.is-loser {
+  border-color: rgb(255 140 157 / 58%);
+}
+
+.extraction-seat span,
+.extraction-seat small,
+.extraction-seat em {
+  color: var(--extraction-muted);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.extraction-seat strong {
+  overflow-wrap: anywhere;
+}
+
+.extraction-seat em {
+  color: var(--extraction-error);
+}
+
+.extraction-facts {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 14px 0 0;
+}
+
+.extraction-facts div,
+.extraction-player__facts div {
+  background: #0b1017;
+  border: 1px solid #202a35;
+  border-radius: 9px;
+  padding: 13px;
+}
+
+.extraction-facts dt,
+.extraction-player__facts dt {
+  color: var(--extraction-muted);
+  font-size: 0.72rem;
+  margin-bottom: 6px;
+}
+
+.extraction-facts dd,
+.extraction-player__facts dd {
+  font-weight: 750;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.extraction-moment,
+.extraction-json {
+  background: #0b1017;
+  border: 1px solid var(--extraction-border);
+  border-radius: 12px;
+  margin-top: 18px;
+  padding: 20px;
+}
+
+.extraction-moment {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1.2fr);
+}
+
+.extraction-moment h3 {
+  margin: 6px 0;
+}
+
+.extraction-moment .extraction-message,
+.extraction-share {
+  grid-column: 1 / -1;
+  margin: 0;
+  max-width: none;
+}
+
+.extraction-share__row input {
+  color: var(--extraction-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.extraction-share p {
+  color: var(--extraction-accent);
+  margin: 8px 0 0;
+}
+
+.extraction-json summary {
+  color: var(--extraction-accent);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.extraction-json pre {
+  color: #bdcbd4;
+  font: 0.78rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin: 18px 0 0;
+  max-height: 520px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.extraction-player__body {
+  align-items: center;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 120px 1fr;
+  margin-top: 28px;
+}
+
+.extraction-player__body img,
+.extraction-avatar-placeholder {
+  aspect-ratio: 1;
+  border: 1px solid var(--extraction-border);
+  border-radius: 16px;
+  object-fit: cover;
+  width: 120px;
+}
+
+.extraction-avatar-placeholder {
+  align-items: center;
+  background: var(--extraction-accent-soft);
+  color: var(--extraction-accent);
+  display: flex;
+  font-size: 3rem;
+  font-weight: 800;
+  justify-content: center;
+}
+
+.extraction-player__facts {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.extraction-player__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.extraction-player__links a:last-child {
+  background: transparent;
+  color: var(--extraction-accent);
+}
+
+@media (max-width: 760px) {
+  .extraction-page {
+    padding: 36px 14px 64px;
+  }
+
+  .extraction-search__row,
+  .extraction-moment__row,
+  .extraction-share__row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .extraction-teams,
+  .extraction-moment,
+  .extraction-player__body,
+  .extraction-player__facts {
+    grid-template-columns: 1fr;
+  }
+
+  .extraction-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .extraction-team__seats,
+  .extraction-facts {
+    grid-template-columns: 1fr;
+  }
+}
