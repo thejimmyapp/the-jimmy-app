@@ -50,6 +50,15 @@ export function ExtractionPage() {
             game URL: id {recognized.gameId}
             {recognized.perspective ? `, perspective ${recognized.perspective}` : ""}
           </p>
+        ) : recognized?.kind === "viewer" ? (
+          <p className="extraction-page__result">
+            viewer URL: game id {recognized.gameId}
+            {recognized.moveAddress ? `, move address ${recognized.moveAddress}` : ""}
+          </p>
+        ) : recognized?.kind === "move" ? (
+          <p className="extraction-page__result">
+            move address: {recognized.moveAddress}
+          </p>
         ) : recognized?.kind === "invalid" ? (
           <p className="extraction-page__result">unrecognized input</p>
         ) : null}

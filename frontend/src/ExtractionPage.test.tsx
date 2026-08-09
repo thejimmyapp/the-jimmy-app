@@ -22,6 +22,33 @@ describe("parseExtractionInput", () => {
       perspective: "fearingforfreddy",
     });
   });
+
+  it("recognizes a viewer URL with a move address", () => {
+    expect(
+      parseExtractionInput(
+        "https://bmacho.github.io/bughouse-viewer/view.html?game_id=180565671769&move=23b",
+      ),
+    ).toEqual({
+      kind: "viewer",
+      gameId: "180565671769",
+      moveAddress: "23b",
+    });
+  });
+
+  it("recognizes a standalone move address", () => {
+    expect(parseExtractionInput("23b")).toEqual({
+      kind: "move",
+      moveAddress: "23b",
+    });
+  });
+
+  it("rejects non-canonical move addresses", () => {
+    expect(
+      parseExtractionInput(
+        "https://bmacho.github.io/bughouse-viewer/view.html?game_id=180565671769&move=23.b",
+      ),
+    ).toEqual({ kind: "invalid" });
+  });
 });
 
 describe("ExtractionPage", () => {
@@ -44,5 +71,22 @@ describe("ExtractionPage", () => {
         "game URL: id 180565671769, perspective fearingforfreddy",
       ),
     ).toBeTruthy();
+
+    fireEvent.change(input, {
+      target: {
+        value:
+          "https://bmacho.github.io/bughouse-viewer/view.html?game_id=180565671769&move=23b",
+      },
+    });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(
+      screen.getByText(
+        "viewer URL: game id 180565671769, move address 23b",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: "23b" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByText("move address: 23b")).toBeTruthy();
   });
 });
