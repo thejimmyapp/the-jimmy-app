@@ -4,6 +4,7 @@ import asyncio
 from copy import deepcopy
 from dataclasses import dataclass
 import logging
+import math
 import re
 import time
 from collections.abc import Iterable
@@ -113,6 +114,20 @@ class ChessComMatchupService:
         self._match_cache[board_a["id"]] = entry
         self._match_cache[board_b["id"]] = entry
         return deepcopy(normalized)
+
+    async def replay_source(self, numeric_id: int) -> dict[str, Any]:
+        """Return the minimal validated callback fields needed by the client decoder."""
+        normalized = await self.normalized_match(numeric_id)
+        cached = self._fresh_match_cache(numeric_id)
+        if cached is None:  # Defensive: normalized_match always stores a fresh pair.
+            raise MatchUpstreamError("Chess.com match replay cache was unavailable")
+        return {
+            "match": normalized,
+            "boards": {
+                "A": _replay_board_payload(cached.raw_board_a),
+                "B": _replay_board_payload(cached.raw_board_b),
+            },
+        }
 
     async def guest_matchups(self) -> dict[str, Any]:
         self._ensure_enabled()
@@ -365,6 +380,49 @@ def _validated_board(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _replay_board_payload(raw: dict[str, Any]) -> dict[str, Any]:
+    validated = _validated_board(raw)
+    game = raw["game"]
+    headers = game.get("pgnHeaders")
+    base_time = _strict_number(game.get("baseTime1"))
+    increment = _strict_number(game.get("timeIncrement1"))
+    initial_fen = headers.get("FEN") if isinstance(headers, dict) else None
+    move_list = game["moveList"]
+    move_timestamps = game["moveTimestamps"]
+    if (
+        base_time is None
+        or base_time < 0
+        or increment is None
+        or increment < 0
+        or not isinstance(initial_fen, str)
+        or not initial_fen.strip()
+        or len(move_list) != validated["ply_count"] * 2
+    ):
+        raise MatchExcludedError("callback_replay_shape")
+    timestamps = move_timestamps.split(",") if move_timestamps else []
+    if len(timestamps) not in {validated["ply_count"], validated["ply_count"] + 1} or any(
+        not value.isdigit() for value in timestamps
+    ):
+        raise MatchExcludedError("callback_replay_shape")
+    safe_headers = {
+        key: headers.get(key)
+        for key in ("White", "Black", "WhiteElo", "BlackElo", "Date", "EndTime", "Result", "TimeControl")
+        if isinstance(headers.get(key), (str, int))
+    }
+    return {
+        "id": validated["id"],
+        "uuid": validated["uuid"],
+        "partnerGameId": validated["partner_uuid"],
+        "moveList": move_list,
+        "moveTimestamps": move_timestamps,
+        "plyCount": validated["ply_count"],
+        "baseTime1": base_time,
+        "timeIncrement1": increment,
+        "initialFen": initial_fen,
+        "headers": safe_headers,
+    }
+
+
 def _normalize_boards(board_a: dict[str, Any], board_b: dict[str, Any]) -> dict[str, Any]:
     reason_a = board_a["reason"]
     reason_b = board_b["reason"]
@@ -434,6 +492,12 @@ def _relative_seat(origin: str, target: str) -> str | None:
 
 def _strict_int(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _strict_number(value: Any) -> int | float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    return value
 
 
 def _unique_valid_usernames(values: Iterable[Any]) -> list[str]:

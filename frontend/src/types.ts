@@ -29,12 +29,31 @@ export interface GuestMatchupList {
   cached: boolean;
 }
 
+export interface CallbackReplayBoard {
+  id: number;
+  uuid: string;
+  partnerGameId: string;
+  moveList: string;
+  moveTimestamps: string;
+  plyCount: number;
+  baseTime1: number;
+  timeIncrement1: number;
+  initialFen: string;
+  headers: Partial<Record<"White" | "Black" | "WhiteElo" | "BlackElo" | "Date" | "EndTime" | "Result" | "TimeControl", string | number>>;
+}
+
+export interface GuestMatchReplaySource {
+  match: NormalizedMatch;
+  boards: Record<BoardId, CallbackReplayBoard>;
+}
+
 export interface ReplayPosition {
   ply: number;
   label: string;
   board: string[][];
   side_to_move: string;
   variant_fen: string;
+  fen?: string;
   white_pocket: string;
   black_pocket: string;
   white_clock: string;
@@ -75,6 +94,10 @@ export interface GamePayload {
   timeline: Array<{ global_ply: number; board: BoardId; local_ply: number; move: string; board_a: ReplayPosition; board_b: ReplayPosition }>;
   second_board_available: boolean;
   limitations: string[];
+  cross_board_ordering?: {
+    method: "exact" | "clock-inferred";
+    exact: boolean;
+  };
   outcome: {
     summary: string;
     detail: string;

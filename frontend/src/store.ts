@@ -25,6 +25,7 @@ interface CoachState {
   setGames: (games: GameSummary[]) => void;
   setGame: (game: GamePayload | null) => void;
   setGuestMatch: (match: NormalizedMatch | null) => void;
+  setGuestReplay: (match: NormalizedMatch, game: GamePayload) => void;
   seek: (ply: number) => void;
   applyExploration: (boardA: ReplayPosition, boardB: ReplayPosition | null, notation: string) => void;
   undoExploration: () => void;
@@ -65,6 +66,7 @@ export const useCoachStore = create<CoachState>((set) => ({
   setGames: (games) => set({ games }),
   setGame: (game) => set({ game, guestMatch: null, globalPly: 0, mode: "review", explorationStartPly: null, explorationPositions: null, explorationHistory: [], explorationFuture: [], variationMoves: [], variationFutureMoves: [] }),
   setGuestMatch: (guestMatch) => set({ guestMatch, game: null, globalPly: 0, mode: "review", explorationStartPly: null, explorationPositions: null, explorationHistory: [], explorationFuture: [], variationMoves: [], variationFutureMoves: [] }),
+  setGuestReplay: (guestMatch, game) => set({ guestMatch, game, globalPly: 0, mode: "review", explorationStartPly: null, explorationPositions: null, explorationHistory: [], explorationFuture: [], variationMoves: [], variationFutureMoves: [] }),
   seek: (globalPly) => set({ globalPly, mode: "review", explorationStartPly: null, explorationPositions: null, explorationHistory: [], explorationFuture: [], variationMoves: [], variationFutureMoves: [] }),
   applyExploration: (boardA, boardB, notation) => set((state) => ({
     mode: "exploration",

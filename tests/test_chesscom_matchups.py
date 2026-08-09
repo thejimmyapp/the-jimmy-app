@@ -36,6 +36,17 @@ def callback_board(
             "colorOfWinner": winner,
             "moveList": "aa" * plies,
             "moveTimestamps": ",".join("100" for _ in range(plies + 1)),
+            "baseTime1": 1800,
+            "timeIncrement1": 0.0,
+            "pgnHeaders": {
+                "FEN": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                "White": white[0],
+                "Black": black[0],
+                "WhiteElo": white[1],
+                "BlackElo": black[1],
+                "Result": "1-0" if winner == "white" else "0-1",
+                "TimeControl": "180",
+            },
             "resultMessage": result_message,
         },
         "players": {
@@ -102,6 +113,32 @@ def test_match_proxy_fetches_partner_sequentially_normalizes_and_caches_raw_pair
     }
     assert "resultMessage" not in match
     assert service._match_cache[180443871315].raw_board_a["game"]["resultMessage"] == "ignored free-form text"
+
+    replay = asyncio.run(service.replay_source(180443871315))
+    assert requests == [
+        "/callback/live/game/180443871315",
+        f"/callback/live/game/{partner_uuid}",
+    ]
+    assert replay["match"] == match
+    assert replay["boards"]["A"] == {
+        "id": 180443871315,
+        "uuid": primary_uuid,
+        "partnerGameId": partner_uuid,
+        "moveList": "aa" * 71,
+        "moveTimestamps": ",".join("100" for _ in range(72)),
+        "plyCount": 71,
+        "baseTime1": 1800,
+        "timeIncrement1": 0,
+        "initialFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "headers": {
+            "White": "vjbaker",
+            "Black": "larso",
+            "WhiteElo": 2799,
+            "BlackElo": 2677,
+            "Result": "0-1",
+            "TimeControl": "180",
+        },
+    }
 
 
 def test_match_proxy_fails_closed_for_unknown_terminal_code_even_if_message_looks_valid() -> None:

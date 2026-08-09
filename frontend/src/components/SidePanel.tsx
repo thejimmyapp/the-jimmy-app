@@ -57,12 +57,12 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
   }, [games, minRating, result, search, sort]);
 
   useEffect(() => {
-    if (game) {
-      setPrimaryTab("review");
-      setReviewTab("partner");
-    } else if (guestMatch) {
+    if (guestMatch) {
       setPrimaryTab("review");
       setReviewTab("moves");
+    } else if (game) {
+      setPrimaryTab("review");
+      setReviewTab("partner");
     }
   }, [game, guestMatch]);
 

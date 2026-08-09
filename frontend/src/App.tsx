@@ -3,6 +3,7 @@ import { AlertTriangle, BarChart3, Bot, Check, Copy, ExternalLink, FileInput, Ho
 import { CSSProperties, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./api";
+import { MatchReconstructionError, reconstructGuestMatch } from "./bughouseDecoder";
 import { buildChessComConnectorPrompt } from "./chesscomConnectorPrompt";
 import { bmachoUrlFromChessComUrl } from "./chesscomGameUrl";
 import { BoardPanel } from "./components/BoardPanel";
@@ -68,7 +69,7 @@ const initialPieceSize = (): PieceSizeId => {
 export default function App() {
   const store = useCoachStore();
   const queryClient = useQueryClient();
-  const { roomId, username, setGame, setGuestMatch, setRoom } = store;
+  const { roomId, username, setGame, setGuestReplay, setRoom } = store;
   const joinedRoomRef = useRef<string | null>(null);
   const [boardTheme, setBoardTheme] = useState<BoardThemeId>(initialBoardTheme);
   const [pieceStyle, setPieceStyle] = useState<PieceStyleId>(initialPieceStyle);
@@ -226,12 +227,17 @@ export default function App() {
     setOnboardingPhase("matchups");
   }, []);
 
-  const onUsernameSubmit = useCallback((_username: string) => {
+  const onUsernameSubmit = useCallback(() => {
     // Username lookup remains a named, syntactically validated stub.
   }, []);
 
-  const selectGuestMatch = useCallback((match: NormalizedMatch) => {
-    setGuestMatch(match);
+  const selectGuestMatch = useCallback(async (match: NormalizedMatch) => {
+    const source = await api.chessComMatchReplay(match.game_ids.A);
+    if (source.match.game_ids.A !== match.game_ids.A || source.match.game_ids.B !== match.game_ids.B) {
+      throw new MatchReconstructionError("invalid_partner_link", "The selected matchup changed while its replay was loading.");
+    }
+    const replay = reconstructGuestMatch(source);
+    setGuestReplay(source.match, replay.game);
     setView("review");
     updateGuestProgress((current) => ({
       ...current,
@@ -243,7 +249,7 @@ export default function App() {
         dock_review: "unlocked",
       },
     }));
-  }, [setGuestMatch, updateGuestProgress]);
+  }, [setGuestReplay, updateGuestProgress]);
 
   const toggleCurrentLesson = () => {
     if (!store.game || !store.game.lesson) return;
@@ -306,7 +312,7 @@ export default function App() {
     {store.game.lesson && <ReviewLesson lesson={store.game.lesson} saved={lessonSaved} onToggleSave={toggleCurrentLesson} onReview={(globalPly) => { store.seek(globalPly); sendRoomEvent("timeline.seek", { global_ply: globalPly }); }} />}
     {integrityNotices.length > 0 && <div className="replay-integrity" role="status"><AlertTriangle size={15} /><strong>REPLAY LIMITS</strong><span>{integrityNotices.join(" ")}</span></div>}
     <AnalysisLimitations compact />
-    <section className="game-metadata"><span>GAME METADATA</span><dl><div><dt>Game</dt><dd>{store.game.game.id}</dd></div><div><dt>Played</dt><dd>{String(store.game.game.played_at ?? "Unknown").slice(0, 10)}</dd></div><div><dt>Result</dt><dd>{String(store.game.game.result ?? "Unknown")}</dd></div><div><dt>Two-board replay</dt><dd>{store.game.second_board_available ? "Available" : "Unavailable"}</dd></div></dl></section>
+    <section className="game-metadata"><span>GAME METADATA</span><dl><div><dt>Game</dt><dd>{store.game.game.id}</dd></div><div><dt>Played</dt><dd>{String(store.game.game.played_at ?? "Unknown").slice(0, 10)}</dd></div><div><dt>Result</dt><dd>{String(store.game.game.result ?? "Unknown")}</dd></div><div><dt>Two-board replay</dt><dd>{store.game.second_board_available ? "Available" : "Unavailable"}</dd></div>{store.game.cross_board_ordering && <div><dt>Cross-board order</dt><dd>{store.game.cross_board_ordering.exact ? "Exact" : "Clock-inferred (not exact)"}</dd></div>}</dl></section>
     <p className="zoom-note">Board sizing is designed to work best at 175% browser zoom, matching the Chess.com Bughouse play page.</p>
   </> : <div className="empty-panel">Select a game to see review information.</div>;
   const capabilityLocked = (key: CapabilityKey) => isCapabilityLocked(guestProgress.capabilities, key);
@@ -333,7 +339,7 @@ export default function App() {
       stage={showOnboarding ? (onboardingPhase === "entry" ? <OnboardingMap onGuestSpawn={onGuestSpawn} onUsernameSubmit={onUsernameSubmit} /> : <GuestMatchupList onSelect={selectGuestMatch} />) : view === "review" ? <section className="workspace">
         <div className={`boards-zone ${store.game ? "has-game" : ""}`}>
           {store.mode === "exploration" && <div className="stage-actions"><button title="Undo exploration move" onClick={store.undoExploration}><Undo2 size={16} /></button>{store.explorationFuture.length > 0 && <button title="Redo exploration move" onClick={store.redoExploration}><Redo2 size={16} /></button>}<button title="Return to game" onClick={() => { store.returnToGame(); sendRoomEvent("variation.return_to_game", {}); }}><RotateCcw size={16} /></button></div>}
-          {store.game ? <div className="boards-grid"><BoardPanel boardId="A" position={boardA} orientation={userIsWhite ? "white" : "black"} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} title="BOARD A · YOUR BOARD" playerTop={userIsWhite ? players?.board_a_black ?? "Opponent" : players?.board_a_white ?? "Opponent"} playerBottom={userIsWhite ? players?.board_a_white ?? store.username : players?.board_a_black ?? store.username} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}
+          {store.game ? <div className="boards-grid"><BoardPanel boardId="A" position={boardA} orientation={userIsWhite ? "white" : "black"} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} title={store.guestMatch ? "BOARD A · GUEST MATCH" : "BOARD A · YOUR BOARD"} playerTop={userIsWhite ? players?.board_a_black ?? "Opponent" : players?.board_a_white ?? "Opponent"} playerBottom={userIsWhite ? players?.board_a_white ?? store.username : players?.board_a_black ?? store.username} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}
         </div>
       </section> : <StatsDashboard username={store.username} />}
       dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} infoContent={reviewInfo} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button className="coach-button" title="Run the coupled Bughouse coaching pipeline" onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach</button>}</> : undefined} partnerContent={store.game ? <BoardPanel boardId="B" position={boardB} orientation={userIsWhite ? "black" : "white"} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} title="BOARD B · PARTNER BOARD" playerTop={secondBoardAvailable ? (userIsWhite ? players?.board_b_white ?? "Diagonal Opponent Unknown" : players?.board_b_black ?? "Diagonal Opponent Unknown") : "Diagonal Opponent Unknown"} playerBottom={secondBoardAvailable ? (userIsWhite ? players?.board_b_black ?? "Partner Unknown" : players?.board_b_white ?? "Partner Unknown") : "Partner Unknown"} unavailable={!secondBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : <div className="empty-panel">Complete onboarding to open review tools.</div>} />}
