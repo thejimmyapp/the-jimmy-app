@@ -21,9 +21,11 @@ interface Props {
   onRemoveSavedLesson: (id: string) => void;
   onMap: () => void;
   initialTab?: PrimaryTab;
+  dockActions?: ReactNode;
+  dockPanel?: ReactNode;
 }
 
-export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review" }: Props) {
+export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review", dockActions, dockPanel }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
   const [reviewTab, setReviewTab] = useState<ReviewTab>("partner");
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
@@ -96,7 +98,7 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
 
   return (
     <aside className="side-panel utility-panel" aria-label="Review utility panel">
-      <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><button type="button" onClick={onMap}><Home size={13} /> Map</button></div>
+      <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><div className="utility-titlebar-actions">{dockActions}<button type="button" onClick={onMap}><Home size={13} /> Map</button></div></div>
       <div className="utility-primary-tabs" role="tablist" aria-label="Review tools">
         {(["review", "games", "library", "collaborate"] as PrimaryTab[]).map((tab) => <button key={tab} role="tab" aria-selected={primaryTab === tab} className={primaryTab === tab ? "active" : ""} onClick={() => choosePrimary(tab)}>{tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</> : tab[0].toUpperCase() + tab.slice(1)}</button>)}
       </div>
@@ -110,7 +112,7 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
 
       <div className={`utility-pane partner-pane ${primaryTab === "review" && reviewTab === "partner" ? "active" : ""}`} aria-hidden={!(primaryTab === "review" && reviewTab === "partner")}>{partnerContent}</div>
 
-      {primaryTab === "review" && reviewTab === "moves" && <div className="utility-pane moves-pane"><Timeline variant="panel" /></div>}
+      <div className={`utility-pane moves-pane ${primaryTab === "review" && reviewTab === "moves" ? "active" : "inactive"}`} aria-hidden={!(primaryTab === "review" && reviewTab === "moves")}><Timeline variant="panel" /></div>
       {primaryTab === "review" && reviewTab === "info" && <div className="utility-pane info-pane">{infoContent}</div>}
 
       {primaryTab === "games" && <div className="utility-pane games-pane">
@@ -148,6 +150,7 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
         <div className="message-list">{collaborateTab === "chat" ? messages.map((item) => <article key={item.id}><header><strong>{item.author}</strong><button title="Go to referenced move">A · {item.ply}</button></header><p>{item.content}</p></article>) : <div className="empty-panel">Notes attached to this room and move appear here.</div>}</div>
         <form className="composer" onSubmit={submit}><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={collaborateTab === "chat" ? "Message your partner" : "Add a shared note"} maxLength={5000} /><button aria-label="Send"><Send size={17} /></button></form>
       </div>}
+      {dockPanel && <div className="dock-panel-overlay">{dockPanel}</div>}
     </aside>
   );
 }

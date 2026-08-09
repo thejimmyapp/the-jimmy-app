@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BarChart3, Bot, Check, Copy, ExternalLink, FileInput, Home, LogOut, Palette, Radio, Redo2, RotateCcw, Settings, ShieldCheck, Swords, Undo2, UserRoundPlus, Users, X } from "lucide-react";
+import { AlertTriangle, BarChart3, Bot, Check, Copy, ExternalLink, FileInput, Home, LogOut, MoreHorizontal, Palette, Radio, Redo2, RotateCcw, Settings, ShieldCheck, Swords, Undo2, UserRoundPlus, Users, X } from "lucide-react";
 import { CSSProperties, FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, ApiError } from "./api";
 import { buildChessComConnectorPrompt } from "./chesscomConnectorPrompt";
 import { bmachoUrlForGameId, bmachoUrlFromChessComUrl } from "./chesscomGameUrl";
 import { BoardPanel } from "./components/BoardPanel";
+import { AppShell } from "./components/AppShell";
 import { AnalysisAcknowledgement, AnalysisLimitations } from "./components/AnalysisAcknowledgement";
 import { LegalLinks } from "./components/LegalLinks";
 import { OnboardingMap } from "./components/OnboardingMap";
@@ -294,40 +296,39 @@ export default function App() {
     <section className="game-metadata"><span>GAME METADATA</span><dl><div><dt>Game</dt><dd>{store.game.game.id}</dd></div><div><dt>Played</dt><dd>{String(store.game.game.played_at ?? "Unknown").slice(0, 10)}</dd></div><div><dt>Result</dt><dd>{String(store.game.game.result ?? "Unknown")}</dd></div><div><dt>Two-board replay</dt><dd>{store.game.second_board_available ? "Available" : "Unavailable"}</dd></div></dl></section>
     <p className="zoom-note">Board sizing is designed to work best at 175% browser zoom, matching the Chess.com Bughouse play page.</p>
   </> : <div className="empty-panel">Select a game to see review information.</div>;
+  const showDock = Boolean(store.game) && !showOnboardingMap;
   return (
-    <main className={`app-shell ${view === "stats" ? "stats-view" : ""} ${showOnboardingMap ? "review-entry-shell" : ""}`} data-board-theme={boardTheme} data-piece-style={pieceStyle} data-piece-size={pieceSize}>
-      <div className="small-screen-message" role="status"><strong>Widen the window to at least 992px to use The Jimmy App.</strong><span>Board sizing is designed to work best at 175% browser zoom, matching the Chess.com Bughouse play page.</span></div>
-      {!showOnboardingMap && <header className="app-header">
-        <div className="brand"><span className="brand-mark">J</span><div><strong>THE JIMMY APP</strong><small>COLLABORATIVE BUGHOUSE COACH</small></div></div>
-        <nav className="primary-nav" aria-label="Main views">
-          <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><Swords size={14} />Review</button>
-          <button className={view === "stats" ? "active" : ""} onClick={() => setView("stats")}><BarChart3 size={14} />Statistics</button>
+    <>
+    <AppShell
+      className={`${view === "stats" ? "stats-view" : ""} ${showOnboardingMap ? "review-entry-shell" : ""}`}
+      boardTheme={boardTheme}
+      pieceStyle={pieceStyle}
+      pieceSize={pieceSize}
+      rail={<>
+        <div className="rail-brand" title="The Jimmy App"><span className="brand-mark">J</span></div>
+        <nav className="rail-nav" aria-label="Main views">
+          <button className={view === "review" ? "active" : ""} aria-label="Review" title="Review" onClick={() => setView("review")}><Swords size={17} /></button>
+          <button className={view === "stats" ? "active" : ""} aria-label="Statistics" title="Statistics" onClick={() => setView("stats")}><BarChart3 size={17} /></button>
         </nav>
-        <div className="header-actions">
-          <LegalLinks />
-          <button className="icon-button map-button" title="Return to onboarding map" onClick={goToMap}><Home size={15} /> Map</button>
-          {store.mode === "exploration" && <button className="icon-button" title="Undo exploration move" onClick={store.undoExploration}><Undo2 size={16} /></button>}
-          {store.explorationFuture.length > 0 && <button className="icon-button" title="Redo exploration move" onClick={store.redoExploration}><Redo2 size={16} /></button>}
-          {store.mode === "exploration" && <button className="return-game" onClick={() => { store.returnToGame(); sendRoomEvent("variation.return_to_game", {}); }}><RotateCcw size={16} /> Return to move {store.explorationStartPly}</button>}
-          <button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>
-          {shareCopied && <span className="copy-confirm">Link copied</span>}
-          {roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}
-          {store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}
-          {view === "review" && <button className="coach-button" disabled={!store.game} title="Run the coupled Bughouse coaching pipeline" onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach</button>}
-          <button className="icon-button" title="Board settings" onClick={() => setSettingsOpen(true)}><Settings size={16} /></button>
-          <button className="connect-button" onClick={() => setConnectOpen(true)}><Radio size={15} /> {store.username || "Connect Chess.com"}</button>
+        <div className="rail-actions">
+          <button aria-label="Return to onboarding map" title="Return to onboarding map" onClick={goToMap}><Home size={17} /></button>
+          <button aria-label="Board settings" title="Board settings" disabled={!showDock} onClick={() => setSettingsOpen(true)}><Settings size={17} /></button>
+          <button aria-label="Connect Chess.com" title="Connect Chess.com" disabled={!showDock} onClick={() => setConnectOpen(true)}><Radio size={17} /></button>
         </div>
-      </header>}
-      {showOnboardingMap ? <OnboardingMap progress={guestProgress} onNodeChange={changeMapNode} onReset={resetGuestProgress} onImportBothBoards={openImport} onAdvancedRecovery={() => { setAuthenticatedOpen(true); setConnectOpen(true); }} reviewForm={<ReviewStart defaultUsername={store.username} pending={resolveMutation.isPending || restoredGameQuery.isFetching} errorMessage={resolutionError ?? (restoredGameQuery.error instanceof Error ? restoredGameQuery.error.message : undefined)} fallbackUrl={resolutionFallbackUrl} onReview={(url, requestedUsername) => resolveMutation.mutate({ url, username: requestedUsername })} onBrowseGames={() => setArchiveOpen(true)} onImportBothBoards={openImport} />} /> : view === "review" ? <><section className="workspace">
+        <details className="rail-overflow"><summary aria-label="More navigation" title="More navigation"><MoreHorizontal size={17} /></summary><LegalLinks /></details>
+      </>}
+      stage={showOnboardingMap ? <OnboardingMap progress={guestProgress} onNodeChange={changeMapNode} onReset={resetGuestProgress} onImportBothBoards={openImport} onAdvancedRecovery={() => { setAuthenticatedOpen(true); setConnectOpen(true); }} reviewForm={<ReviewStart defaultUsername={store.username} pending={resolveMutation.isPending || restoredGameQuery.isFetching} errorMessage={resolutionError ?? (restoredGameQuery.error instanceof Error ? restoredGameQuery.error.message : undefined)} fallbackUrl={resolutionFallbackUrl} onReview={(url, requestedUsername) => resolveMutation.mutate({ url, username: requestedUsername })} onBrowseGames={() => setArchiveOpen(true)} onImportBothBoards={openImport} />} /> : view === "review" ? <section className="workspace">
         <div className={`boards-zone ${store.game ? "has-game" : ""}`}>
+          {store.mode === "exploration" && <div className="stage-actions"><button title="Undo exploration move" onClick={store.undoExploration}><Undo2 size={16} /></button>{store.explorationFuture.length > 0 && <button title="Redo exploration move" onClick={store.redoExploration}><Redo2 size={16} /></button>}<button title="Return to game" onClick={() => { store.returnToGame(); sendRoomEvent("variation.return_to_game", {}); }}><RotateCcw size={16} /></button></div>}
           {store.game ? <div className="boards-grid"><BoardPanel boardId="A" position={boardA} orientation={userIsWhite ? "white" : "black"} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} title="BOARD A · YOUR BOARD" playerTop={userIsWhite ? players?.board_a_black ?? "Opponent" : players?.board_a_white ?? "Opponent"} playerBottom={userIsWhite ? players?.board_a_white ?? store.username : players?.board_a_black ?? store.username} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}
         </div>
-        <SidePanel initialTab={store.game ? "review" : "games"} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} infoContent={reviewInfo} partnerContent={store.game ? <BoardPanel boardId="B" position={boardB} orientation={userIsWhite ? "black" : "white"} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} title="BOARD B · PARTNER BOARD" playerTop={secondBoardAvailable ? (userIsWhite ? players?.board_b_white ?? "Diagonal Opponent Unknown" : players?.board_b_black ?? "Diagonal Opponent Unknown") : "Diagonal Opponent Unknown"} playerBottom={secondBoardAvailable ? (userIsWhite ? players?.board_b_black ?? "Partner Unknown" : players?.board_b_white ?? "Partner Unknown") : "Partner Unknown"} unavailable={!secondBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : <div className="empty-panel">Select a game to load Board B.</div>} />
-      </section><TeamCoach open={coachOpen} onClose={() => setCoachOpen(false)} boardA={boardA} boardB={boardB} /></> : <StatsDashboard username={store.username} />}
+      </section> : <StatsDashboard username={store.username} />}
+      dock={showDock ? <SidePanel initialTab="review" onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} infoContent={reviewInfo} dockActions={<><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button className="coach-button" disabled={!store.game} title="Run the coupled Bughouse coaching pipeline" onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach</button>}</>} partnerContent={<BoardPanel boardId="B" position={boardB} orientation={userIsWhite ? "black" : "white"} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} title="BOARD B · PARTNER BOARD" playerTop={secondBoardAvailable ? (userIsWhite ? players?.board_b_white ?? "Diagonal Opponent Unknown" : players?.board_b_black ?? "Diagonal Opponent Unknown") : "Diagonal Opponent Unknown"} playerBottom={secondBoardAvailable ? (userIsWhite ? players?.board_b_black ?? "Partner Unknown" : players?.board_b_white ?? "Partner Unknown") : "Partner Unknown"} unavailable={!secondBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} />} /> : undefined}
+    />
+    {showDock && <TeamCoach open={coachOpen} onClose={() => setCoachOpen(false)} boardA={boardA} boardB={boardB} />}
       <AnalysisAcknowledgement open={acknowledgementOpen} onClose={closeAcknowledgement} onContinue={continueAcknowledgement} />
-      {connectOpen && (
-        <div className="modal-backdrop" role="presentation">
-          <form className={`connect-modal ${manualImportOpen || authenticatedOpen ? "connector-mode" : ""}`} onSubmit={connect}>
+      {connectOpen && (document.getElementById("app-dock-panel") ?? document.getElementById("app-stage-panel")) && createPortal(
+          <form className={`connect-modal dock-tool-panel ${manualImportOpen || authenticatedOpen ? "connector-mode" : ""}`} onSubmit={connect}>
             <button type="button" className="modal-close" onClick={() => setConnectOpen(false)} aria-label="Close"><X /></button>
             <span className="modal-kicker">CHESS.COM CONNECTION</span>
             <h1>Connect your games</h1>
@@ -387,12 +388,10 @@ export default function App() {
               </section>
             )}
             {store.username && <button type="button" className="text-button" onClick={() => setConnectOpen(false)}><LogOut size={15} /> Continue as {store.username}</button>}
-          </form>
-        </div>
+          </form>, (document.getElementById("app-dock-panel") ?? document.getElementById("app-stage-panel"))!,
       )}
-      {settingsOpen && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="settings-modal" role="dialog" aria-label="Board settings">
+      {settingsOpen && (document.getElementById("app-dock-panel") ?? document.getElementById("app-stage-panel")) && createPortal(
+          <section className="settings-modal dock-tool-panel" role="dialog" aria-label="Board settings">
             <button type="button" className="modal-close" onClick={() => setSettingsOpen(false)} aria-label="Close"><X /></button>
             <span className="modal-kicker">BOARD SETTINGS</span>
             <h1>Board style</h1>
@@ -436,9 +435,8 @@ export default function App() {
               {pieceSizes.map((size) => <button key={size.id} className={pieceSize === size.id ? "active" : ""} type="button" onClick={() => choosePieceSize(size.id)}>{size.name}</button>)}
             </div>
             <button className="settings-done" type="button" onClick={() => setSettingsOpen(false)}><Palette size={15} /> Apply style</button>
-          </section>
-        </div>
+          </section>, (document.getElementById("app-dock-panel") ?? document.getElementById("app-stage-panel"))!,
       )}
-    </main>
+    </>
   );
 }
