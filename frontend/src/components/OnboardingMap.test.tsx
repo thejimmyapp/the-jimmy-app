@@ -30,7 +30,7 @@ describe("locked-shell onboarding", () => {
     const guest = screen.getByRole("button", { name: /Guest Spawn/ });
     const username = screen.getByRole("textbox", { name: /Username/ });
 
-    fireEvent.click(guest);
+    fireEvent.keyDown(guest, { key: "Enter" });
     expect(onGuestSpawn).toHaveBeenCalledOnce();
     fireEvent.change(username, { target: { value: "bad name" } });
     fireEvent.keyDown(username, { key: "Enter" });

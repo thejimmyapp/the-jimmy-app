@@ -9,6 +9,7 @@ import { BoardPanel } from "./components/BoardPanel";
 import { AppShell } from "./components/AppShell";
 import { AnalysisAcknowledgement, AnalysisLimitations } from "./components/AnalysisAcknowledgement";
 import { LegalLinks } from "./components/LegalLinks";
+import { GuestMatchupList } from "./components/GuestMatchupList";
 import { OnboardingMap } from "./components/OnboardingMap";
 import { ReviewLesson } from "./components/ReviewLesson";
 import { SidePanel } from "./components/SidePanel";
@@ -18,7 +19,7 @@ import { acceptAnalysisAcknowledgement, hasAnalysisAcknowledgement, isCapability
 import { applyRoomSnapshot, connectRoomSocket, sendRoomEvent } from "./socket";
 import { currentPosition, useCoachStore } from "./store";
 import { replayNotices } from "./replayIntegrity";
-import type { GameSummary } from "./types";
+import type { GameSummary, NormalizedMatch } from "./types";
 
 const boardThemes = [
   { id: "slate", name: "Slate", light: "#c8d2d8", dark: "#58717e", white: "#f7f5ed", black: "#17202b" },
@@ -67,7 +68,7 @@ const initialPieceSize = (): PieceSizeId => {
 export default function App() {
   const store = useCoachStore();
   const queryClient = useQueryClient();
-  const { roomId, username, setGame, setRoom } = store;
+  const { roomId, username, setGame, setGuestMatch, setRoom } = store;
   const joinedRoomRef = useRef<string | null>(null);
   const [boardTheme, setBoardTheme] = useState<BoardThemeId>(initialBoardTheme);
   const [pieceStyle, setPieceStyle] = useState<PieceStyleId>(initialPieceStyle);
@@ -87,6 +88,7 @@ export default function App() {
   const [shareCopied, setShareCopied] = useState(false);
   const [guestProgress, setGuestProgress] = useState<GuestProgress>(loadGuestProgress);
   const [acknowledgementOpen, setAcknowledgementOpen] = useState(false);
+  const [onboardingPhase, setOnboardingPhase] = useState<"entry" | "matchups">("entry");
   const analysisResolverRef = useRef<((accepted: boolean) => void) | null>(null);
   const [reviewGameId, setReviewGameId] = useState<number | null>(() => {
     if (store.roomId) return null;
@@ -214,26 +216,34 @@ export default function App() {
     window.setTimeout(() => setSetupPromptCopied(false), 1800);
   };
   const currentGameFallbackUrl = bmachoUrlFromChessComUrl(store.game?.game.url);
-  const showOnboardingMap = !store.game && !store.roomId && !archiveOpen && view === "review";
+  const showOnboarding = !store.game && !store.guestMatch && !store.roomId && !archiveOpen && view === "review";
   const qualifyingGames = qualifyingGameCount(guestProgress.savedLessons);
   const currentLesson = store.game?.lesson;
   const currentLessonId = store.game && currentLesson ? lessonStorageId(store.game.game.id, currentLesson) : null;
   const lessonSaved = Boolean(currentLessonId && guestProgress.savedLessons.some((item) => item.id === currentLessonId));
 
-  const unlockOnboardingProof = useCallback(() => {
-    updateGuestProgress((current) => ({
-      ...current,
-      capabilities: { ...current.capabilities, rail_statistics: "unlocked" },
-    }));
-  }, [updateGuestProgress]);
-
   const onGuestSpawn = useCallback(() => {
-    unlockOnboardingProof();
-  }, [unlockOnboardingProof]);
+    setOnboardingPhase("matchups");
+  }, []);
 
   const onUsernameSubmit = useCallback((_username: string) => {
-    unlockOnboardingProof();
-  }, [unlockOnboardingProof]);
+    // Username lookup remains a named, syntactically validated stub.
+  }, []);
+
+  const selectGuestMatch = useCallback((match: NormalizedMatch) => {
+    setGuestMatch(match);
+    setView("review");
+    updateGuestProgress((current) => ({
+      ...current,
+      firstGameOpened: true,
+      mapNode: "analyze",
+      capabilities: {
+        ...current.capabilities,
+        rail_review: "unlocked",
+        dock_review: "unlocked",
+      },
+    }));
+  }, [setGuestMatch, updateGuestProgress]);
 
   const toggleCurrentLesson = () => {
     if (!store.game || !store.game.lesson) return;
@@ -261,7 +271,8 @@ export default function App() {
   };
 
   const goToMap = () => {
-    useCoachStore.setState({ game: null, roomId: null, participants: [], globalPly: 0 });
+    useCoachStore.setState({ game: null, guestMatch: null, roomId: null, participants: [], globalPly: 0 });
+    setOnboardingPhase("entry");
     setArchiveOpen(false);
     setView("review");
     setReviewGameId(null);
@@ -302,11 +313,11 @@ export default function App() {
   return (
     <>
     <AppShell
-      className={`${view === "stats" ? "stats-view" : ""} ${showOnboardingMap ? "review-entry-shell" : ""}`}
+      className={`${view === "stats" ? "stats-view" : ""} ${showOnboarding ? "review-entry-shell" : ""}`}
       boardTheme={boardTheme}
       pieceStyle={pieceStyle}
       pieceSize={pieceSize}
-      onboardingLocked={showOnboardingMap}
+      onboardingLocked={showOnboarding}
       rail={<>
         <div className={`rail-brand ${capabilityLocked("rail_onboarding") ? "capability-locked" : ""}`} title="The Jimmy App"><span className="brand-mark">J</span></div>
         <nav className="rail-nav" aria-label="Main views">
@@ -319,7 +330,7 @@ export default function App() {
           <button disabled={capabilityLocked("rail_chesscom")} className={capabilityLocked("rail_chesscom") ? "capability-locked" : ""} aria-label="Connect Chess.com" title="Connect Chess.com" onClick={() => setConnectOpen(true)}><Radio size={17} />{capabilityLocked("rail_chesscom") && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>
         </div>
       </>}
-      stage={showOnboardingMap ? <OnboardingMap onGuestSpawn={onGuestSpawn} onUsernameSubmit={onUsernameSubmit} /> : view === "review" ? <section className="workspace">
+      stage={showOnboarding ? (onboardingPhase === "entry" ? <OnboardingMap onGuestSpawn={onGuestSpawn} onUsernameSubmit={onUsernameSubmit} /> : <GuestMatchupList onSelect={selectGuestMatch} />) : view === "review" ? <section className="workspace">
         <div className={`boards-zone ${store.game ? "has-game" : ""}`}>
           {store.mode === "exploration" && <div className="stage-actions"><button title="Undo exploration move" onClick={store.undoExploration}><Undo2 size={16} /></button>{store.explorationFuture.length > 0 && <button title="Redo exploration move" onClick={store.redoExploration}><Redo2 size={16} /></button>}<button title="Return to game" onClick={() => { store.returnToGame(); sendRoomEvent("variation.return_to_game", {}); }}><RotateCcw size={16} /></button></div>}
           {store.game ? <div className="boards-grid"><BoardPanel boardId="A" position={boardA} orientation={userIsWhite ? "white" : "black"} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} title="BOARD A · YOUR BOARD" playerTop={userIsWhite ? players?.board_a_black ?? "Opponent" : players?.board_a_white ?? "Opponent"} playerBottom={userIsWhite ? players?.board_a_white ?? store.username : players?.board_a_black ?? store.username} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}

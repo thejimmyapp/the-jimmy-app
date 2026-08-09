@@ -61,6 +61,11 @@ export function OnboardingMap({ onGuestSpawn, onUsernameSubmit }: Props) {
     if (event.key === "Enter" && event.target === usernameRef.current) {
       event.preventDefault();
       submitUsername();
+      return;
+    }
+    if (event.key === "Enter" && event.target === guestRef.current) {
+      event.preventDefault();
+      onGuestSpawn();
     }
   };
 

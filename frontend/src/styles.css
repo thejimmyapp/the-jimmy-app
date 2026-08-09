@@ -1614,6 +1614,15 @@ button.onboarding-entry-node { cursor: pointer; }
 .username-entry-node > input:focus { outline: 0; border-color: var(--cyan); }
 .onboarding-entry-error { color: #ff99a6; font-size: 10px; }
 .onboarding-entry-status { color: #6f8199; font-size: 9px; }
+.guest-matchup-surface { grid-template-rows: auto minmax(0, auto); }
+.guest-matchup-surface:focus { outline: 0; }
+.guest-matchup-list { width: min(720px, 100%); display: grid; gap: 8px; padding: 4px; outline: 0; }
+.guest-matchup-card { display: grid; gap: 4px; padding: 13px 15px; border: 1px solid #2d3e54; border-radius: 3px; background: #0d1725; color: #dce8f6; }
+.guest-matchup-card.active { border-color: var(--cyan); background: #102330; box-shadow: inset 3px 0 var(--cyan); }
+.guest-matchup-card strong { font-size: 12px; }
+.guest-matchup-card small { color: #7890a9; font-size: 8px; }
+.guest-matchup-status { min-width: min(520px, 100%); padding: 18px; border: 1px solid #2d3e54; background: #0d1725; color: #9eb1c8; text-align: center; font-size: 11px; }
+.guest-matchup-error { border-color: #754554; color: #ffacb7; }
 .settings-legal { margin-top: 14px; padding-top: 12px; border-top: 1px solid #28374d; }
 .settings-legal .legal-links { display: flex; justify-content: center; gap: 14px; }
 .settings-legal .legal-links a { color: #91a5bd; font-size: 10px; }

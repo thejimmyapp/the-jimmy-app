@@ -1,4 +1,4 @@
-import type { BoardId, CoachJob, CoachPreparedPayload, CoachPrepareRequest, ExplorationMoveResult, GamePayload, GameSummary, LeakMapJob, PlayerStats, PuzzleMove, PuzzlePayload, PuzzleResponse, QwenStatus, RoomPayload } from "./types";
+import type { BoardId, CoachJob, CoachPreparedPayload, CoachPrepareRequest, ExplorationMoveResult, GamePayload, GameSummary, GuestMatchupList, LeakMapJob, NormalizedMatch, PlayerStats, PuzzleMove, PuzzlePayload, PuzzleResponse, QwenStatus, RoomPayload } from "./types";
 
 type ApiErrorDetail = { code?: string; message?: string; external_game_id?: string };
 
@@ -28,6 +28,8 @@ const json = async <T>(responsePromise: Promise<Response>): Promise<T> => {
 };
 
 export const api = {
+  chessComMatch: (gameId: number) => json<NormalizedMatch>(fetch(`/api/chesscom/matches/${gameId}`)),
+  guestMatchups: () => json<GuestMatchupList>(fetch("/api/chesscom/guest-matchups")),
   connectChessCom: (username: string) =>
     json<{ public_profile_connected: boolean; bughouse_games_found: number; new_games_stored: number }>(
       fetch("/api/chesscom/connect", {

@@ -5,10 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { GUEST_PROGRESS_KEY } from "./guestProgress";
 import { useCoachStore } from "./store";
-import type { GamePayload } from "./types";
+import type { GamePayload, NormalizedMatch } from "./types";
 
 const apiMock = vi.hoisted(() => ({
   games: vi.fn(),
+  guestMatchups: vi.fn(),
   game: vi.fn(),
   resolveGame: vi.fn(),
   connectChessCom: vi.fn(),
@@ -75,6 +76,22 @@ const completeGame: GamePayload = {
   },
 };
 
+const guestMatch: NormalizedMatch = {
+  game_ids: { A: 180443871315, B: 180443871317 },
+  seats: {
+    "A-white": { name: "vjbaker", rating: 2799 },
+    "A-black": { name: "larso", rating: 2677 },
+    "B-white": { name: "littleplotkin", rating: 2608 },
+    "B-black": { name: "chickencrossroad", rating: 2408 },
+  },
+  ply_counts: { A: 71, B: 81 },
+  decisive_board: "B",
+  loser_seat: "B-black",
+  action: "checkmated",
+  highest_rated: { name: "vjbaker", rating: 2799, seat: "A-white", outcome: "LOST" },
+  loser_relative_to_highest: "partner",
+};
+
 const renderApp = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}><App /></QueryClientProvider>);
@@ -82,7 +99,7 @@ const renderApp = () => {
 
 afterEach(() => {
   cleanup();
-  useCoachStore.setState({ username: "", game: null, games: [], roomId: null });
+  useCoachStore.setState({ username: "", game: null, guestMatch: null, games: [], roomId: null });
 });
 
 describe("URL-first exact review", () => {
@@ -90,8 +107,21 @@ describe("URL-first exact review", () => {
     vi.clearAllMocks();
     localStorage.clear();
     history.replaceState(null, "", "/");
-    useCoachStore.setState({ username: "", game: null, games: [], roomId: null });
+    useCoachStore.setState({ username: "", game: null, guestMatch: null, games: [], roomId: null });
     apiMock.games.mockResolvedValue({ games: [] });
+    apiMock.guestMatchups.mockResolvedValue({
+      matches: Array.from({ length: 5 }, (_, index) => ({
+        ...guestMatch,
+        game_ids: { A: guestMatch.game_ids.A + index * 2, B: guestMatch.game_ids.B + index * 2 },
+      })),
+      examined: 5,
+      excluded: 0,
+      exclusion_counts: {},
+      players_sampled: ["vjbaker", "nochewycandy"],
+      players_represented: ["vjbaker", "nochewycandy", "third-player"],
+      seed_source: "leaderboard_top_50",
+      cached: false,
+    });
     apiMock.game.mockResolvedValue(completeGame);
     apiMock.resolveGame.mockResolvedValue({
       status: "resolved",
@@ -130,16 +160,23 @@ describe("URL-first exact review", () => {
     expect(new URLSearchParams(location.search).get("game")).toBe("42");
   });
 
-  it("persists and live-renders the proof-of-concept capability unlock without calling an API", () => {
+  it("loads guest matchups, selects by keyboard, stores the match, and unlocks Review/Moves", async () => {
     renderApp();
     const statistics = screen.getByRole("button", { name: "Statistics", hidden: true }) as HTMLButtonElement;
     expect(statistics.disabled).toBe(true);
-    expect(statistics.classList.contains("capability-locked")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: /Guest Spawn/ }));
-    expect(statistics.disabled).toBe(false);
-    expect(statistics.classList.contains("capability-locked")).toBe(false);
+    const list = await screen.findByRole("listbox", { name: "Guest matchups" });
+    fireEvent.keyDown(list, { key: "Enter" });
+
+    expect(useCoachStore.getState().guestMatch).toEqual(guestMatch);
+    expect(screen.getByText("Select a Bughouse game")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Review" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(statistics.disabled).toBe(true);
     const stored = JSON.parse(localStorage.getItem(GUEST_PROGRESS_KEY) ?? "{}") as { capabilities?: Record<string, string> };
-    expect(stored.capabilities?.rail_statistics).toBe("unlocked");
+    expect(stored.capabilities?.rail_review).toBe("unlocked");
+    expect(stored.capabilities?.dock_review).toBe("unlocked");
+    expect(stored.capabilities?.rail_statistics).toBe("locked");
+    expect(apiMock.guestMatchups).toHaveBeenCalledOnce();
     expect(apiMock.resolveGame).not.toHaveBeenCalled();
     expect(apiMock.connectChessCom).not.toHaveBeenCalled();
   });
@@ -168,13 +205,12 @@ describe("URL-first exact review", () => {
     expect(screen.queryByRole("heading", { name: "Review the game you just played." })).toBeNull();
   });
 
-  it("validates and commits the username stub without network activity", () => {
+  it("validates and commits the username stub without unlocking or network activity", () => {
     renderApp();
     const username = screen.getByRole("textbox", { name: /Username/ });
     fireEvent.change(username, { target: { value: "Jimmy_42" } });
     fireEvent.keyDown(username, { key: "Enter" });
-    const stored = JSON.parse(localStorage.getItem(GUEST_PROGRESS_KEY) ?? "{}") as { capabilities?: Record<string, string> };
-    expect(stored.capabilities?.rail_statistics).toBe("unlocked");
+    expect(localStorage.getItem(GUEST_PROGRESS_KEY)).toBeNull();
     expect(apiMock.resolveGame).not.toHaveBeenCalled();
     expect(apiMock.connectChessCom).not.toHaveBeenCalled();
     expect(apiMock.importPgn).not.toHaveBeenCalled();

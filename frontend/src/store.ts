@@ -1,10 +1,11 @@
 import { create } from "zustand";
-import type { Annotation, BoardId, ChatItem, ExplorationPair, GamePayload, GameSummary, ReplayPosition, RoomParticipant } from "./types";
+import type { Annotation, BoardId, ChatItem, ExplorationPair, GamePayload, GameSummary, NormalizedMatch, ReplayPosition, RoomParticipant } from "./types";
 
 interface CoachState {
   username: string;
   games: GameSummary[];
   game: GamePayload | null;
+  guestMatch: NormalizedMatch | null;
   globalPly: number;
   mode: "review" | "exploration";
   explorationStartPly: number | null;
@@ -23,6 +24,7 @@ interface CoachState {
   setUsername: (username: string) => void;
   setGames: (games: GameSummary[]) => void;
   setGame: (game: GamePayload | null) => void;
+  setGuestMatch: (match: NormalizedMatch | null) => void;
   seek: (ply: number) => void;
   applyExploration: (boardA: ReplayPosition, boardB: ReplayPosition | null, notation: string) => void;
   undoExploration: () => void;
@@ -40,6 +42,7 @@ export const useCoachStore = create<CoachState>((set) => ({
   username: localStorage.getItem("bughouse.username") ?? "",
   games: [],
   game: null,
+  guestMatch: null,
   globalPly: 0,
   mode: "review",
   explorationStartPly: null,
@@ -60,7 +63,8 @@ export const useCoachStore = create<CoachState>((set) => ({
     set({ username });
   },
   setGames: (games) => set({ games }),
-  setGame: (game) => set({ game, globalPly: 0, mode: "review", explorationStartPly: null, explorationPositions: null, explorationHistory: [], explorationFuture: [], variationMoves: [], variationFutureMoves: [] }),
+  setGame: (game) => set({ game, guestMatch: null, globalPly: 0, mode: "review", explorationStartPly: null, explorationPositions: null, explorationHistory: [], explorationFuture: [], variationMoves: [], variationFutureMoves: [] }),
+  setGuestMatch: (guestMatch) => set({ guestMatch, game: null, globalPly: 0, mode: "review", explorationStartPly: null, explorationPositions: null, explorationHistory: [], explorationFuture: [], variationMoves: [], variationFutureMoves: [] }),
   seek: (globalPly) => set({ globalPly, mode: "review", explorationStartPly: null, explorationPositions: null, explorationHistory: [], explorationFuture: [], variationMoves: [], variationFutureMoves: [] }),
   applyExploration: (boardA, boardB, notation) => set((state) => ({
     mode: "exploration",

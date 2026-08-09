@@ -1,5 +1,34 @@
 export type BoardId = "A" | "B";
 
+export type MatchSeat = "A-white" | "A-black" | "B-white" | "B-black";
+
+export interface NormalizedMatch {
+  game_ids: Record<BoardId, number>;
+  seats: Record<MatchSeat, { name: string; rating: number }>;
+  ply_counts: Record<BoardId, number>;
+  decisive_board: BoardId;
+  loser_seat: MatchSeat;
+  action: "checkmated" | "resigned" | "flagged" | "abandoned";
+  highest_rated: {
+    name: string;
+    rating: number;
+    seat: MatchSeat;
+    outcome: "WON" | "LOST";
+  };
+  loser_relative_to_highest: "oppo" | "partner" | "diag oppo" | null;
+}
+
+export interface GuestMatchupList {
+  matches: NormalizedMatch[];
+  examined: number;
+  excluded: number;
+  exclusion_counts: Record<string, number>;
+  players_sampled: string[];
+  players_represented: string[];
+  seed_source: "players_of_interest" | "leaderboard_top_50";
+  cached: boolean;
+}
+
 export interface ReplayPosition {
   ply: number;
   label: string;

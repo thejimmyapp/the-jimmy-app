@@ -16,6 +16,12 @@ from sqlalchemy.orm import Session
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from backend.chesscom import ChessComService
+from backend.chesscom_matchups import (
+    ChessComMatchupService,
+    MatchExcludedError,
+    MatchProxyDisabledError,
+    MatchUpstreamError,
+)
 from backend.coach import prepare_coach_context
 from backend.coach_jobs import CoachJobs
 from backend.config import get_settings
@@ -58,6 +64,7 @@ analysis_jobs = AnalysisJobs(settings, games)
 qwen_runtime = QwenRuntime(settings)
 coach_jobs = CoachJobs(settings, games, qwen_runtime)
 leak_map_jobs = LeakMapJobs(settings, games)
+chesscom_matchups = ChessComMatchupService(settings)
 app = FastAPI(title=settings.app_name, version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -167,6 +174,39 @@ def _raw_chesscom_game_id(game: dict[str, object]) -> str | None:
 @app.get("/api/chesscom/{username}/bughouse-games")
 def list_bughouse_games(username: str, limit: int = Query(default=500, ge=1, le=5000)) -> dict[str, object]:
     return {"username": username, "games": games.list_games(username, limit)}
+
+
+def _matchup_http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, MatchProxyDisabledError):
+        return HTTPException(
+            status_code=503,
+            detail={"code": "chesscom_match_proxy_disabled", "message": "Guest matchups are disabled."},
+        )
+    if isinstance(exc, MatchExcludedError):
+        return HTTPException(
+            status_code=422,
+            detail={"code": "match_not_eligible", "message": "This match cannot be normalized safely."},
+        )
+    return HTTPException(
+        status_code=502,
+        detail={"code": "chesscom_match_upstream_unavailable", "message": "Guest matchups are temporarily unavailable."},
+    )
+
+
+@app.get("/api/chesscom/matches/{game_id}")
+async def chesscom_match(game_id: int) -> dict[str, object]:
+    try:
+        return await chesscom_matchups.normalized_match(game_id)
+    except (MatchProxyDisabledError, MatchExcludedError, MatchUpstreamError) as exc:
+        raise _matchup_http_error(exc) from exc
+
+
+@app.get("/api/chesscom/guest-matchups")
+async def chesscom_guest_matchups() -> dict[str, object]:
+    try:
+        return await chesscom_matchups.guest_matchups()
+    except (MatchProxyDisabledError, MatchExcludedError, MatchUpstreamError) as exc:
+        raise _matchup_http_error(exc) from exc
 
 
 @app.post("/api/games/resolve")

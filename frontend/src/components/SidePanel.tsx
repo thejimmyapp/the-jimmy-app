@@ -45,7 +45,7 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
   const [unreadChat, setUnreadChat] = useState(0);
   const [lastNotice, setLastNotice] = useState("");
   const [unavailableLessons, setUnavailableLessons] = useState<string[]>([]);
-  const { games, game, messages, addMessage, displayName, globalPly, participants, roomId } = useCoachStore();
+  const { games, game, guestMatch, messages, addMessage, displayName, globalPly, participants, roomId } = useCoachStore();
 
   const filteredGames = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -60,8 +60,11 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
     if (game) {
       setPrimaryTab("review");
       setReviewTab("partner");
+    } else if (guestMatch) {
+      setPrimaryTab("review");
+      setReviewTab("moves");
     }
-  }, [game]);
+  }, [game, guestMatch]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
