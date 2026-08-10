@@ -37,6 +37,8 @@ interface Props {
   pieceStyle: PieceStyleId;
   title: string;
   showTitle?: boolean;
+  onCaptureMoment?: () => void;
+  captureMomentDisabled?: boolean;
   playerTop: string;
   playerBottom: string;
   unavailable?: boolean;
@@ -68,7 +70,7 @@ export type BoardAnalysisState = {
   error?: string;
 };
 
-export function BoardPanel({ boardId, position, pairedPosition, orientation, pieceStyle, title, showTitle = true, playerTop, playerBottom, unavailable = false, onImportBothBoards, externalFallbackUrl, locked = false, onMoveIntent, onAnalysisChange, layout = "standard", beforeAnalyze, keyboardFocused = false, analysisLocked = false }: Props) {
+export function BoardPanel({ boardId, position, pairedPosition, orientation, pieceStyle, title, showTitle = true, onCaptureMoment, captureMomentDisabled = false, playerTop, playerBottom, unavailable = false, onImportBothBoards, externalFallbackUrl, locked = false, onMoveIntent, onAnalysisChange, layout = "standard", beforeAnalyze, keyboardFocused = false, analysisLocked = false }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const lastWheelAt = useRef(0);
   const [arrowStart, setArrowStart] = useState<string | null>(null);
@@ -315,7 +317,7 @@ export function BoardPanel({ boardId, position, pairedPosition, orientation, pie
 
   return (
     <section className={`board-panel board-layout-${layout} ${mode === "exploration" ? "is-exploring" : ""} ${unavailable ? "is-unavailable" : ""} ${keyboardFocused ? "board-focus-active" : ""}`} data-keyboard-focus={keyboardFocused ? "active" : "inactive"}>
-      <div className="board-heading">{showTitle && <strong>{title}</strong>}{keyboardFocused && <span className="board-focus-badge">KEYBOARD FOCUS</span>}<span>{position?.side_to_move ?? "Unavailable"} to move</span></div>
+      <div className="board-heading">{showTitle && <strong>{title}</strong>}{onCaptureMoment && <button type="button" className="moment-capture-button" onClick={onCaptureMoment} disabled={captureMomentDisabled} aria-label="Save current learning moment" title="Save current learning moment (m)"><kbd>m</kbd> moment</button>}{keyboardFocused && <span className="board-focus-badge">KEYBOARD FOCUS</span>}<span>{position?.side_to_move ?? "Unavailable"} to move</span></div>
       <PlayerBar name={playerTop} clock={orientation === "white" ? position?.black_clock : position?.white_clock} />
       <div className={`board-stage ${layout === "standard" ? "horizontal-pockets" : "vertical-pockets"}`}>
         {layout !== "standard" && <div className="pocket-stack">

@@ -12,7 +12,9 @@ import {
   loadGuestProgress,
   qualifyingGameCount,
   savedLessonFrom,
+  savedMomentCount,
   storeGuestProgress,
+  type SavedMoment,
 } from "./guestProgress";
 
 const lesson = (overrides: Partial<ReviewLesson> = {}): ReviewLesson => ({
@@ -32,6 +34,17 @@ const lesson = (overrides: Partial<ReviewLesson> = {}): ReviewLesson => ({
   ...overrides,
 });
 
+const moment: SavedMoment = {
+  matchIds: { A: 101, B: 102 },
+  ply: 24,
+  boardId: "B",
+  move: "N@h6",
+  seat: "A-black",
+  glyph: "!?",
+  note: "Cuts off the king while the other board catches up.",
+  savedAt: "2026-08-10T00:00:00.000Z",
+};
+
 describe("versioned guest progress", () => {
   beforeEach(() => localStorage.clear());
 
@@ -43,13 +56,14 @@ describe("versioned guest progress", () => {
   });
 
   it("hydrates a complete locked capability map for legacy progress", () => {
-    localStorage.setItem(GUEST_PROGRESS_KEY, JSON.stringify({ version: 1, firstGameOpened: false, mapNode: "start", savedLessons: [] }));
+    localStorage.setItem("thejimmyapp.guestProgress.v1", JSON.stringify({ version: 1, firstGameOpened: false, mapNode: "start", savedLessons: [] }));
     const progress = loadGuestProgress();
     expect(progress.capabilities.rail_onboarding).toBe("unlocked");
     expect(progress.capabilities.rail_statistics).toBe("locked");
     expect(progress.capabilities.dock_review).toBe("locked");
     expect(progress.capabilities.board_analysis).toBe("locked");
     expect(progress.capabilities.team_coach).toBe("locked");
+    expect(progress.savedMoments).toEqual([]);
     expect(Object.keys(progress.capabilities)).toHaveLength(11);
   });
 
@@ -70,9 +84,10 @@ describe("versioned guest progress", () => {
   });
 
   it("persists, rehydrates, and clears progress and acknowledgement", () => {
-    const progress = { ...emptyGuestProgress(), firstGameOpened: true, mapNode: "library" as const, savedLessons: [savedLessonFrom(10, lesson())!] };
+    const progress = { ...emptyGuestProgress(), firstGameOpened: true, mapNode: "library" as const, savedLessons: [savedLessonFrom(10, lesson())!], savedMoments: [moment] };
     storeGuestProgress(progress);
     expect(loadGuestProgress()).toEqual(progress);
+    expect(savedMomentCount(loadGuestProgress())).toBe(1);
     expect(hasAnalysisAcknowledgement()).toBe(false);
     acceptAnalysisAcknowledgement();
     expect(localStorage.getItem(ANALYSIS_ACKNOWLEDGEMENT_KEY)).toBe(ANALYSIS_ACKNOWLEDGEMENT_VERSION);

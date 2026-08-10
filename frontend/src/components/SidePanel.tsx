@@ -1,6 +1,6 @@
 import { Bell, BookOpen, Home, LockKeyhole, Search, Send, Trash2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { isCapabilityLocked, type CapabilityKey, type CapabilityMap, type SavedLesson } from "../guestProgress";
+import { isCapabilityLocked, savedMomentKey, type CapabilityKey, type CapabilityMap, type SavedLesson, type SavedMoment } from "../guestProgress";
 import { sendRoomEvent } from "../socket";
 import { useCoachStore } from "../store";
 import type { BoardId, GameSummary } from "../types";
@@ -16,9 +16,14 @@ interface Props {
   boardContent?: ReactNode;
   infoContent: ReactNode;
   savedLessons: SavedLesson[];
+  savedMoments?: SavedMoment[];
+  savedMomentCount?: number;
+  momentPlayers?: Record<string, string>;
   qualifyingGames: number;
   onOpenSavedLesson: (lesson: SavedLesson) => Promise<boolean>;
   onRemoveSavedLesson: (id: string) => void;
+  onOpenSavedMoment?: (moment: SavedMoment) => Promise<boolean>;
+  onRemoveSavedMoment?: (key: string) => void;
   onMap: () => void;
   initialTab?: PrimaryTab;
   dockActions?: ReactNode;
@@ -41,7 +46,7 @@ const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
   collaborate: "dock_collaborate",
 };
 
-export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
+export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
   const [reviewTab, setReviewTab] = useState<ReviewTab | null>(null);
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
@@ -53,6 +58,7 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
   const [unreadChat, setUnreadChat] = useState(0);
   const [lastNotice, setLastNotice] = useState("");
   const [unavailableLessons, setUnavailableLessons] = useState<string[]>([]);
+  const [unavailableMoments, setUnavailableMoments] = useState<string[]>([]);
   const { games, game, guestMatch, messages, addMessage, displayName, globalPly, participants, roomId } = useCoachStore();
 
   const filteredGames = useMemo(() => {
@@ -136,12 +142,12 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
   };
 
   return (
-    <aside className={`side-panel utility-panel ${isCapabilityLocked(capabilities, primaryCapability[primaryTab]) ? "capability-locked" : ""}`} aria-label="Review utility panel">
+    <aside className={`side-panel utility-panel ${isCapabilityLocked(capabilities, primaryCapability[primaryTab]) ? "capability-locked" : ""}`} aria-label="Review utility panel" data-saved-moment-count={savedMomentCount}>
       <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><div className="utility-titlebar-actions">{onSwapBoards && <button type="button" className="board-swap-button" aria-label="Swap staged board" title="Swap staged board" onClick={swapBoards}><span aria-hidden="true">↹⇄</span></button>}{dockActions}<button type="button" onClick={onMap}><Home size={13} /> Map</button></div></div>
       <div className="utility-primary-tabs" role="tablist" aria-label="Review tools">
         {(["review", "games", "library", "collaborate"] as PrimaryTab[]).map((tab) => {
           const locked = isCapabilityLocked(capabilities, primaryCapability[tab]);
-          return <button key={tab} role="tab" aria-selected={primaryTab === tab} disabled={locked} className={`${primaryTab === tab ? "active" : ""} ${locked ? "capability-locked" : ""}`} onClick={() => choosePrimary(tab)}>{tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</> : tab[0].toUpperCase() + tab.slice(1)}{locked && <LockKeyhole className="capability-lock-badge" size={11} aria-hidden="true" />}</button>;
+          return <button key={tab} role="tab" aria-selected={primaryTab === tab} disabled={locked} className={`${primaryTab === tab ? "active" : ""} ${locked ? "capability-locked" : ""}`} onClick={() => choosePrimary(tab)}>{tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</> : tab === "library" ? <>Library{savedMomentCount > 0 && <span className="library-count">{savedMomentCount}</span>}</> : tab[0].toUpperCase() + tab.slice(1)}{locked && <LockKeyhole className="capability-lock-badge" size={11} aria-hidden="true" />}</button>;
         })}
       </div>
 
@@ -174,7 +180,19 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
       </div>}
 
       {primaryTab === "library" && <div className="utility-pane library-pane">
-        <header className="library-header"><BookOpen size={17} /><div><strong>Guest learning library</strong><span>{qualifyingGames}/3 games toward second-board instructions</span></div></header>
+        <header className="library-header"><BookOpen size={17} /><div><strong>Guest learning library</strong><span>{savedMomentCount} saved {savedMomentCount === 1 ? "moment" : "moments"}</span><span>{qualifyingGames}/3 games toward second-board instructions</span></div></header>
+        <div className="moment-library-list">
+          {savedMoments.map((moment) => {
+            const key = savedMomentKey(moment);
+            return <article className={unavailableMoments.includes(key) ? "unavailable" : ""} key={key}>
+              <span className="moment-card-glyph">{moment.glyph}</span>
+              <div><strong>{moment.move} · {moment.seat}</strong><p>{moment.note}</p><small>{momentPlayers[key] ?? "Players unavailable"}</small></div>
+              <button type="button" className="moment-card-open" onClick={async () => { const opened = await onOpenSavedMoment?.(moment); setUnavailableMoments((items) => opened ? items.filter((item) => item !== key) : [...new Set([...items, key])]); }}>Open</button>
+              <button type="button" className="moment-card-delete" aria-label={`Delete saved moment at ply ${moment.ply}`} onClick={() => onRemoveSavedMoment?.(key)}><Trash2 size={14} /></button>
+              {unavailableMoments.includes(key) && <em>That guest match is not in the current matchup list.</em>}
+            </article>;
+          })}
+        </div>
         <div className="unlock-progress"><span style={{ width: `${Math.min(3, qualifyingGames) / 3 * 100}%` }} /><strong>{qualifyingGames}/3 games</strong></div>
         <p className="library-boundary">Only medium- or high-confidence mistakes and blunders with a legal suggested move count. Saved here means stored in this browser.</p>
         <div className="library-list">
@@ -182,7 +200,7 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
             <button type="button" className="library-open" onClick={async () => { const opened = await onOpenSavedLesson(lesson); setUnavailableLessons((items) => opened ? items.filter((id) => id !== lesson.id) : [...new Set([...items, lesson.id])]); }}><span>{lesson.severity.toUpperCase()} · GAME {lesson.gameId}</span><strong>{lesson.playedMove} → {lesson.bestMove}</strong><small>Global ply {lesson.globalPly} · {lesson.pattern}</small>{unavailableLessons.includes(lesson.id) && <em>This game is unavailable or has been reanalyzed.</em>}</button>
             <button type="button" className="library-remove" aria-label={`Remove saved lesson from game ${lesson.gameId}`} onClick={() => onRemoveSavedLesson(lesson.id)}><Trash2 size={14} /></button>
           </article>)}
-          {!savedLessons.length && <div className="empty-panel">No saved learning moments yet. Open Review → Info when a game has an evidence-backed lesson.</div>}
+          {!savedMoments.length && !savedLessons.length && <div className="empty-panel">No saved learning moments yet.</div>}
         </div>
       </div>}
 
