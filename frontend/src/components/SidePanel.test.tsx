@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initialCapabilityMap, type SavedLesson } from "../guestProgress";
+import { QUEST_COPY } from "../quest";
 import { useCoachStore } from "../store";
 import type { NormalizedMatch } from "../types";
 import { SidePanel } from "./SidePanel";
@@ -95,5 +96,17 @@ describe("review utility panel", () => {
     await waitFor(() => expect(props.onOpenSavedLesson).toHaveBeenCalledWith(saved));
     fireEvent.click(screen.getByRole("button", { name: "Remove saved lesson from game 42" }));
     expect(props.onRemoveSavedLesson).toHaveBeenCalledWith(saved.id);
+  });
+
+  it("keeps the locked quest timer operable and shows live progress plus the room warning", () => {
+    useCoachStore.setState({ roomId: "room-1" });
+    renderPanel({ questCountdown: "4:37", questProgress: 2, roomQuestRemainingSeconds: 277 });
+    const questTab = screen.getByRole("tab", { name: "4:37" }) as HTMLButtonElement;
+    expect(questTab.disabled).toBe(false);
+    expect(questTab.classList.contains("capability-locked")).toBe(true);
+    fireEvent.click(questTab);
+    expect(screen.getByText(QUEST_COPY)).toBeTruthy();
+    expect(screen.getByRole("progressbar", { name: "Quest learning moments" }).getAttribute("aria-valuenow")).toBe("2");
+    expect(screen.getByText("everything here resets in 4:37 — help guest_1 complete their quest.")).toBeTruthy();
   });
 });

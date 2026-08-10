@@ -132,5 +132,6 @@ class SocketEvent(BaseModel):
         "chat.message",
         "note.create",
         "note.update",
+        "quest.status",
     ]
     payload: dict[str, Any] = Field(default_factory=dict)

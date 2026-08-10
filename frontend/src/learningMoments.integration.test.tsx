@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { reconstructGuestMatch } from "./bughouseDecoder";
 import replayFixtures from "./fixtures/guest-match-replays.json";
-import { loadGuestProgress } from "./guestProgress";
+import { GUEST_PROGRESS_KEY, emptyGuestProgress, loadGuestProgress, storeGuestProgress } from "./guestProgress";
+import { startGuestQuest } from "./quest";
 import { useCoachStore } from "./store";
 import type { CallbackReplayBoard, NormalizedMatch } from "./types";
 
@@ -20,6 +22,7 @@ vi.mock("./api", async (importOriginal) => {
 vi.mock("./socket", () => ({
   applyRoomSnapshot: vi.fn(),
   connectRoomSocket: vi.fn(),
+  disconnectRoomSocket: vi.fn(),
   sendRoomEvent: vi.fn(),
 }));
 
@@ -91,6 +94,7 @@ describe("guest learning moment library", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it("saves three moments across two games, opens an exact ply, and deletes one", async () => {
@@ -101,6 +105,8 @@ describe("guest learning moment library", () => {
     let list = await screen.findByRole("listbox", { name: "Guest matchups" });
     fireEvent.keyDown(list, { key: "Enter" });
     expect(await screen.findAllByLabelText(/Board chessboard/)).toHaveLength(2);
+    expect(loadGuestProgress().questDeadline).not.toBeNull();
+    expect(screen.getByRole("tab", { name: /^(5:00|4:59)$/ })).toBeTruthy();
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     saveMoment("!!", "The first game starts to squeeze the king.");
@@ -118,6 +124,10 @@ describe("guest learning moment library", () => {
     await waitFor(() => expect(useCoachStore.getState().guestMatch?.game_ids).toEqual(secondMatch.game_ids));
     fireEvent.keyDown(window, { key: "ArrowRight" });
     saveMoment("!", "A second game shows the same timing from another angle.", true);
+    expect(loadGuestProgress().questCompleted).toBe(true);
+    expect(loadGuestProgress().questDeadline).toBeNull();
+    expect(loadGuestProgress().capabilities.dock_quest).toBe("unlocked");
+    expect(screen.getByRole("tab", { name: "Complete" })).toBeTruthy();
 
     const libraryTab = screen.getByRole("tab", { name: /Library/ }) as HTMLButtonElement;
     expect(libraryTab.disabled).toBe(false);
@@ -137,5 +147,52 @@ describe("guest learning moment library", () => {
     expect(loadGuestProgress().savedMoments).toHaveLength(2);
     expect(container.querySelector(".side-panel")?.getAttribute("data-saved-moment-count")).toBe("2");
     expect(screen.getAllByRole("button", { name: "Open" })).toHaveLength(2);
+  });
+
+  it("clears an insufficient guest session and returns to entry when the persisted deadline expires", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-10T05:00:00.000Z"));
+    const replay = reconstructGuestMatch(replayFor(firstMatch));
+    useCoachStore.getState().setGuestReplay(firstMatch, replay.game);
+    const running = startGuestQuest({
+      ...emptyGuestProgress(),
+      firstGameOpened: true,
+      capabilities: { ...emptyGuestProgress().capabilities, rail_review: "unlocked", dock_review: "unlocked" },
+    });
+    storeGuestProgress({ ...running, questDeadline: Date.now() + 1_000 });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
+    expect(screen.getByRole("tab", { name: "0:01" })).toBeTruthy();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_250);
+      await Promise.resolve();
+    });
+
+    expect(useCoachStore.getState().game).toBeNull();
+    expect(useCoachStore.getState().guestMatch).toBeNull();
+    expect(localStorage.getItem(GUEST_PROGRESS_KEY)).toBeNull();
+    expect(screen.getByRole("heading", { name: "Greetings small children" })).toBeTruthy();
+  });
+
+  it("completes the quest after three moments saved from one guest game", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole("button", { name: /Click me\?/ }));
+    const list = await screen.findByRole("listbox", { name: "Guest matchups" });
+    fireEvent.keyDown(list, { key: "Enter" });
+    expect(await screen.findAllByLabelText(/Board chessboard/)).toHaveLength(2);
+
+    for (const [glyph, note] of [["!!", "First moment."], ["!?", "Second moment."], ["!", "Third moment."]] as const) {
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      saveMoment(glyph, note);
+    }
+
+    const completed = loadGuestProgress();
+    expect(completed.savedMoments).toHaveLength(3);
+    expect(completed.questCompleted).toBe(true);
+    expect(completed.questDeadline).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Complete" }));
+    expect(screen.getByRole("progressbar", { name: "Quest learning moments" }).getAttribute("aria-valuenow")).toBe("3");
   });
 });

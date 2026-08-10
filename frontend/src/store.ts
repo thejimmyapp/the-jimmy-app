@@ -21,6 +21,7 @@ interface CoachState {
   followPartner: boolean;
   annotations: Annotation[];
   messages: ChatItem[];
+  roomQuestDeadline: number | null;
   setUsername: (username: string) => void;
   setGames: (games: GameSummary[]) => void;
   setGame: (game: GamePayload | null) => void;
@@ -37,6 +38,7 @@ interface CoachState {
   addAnnotation: (annotation: Annotation) => void;
   removeAnnotation: (id: string) => void;
   addMessage: (message: ChatItem) => void;
+  setRoomQuestDeadline: (deadline: number | null) => void;
 }
 
 export const useCoachStore = create<CoachState>((set) => ({
@@ -59,6 +61,7 @@ export const useCoachStore = create<CoachState>((set) => ({
   followPartner: true,
   annotations: [],
   messages: [],
+  roomQuestDeadline: null,
   setUsername: (username) => {
     localStorage.setItem("bughouse.username", username);
     set({ username });
@@ -116,6 +119,7 @@ export const useCoachStore = create<CoachState>((set) => ({
   addAnnotation: (annotation) => set((state) => ({ annotations: [...state.annotations.filter((item) => item.id !== annotation.id), annotation] })),
   removeAnnotation: (id) => set((state) => ({ annotations: state.annotations.filter((item) => item.id !== id) })),
   addMessage: (message) => set((state) => ({ messages: [...state.messages.filter((item) => item.id !== message.id), message] })),
+  setRoomQuestDeadline: (roomQuestDeadline) => set({ roomQuestDeadline }),
 }));
 
 export const currentPosition = (game: GamePayload | null, ply: number, board: BoardId) => {

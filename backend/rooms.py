@@ -44,7 +44,7 @@ class RoomHub:
             return
         self.seen_events[room_id].append(event_id)
         event_type = str(event.get("type") or "")
-        if event_type in {"game.select", "timeline.seek", "variation.create", "variation.update", "variation.return_to_game"}:
+        if event_type in {"game.select", "timeline.seek", "variation.create", "variation.update", "variation.return_to_game", "quest.status"}:
             self.snapshots[room_id][event_type] = event
         elif event_type == "annotation.create":
             annotations = self.snapshots[room_id].setdefault("annotations", [])

@@ -63,8 +63,9 @@ describe("versioned guest progress", () => {
     expect(progress.capabilities.dock_review).toBe("locked");
     expect(progress.capabilities.board_analysis).toBe("locked");
     expect(progress.capabilities.team_coach).toBe("locked");
+    expect(progress.capabilities.dock_quest).toBe("locked");
     expect(progress.savedMoments).toEqual([]);
-    expect(Object.keys(progress.capabilities)).toHaveLength(11);
+    expect(Object.keys(progress.capabilities)).toHaveLength(12);
   });
 
   it("counts qualifying distinct games without over-counting duplicates", () => {
@@ -74,6 +75,21 @@ describe("versioned guest progress", () => {
     const third = savedLessonFrom(12, lesson({ id: "mistake-4", severity: "blunder" }))!;
     expect(qualifyingGameCount([first, sameGame])).toBe(1);
     expect(qualifyingGameCount([first, sameGame, second, third])).toBe(3);
+  });
+
+  it("migrates a completed pre-quest library without starting a destructive clock", () => {
+    localStorage.setItem("thejimmyapp.guestProgress.v2", JSON.stringify({
+      version: 2,
+      firstGameOpened: true,
+      mapNode: "analyze",
+      savedLessons: [],
+      savedMoments: [moment, { ...moment, savedAt: "two" }, { ...moment, savedAt: "three" }],
+      capabilities: { dock_library: "unlocked" },
+    }));
+    const migrated = loadGuestProgress();
+    expect(migrated.questCompleted).toBe(true);
+    expect(migrated.questDeadline).toBeNull();
+    expect(migrated.capabilities.dock_quest).toBe("unlocked");
   });
 
   it("rejects inaccuracies, low confidence, and unsupported suggestions", () => {

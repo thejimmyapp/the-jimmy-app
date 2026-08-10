@@ -1329,7 +1329,7 @@ body { background: #050910; }
 .utility-titlebar-actions { display: flex; align-items: center; gap: 5px; }
 .utility-primary-tabs,
 .utility-secondary-tabs { flex: 0 0 auto; display: grid; border-bottom: 1px solid #253247; background: #0e1724; }
-.utility-primary-tabs { height: 44px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.utility-primary-tabs { height: 44px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .utility-secondary-tabs { height: 38px; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #0a121d; }
 .utility-primary-tabs button,
 .utility-secondary-tabs button {
@@ -1353,7 +1353,8 @@ body { background: #050910; }
 .board-pane > .board-panel { margin: 0 auto; }
 .games-pane,
 .library-pane,
-.collaborate-pane { display: flex; flex-direction: column; }
+.collaborate-pane,
+.quest-pane { display: flex; flex-direction: column; }
 .games-pane .sidebar-game-list { flex: 1; }
 
 .timeline.timeline-panel {
@@ -1435,6 +1436,13 @@ body { background: #050910; }
 .moment-card-delete { border: 0; border-left: 1px solid #294159; background: transparent; color: #8bcbd4; font-size: 9px; font-weight: 800; cursor: pointer; }
 .moment-card-delete { color: #8190a3; }
 .moment-library-list article em { grid-column: 1 / -1; padding: 4px 8px; color: #e1a76f; font-size: 8px; font-style: normal; }
+.quest-room-notice { flex: 0 0 auto; padding: 7px 10px; border-bottom: 1px solid #294156; background: #101b27; color: #90a4ba; font-size: 9px; line-height: 1.35; }
+.quest-pane { justify-content: center; gap: 18px; padding: 24px; }
+.quest-progress { display: grid; gap: 8px; }
+.quest-progress strong { color: #dce9f6; font: 22px/1 Consolas, monospace; }
+.quest-progress > span { height: 4px; overflow: hidden; border-radius: 2px; background: #1d2b3d; }
+.quest-progress > span > i { display: block; height: 100%; background: #3e8e99; transition: width .2s ease; }
+.quest-pane p { max-width: 38ch; margin: 0; color: #8fa0b4; font-size: 11px; line-height: 1.65; }
 .unlock-progress { position: relative; height: 28px; overflow: hidden; border: 1px solid #2c4457; border-radius: 3px; background: #0a131f; }
 .unlock-progress > span { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #17677a, #1ea0ae); transition: width .2s ease; }
 .unlock-progress > strong { position: relative; z-index: 1; height: 100%; display: grid; place-items: center; font-size: 9px; }
@@ -1630,6 +1638,7 @@ body { background: #050910; }
 .rail-nav button.capability-locked,
 .rail-actions button.capability-locked,
 .utility-primary-tabs button.capability-locked { color: #647184; opacity: .48; filter: grayscale(1); cursor: not-allowed; }
+.utility-primary-tabs button.quest-preview { cursor: pointer; }
 .coach-button.capability-locked,
 .analyze-button.capability-locked { position: relative; color: #647184; opacity: .48; filter: grayscale(1); cursor: not-allowed; }
 .capability-lock-badge { position: absolute; right: 2px; bottom: 2px; padding: 1px; border-radius: 2px; background: #111a27; color: #9ba7b8; }
