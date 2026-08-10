@@ -2,6 +2,10 @@ param(
     [switch]$IncludeEngine
 )
 
+if ($IncludeEngine) {
+    throw "-IncludeEngine is permanently disabled. Fairy-Stockfish is GPL-3.0; bundling the binary into a distributable ZIP is a conveyance that triggers corresponding-source obligations. The engine is server-side only. See R38(b)."
+}
+
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $Stage = Join-Path $Root "reports\thejimmyapp-portable"
@@ -68,19 +72,8 @@ New-Item -ItemType File -Path (Join-Path $Stage "logs\.gitkeep") -Force | Out-Nu
 New-Item -ItemType File -Path (Join-Path $Stage "reports\.gitkeep") -Force | Out-Null
 New-Item -ItemType File -Path (Join-Path $Stage "secrets\.gitkeep") -Force | Out-Null
 
-if ($IncludeEngine) {
-    $Engine = Join-Path $Root "engines\fairy-stockfish.exe"
-    if (Test-Path -LiteralPath $Engine) {
-        Copy-Item -LiteralPath $Engine -Destination (Join-Path $Stage "engines\fairy-stockfish.exe") -Force
-    } else {
-        Write-Warning "Fairy-Stockfish was not found, so the ZIP will not include it."
-    }
-}
-
 Compress-Archive -Path (Join-Path $Stage "*") -DestinationPath $Zip -Force
 
 Write-Output "Created: $Zip"
 Write-Output "Secrets, local database, logs, videos, and .venv are not included."
-if (-not $IncludeEngine) {
-    Write-Output "Engine not included. Use -IncludeEngine to include engines\fairy-stockfish.exe."
-}
+Write-Output "Engine never included. Fairy-Stockfish is server-side only (GPL-3.0)."
