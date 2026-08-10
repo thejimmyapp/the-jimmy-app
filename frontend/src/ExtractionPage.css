@@ -89,6 +89,7 @@
 }
 
 .extraction-search,
+.extraction-download,
 .extraction-result {
   background: rgb(16 22 30 / 92%);
   border: 1px solid var(--extraction-border);
@@ -97,9 +98,68 @@
 }
 
 .extraction-search {
-  margin: 0 auto;
-  max-width: 900px;
   padding: 20px;
+}
+
+.extraction-t-chart {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  margin: 0 auto;
+  max-width: 960px;
+}
+
+.extraction-t-chart__label {
+  color: var(--extraction-accent);
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  margin-bottom: 14px;
+}
+
+.extraction-download {
+  padding: 20px;
+}
+
+.extraction-download h2 {
+  font-size: 1.15rem;
+  margin: 0 0 8px;
+}
+
+.extraction-download > p {
+  color: var(--extraction-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.extraction-download .extraction-capability {
+  color: var(--extraction-error);
+  margin-top: 12px;
+}
+
+.extraction-download__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.extraction-download__buttons button {
+  flex: 1 1 130px;
+  padding-inline: 12px;
+}
+
+.extraction-page button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+  opacity: 0.42;
+}
+
+.extraction-download .extraction-download__status {
+  color: var(--extraction-accent);
+  margin-top: 10px;
 }
 
 .extraction-search label,
@@ -369,6 +429,7 @@
   }
 
   .extraction-teams,
+  .extraction-t-chart,
   .extraction-moment,
   .extraction-player__body,
   .extraction-player__facts {

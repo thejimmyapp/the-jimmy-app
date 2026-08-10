@@ -116,6 +116,9 @@ describe("ExtractionPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<ExtractionPage />);
 
+    expect((screen.getByRole("button", { name: "Download .json" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/moves:/).parentElement?.textContent).toContain("pending decoder");
+
     const input = screen.getByLabelText("Username, game URL, viewer URL, or numeric game id");
     fireEvent.change(input, {
       target: { value: "https://www.chess.com/game/live/180443871315" },
@@ -123,6 +126,8 @@ describe("ExtractionPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Extract" }));
 
     expect(await screen.findByText("vjbaker(2799) LOST — partner checkmated")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Download .json" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Download .txt" }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByRole("region", { name: "Team 1 · A-white + B-black" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Team 2 · A-black + B-white" })).toBeTruthy();
     expect(screen.getByText("180443871317")).toBeTruthy();
