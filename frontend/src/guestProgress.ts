@@ -1,8 +1,9 @@
-import type { ReviewLesson } from "./types";
+import type { BoardId, MatchSeat, ReviewLesson } from "./types";
 
-export const GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v1";
+const LEGACY_GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v1";
+export const GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v2";
 export const ANALYSIS_ACKNOWLEDGEMENT_KEY = "thejimmyapp.analysisAcknowledgement.v1";
-export const GUEST_PROGRESS_VERSION = 1 as const;
+export const GUEST_PROGRESS_VERSION = 2 as const;
 export const ANALYSIS_ACKNOWLEDGEMENT_VERSION = "analysis-limits-2026-08-06";
 
 export type MapNodeId = "start" | "analyze" | "library" | "partner";
@@ -59,11 +60,26 @@ export interface SavedLesson {
   savedAt: string;
 }
 
+export const momentGlyphs = ["!!", "!", "!?", "?!", "?", "??"] as const;
+export type MomentGlyph = (typeof momentGlyphs)[number];
+
+export interface SavedMoment {
+  matchIds: Record<BoardId, number>;
+  ply: number;
+  boardId: BoardId;
+  move: string;
+  seat: MatchSeat;
+  glyph: MomentGlyph;
+  note: string;
+  savedAt: string;
+}
+
 export interface GuestProgress {
   version: typeof GUEST_PROGRESS_VERSION;
   firstGameOpened: boolean;
   mapNode: MapNodeId;
   savedLessons: SavedLesson[];
+  savedMoments: SavedMoment[];
   capabilities: CapabilityMap;
 }
 
@@ -72,6 +88,7 @@ export const emptyGuestProgress = (): GuestProgress => ({
   firstGameOpened: false,
   mapNode: "start",
   savedLessons: [],
+  savedMoments: [],
   capabilities: initialCapabilityMap(),
 });
 
@@ -99,19 +116,44 @@ const isSavedLesson = (value: unknown): value is SavedLesson => {
     && typeof item.savedAt === "string";
 };
 
+const isSavedMoment = (value: unknown): value is SavedMoment => {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<SavedMoment>;
+  return Boolean(item.matchIds)
+    && Number.isSafeInteger(item.matchIds?.A)
+    && Number.isSafeInteger(item.matchIds?.B)
+    && Number.isInteger(item.ply)
+    && Number(item.ply) > 0
+    && (item.boardId === "A" || item.boardId === "B")
+    && typeof item.move === "string"
+    && item.move.trim().length > 0
+    && typeof item.seat === "string"
+    && /^(A|B)-(white|black)$/.test(item.seat)
+    && momentGlyphs.includes(item.glyph as MomentGlyph)
+    && typeof item.note === "string"
+    && item.note.trim().length > 0
+    && typeof item.savedAt === "string"
+    && item.savedAt.length > 0;
+};
+
+const parseProgress = (raw: string): GuestProgress => {
+  const parsed = JSON.parse(raw) as Partial<GuestProgress> & { version?: number };
+  if (parsed.version !== 1 && parsed.version !== GUEST_PROGRESS_VERSION) return emptyGuestProgress();
+  return {
+    version: GUEST_PROGRESS_VERSION,
+    firstGameOpened: parsed.firstGameOpened === true,
+    mapNode: mapNodes.has(parsed.mapNode as MapNodeId) ? parsed.mapNode as MapNodeId : "start",
+    savedLessons: Array.isArray(parsed.savedLessons) ? parsed.savedLessons.filter(isSavedLesson) : [],
+    savedMoments: parsed.version === GUEST_PROGRESS_VERSION && Array.isArray(parsed.savedMoments) ? parsed.savedMoments.filter(isSavedMoment) : [],
+    capabilities: loadCapabilities(parsed.capabilities),
+  };
+};
+
 export const loadGuestProgress = (): GuestProgress => {
   try {
-    const raw = localStorage.getItem(GUEST_PROGRESS_KEY);
+    const raw = localStorage.getItem(GUEST_PROGRESS_KEY) ?? localStorage.getItem(LEGACY_GUEST_PROGRESS_KEY);
     if (!raw) return emptyGuestProgress();
-    const parsed = JSON.parse(raw) as Partial<GuestProgress>;
-    if (parsed.version !== GUEST_PROGRESS_VERSION) return emptyGuestProgress();
-    return {
-      version: GUEST_PROGRESS_VERSION,
-      firstGameOpened: parsed.firstGameOpened === true,
-      mapNode: mapNodes.has(parsed.mapNode as MapNodeId) ? parsed.mapNode as MapNodeId : "start",
-      savedLessons: Array.isArray(parsed.savedLessons) ? parsed.savedLessons.filter(isSavedLesson) : [],
-      capabilities: loadCapabilities(parsed.capabilities),
-    };
+    return parseProgress(raw);
   } catch {
     return emptyGuestProgress();
   }
@@ -120,6 +162,18 @@ export const loadGuestProgress = (): GuestProgress => {
 export const storeGuestProgress = (progress: GuestProgress) => {
   localStorage.setItem(GUEST_PROGRESS_KEY, JSON.stringify(progress));
 };
+
+export const savedMomentKey = (moment: SavedMoment) => [
+  moment.matchIds.A,
+  moment.matchIds.B,
+  moment.ply,
+  moment.boardId,
+  moment.glyph,
+  moment.savedAt,
+  moment.note,
+].join(":");
+
+export const savedMomentCount = (progress: Pick<GuestProgress, "savedMoments">) => progress.savedMoments.length;
 
 export const isLessonEligible = (lesson: ReviewLesson | null | undefined) => Boolean(
   lesson
@@ -165,5 +219,6 @@ export const acceptAnalysisAcknowledgement = () => {
 
 export const clearGuestProgress = () => {
   localStorage.removeItem(GUEST_PROGRESS_KEY);
+  localStorage.removeItem(LEGACY_GUEST_PROGRESS_KEY);
   localStorage.removeItem(ANALYSIS_ACKNOWLEDGEMENT_KEY);
 };
