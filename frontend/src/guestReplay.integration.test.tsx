@@ -68,7 +68,7 @@ describe("guest replay workspace integration", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
 
-    fireEvent.click(screen.getByRole("button", { name: /Guest Spawn/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Click me\?/ }));
     const list = await screen.findByRole("listbox", { name: "Guest matchups" });
     fireEvent.keyDown(list, { key: "Enter" });
 
