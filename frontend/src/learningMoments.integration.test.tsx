@@ -31,6 +31,7 @@ const boardB = replayFixtures.matches[0].boards.B as CallbackReplayBoard;
 
 const firstMatch: NormalizedMatch = {
   game_ids: { A: boardA.id, B: boardB.id },
+  end_time: 1_786_320_000,
   seats: {
     "A-white": { name: String(boardA.headers.White), rating: Number(boardA.headers.WhiteElo) },
     "A-black": { name: String(boardA.headers.Black), rating: Number(boardA.headers.BlackElo) },

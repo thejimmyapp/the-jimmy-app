@@ -81,6 +81,7 @@ const completeGame: GamePayload = {
 
 const guestMatch: NormalizedMatch = {
   game_ids: { A: 180443871315, B: 180443871317 },
+  end_time: 1_786_320_000,
   seats: {
     "A-white": { name: "vjbaker", rating: 2799 },
     "A-black": { name: "larso", rating: 2677 },
@@ -200,6 +201,7 @@ describe("URL-first exact review", () => {
     expect(screen.getByText("Second Board")).toBeTruthy();
     expect(screen.queryByText("BOARD A · FEATURED PLAYER")).toBeNull();
     expect(screen.queryByText("BOARD B · PARTNER BOARD")).toBeNull();
+    expect(screen.queryByText(/175% browser zoom/)).toBeNull();
     expect((screen.getByRole("button", { name: "Review" }) as HTMLButtonElement).disabled).toBe(false);
     expect(statistics.disabled).toBe(true);
     const stored = JSON.parse(localStorage.getItem(GUEST_PROGRESS_KEY) ?? "{}") as { capabilities?: Record<string, string> };

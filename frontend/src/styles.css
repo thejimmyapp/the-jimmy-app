@@ -1410,13 +1410,17 @@ body { background: #050910; }
 .analysis-limitations.compact { padding: 10px; border: 1px solid #5d4d2e; border-radius: 3px; background: #1b170f; }
 .analysis-limitations.compact .analysis-limitations-title { font-size: 10px; }
 .analysis-limitations.compact p { font-size: 8px; line-height: 1.45; }
+.replay-limits-expander { border: 1px solid #5d4d2e; border-radius: 3px; background: #15130e; }
+.replay-limits-expander > summary { min-height: 38px; display: flex; align-items: center; padding: 0 10px; color: #d8c49a; font-size: 10px; font-weight: 800; cursor: pointer; }
+.replay-limits-expander > summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.replay-limits-expander-content { display: grid; gap: 8px; padding: 0 8px 8px; }
+.replay-limits-expander-content .analysis-limitations.compact { padding: 8px; }
 .game-metadata { padding: 10px; border: 1px solid #26364d; background: #0d1623; }
 .game-metadata > span { color: #7287a2; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
 .game-metadata dl { display: grid; grid-template-columns: 1fr 1fr; gap: var(--grid-y) calc(var(--grid-x) * 2); margin: 9px 0 0; }
 .game-metadata dl div { min-width: 0; }
 .game-metadata dt { color: #657892; font-size: 7px; text-transform: uppercase; }
 .game-metadata dd { margin: 2px 0 0; overflow: hidden; color: #dce8f6; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.zoom-note { margin: 0; padding: 9px; color: #7890aa; font-size: 8px; line-height: 1.45; border-left: 2px solid #40526d; background: #0d1521; }
 
 .library-pane { padding: calc(var(--grid-y) * 2) calc(var(--grid-x) * 2); gap: var(--grid-y); }
 .library-header { display: flex; align-items: center; gap: 8px; color: var(--cyan); }
@@ -1672,7 +1676,6 @@ body { background: #050910; }
 .app-dock .game-metadata dl { gap: 10px 12px; margin-top: 11px; }
 .app-dock .game-metadata dt { font-size: 9px; }
 .app-dock .game-metadata dd { margin-top: 3px; font-size: 11px; }
-.app-dock .zoom-note { padding: 11px; font-size: 10px; line-height: 1.55; }
 
 .locked-shell-onboarding {
   height: 100%;
@@ -1800,11 +1803,20 @@ button.onboarding-entry-node { cursor: pointer; }
 .onboarding-entry-status { color: #6f8199; font-size: 9px; }
 .guest-matchup-surface { grid-template-rows: auto minmax(0, auto); }
 .guest-matchup-surface:focus { outline: 0; }
-.guest-matchup-list { width: min(720px, 100%); display: grid; gap: 8px; padding: 4px; outline: 0; }
+.guest-matchup-list-shell { width: min(720px, 100%); display: grid; gap: 9px; }
+.guest-matchup-list { width: 100%; display: grid; gap: 8px; padding: 4px; outline: 0; }
 .guest-matchup-card { display: grid; gap: 4px; padding: 13px 15px; border: 1px solid #2d3e54; border-radius: 3px; background: #0d1725; color: #dce8f6; }
 .guest-matchup-card.active { border-color: var(--cyan); background: #102330; box-shadow: inset 3px 0 var(--cyan); }
 .guest-matchup-card strong { font-size: 12px; }
 .guest-matchup-card small { color: #7890a9; font-size: 8px; }
+.guest-matchup-list-tools { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; padding: 0 4px; }
+.guest-matchup-regenerate { min-height: 34px; padding: 0 12px; border: 1px solid #2b7888; border-radius: 3px; background: #102630; color: #a8f6ff; font-size: 10px; font-weight: 800; cursor: pointer; }
+.guest-matchup-regenerate:focus-visible,
+.guest-matchup-explainer summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.guest-matchup-regenerate:disabled { opacity: .55; cursor: wait; }
+.guest-matchup-explainer { min-width: 0; border: 1px solid #263950; border-radius: 3px; background: #0b1420; color: #8498b0; font-size: 9px; }
+.guest-matchup-explainer summary { min-height: 32px; display: flex; align-items: center; padding: 0 10px; color: #a1b2c7; cursor: pointer; }
+.guest-matchup-explainer p { margin: 0; padding: 0 10px 10px; color: #8498b0; line-height: 1.5; }
 .guest-matchup-status { min-width: min(520px, 100%); padding: 18px; border: 1px solid #2d3e54; background: #0d1725; color: #9eb1c8; text-align: center; font-size: 11px; }
 .guest-matchup-error { border-color: #754554; color: #ffacb7; }
 .settings-legal { margin-top: 14px; padding-top: 12px; border-top: 1px solid #28374d; }

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime
 import logging
 import math
 import re
@@ -34,6 +35,8 @@ _SEAT_ORDER = ("A-white", "A-black", "B-white", "B-black")
 _LEADERBOARD_FALLBACK_SIZE = 50
 _MAX_MATCHES_PER_SEED_PLAYER = 2
 _MIN_REPRESENTED_SEED_PLAYERS = 3
+_GUEST_MATCH_TARGET = 5
+_GUEST_FRESHNESS_WINDOWS_HOURS = (1, 3, 12, 48)
 
 
 class MatchProxyDisabledError(RuntimeError):
@@ -64,6 +67,20 @@ class _GuestListCacheEntry:
     payload: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class _GuestCandidate:
+    numeric_id: int
+    end_time: int
+    seed_username: str
+
+
+@dataclass(frozen=True)
+class _QualifiedGuestMatch:
+    match: dict[str, Any]
+    seed_username: str
+    was_currently_shown: bool
+
+
 class ChessComMatchupService:
     """Server-only access to Chess.com's callback and public archive endpoints."""
 
@@ -83,12 +100,16 @@ class ChessComMatchupService:
         if not self.settings.chesscom_match_proxy_enabled:
             raise MatchProxyDisabledError("Chess.com match proxy is disabled")
 
-    async def normalized_match(self, numeric_id: int) -> dict[str, Any]:
+    async def normalized_match(self, numeric_id: int, *, end_time: int | None = None) -> dict[str, Any]:
         self._ensure_enabled()
         if isinstance(numeric_id, bool) or numeric_id <= 0:
             raise MatchExcludedError("invalid_game_id")
+        if end_time is not None and (isinstance(end_time, bool) or end_time <= 0):
+            raise MatchExcludedError("invalid_end_time")
         cached = self._fresh_match_cache(numeric_id)
         if cached is not None:
+            if end_time is not None:
+                cached.normalized["end_time"] = end_time
             return deepcopy(cached.normalized)
 
         raw_board_a = await self._callback(str(numeric_id))
@@ -103,7 +124,7 @@ class ChessComMatchupService:
         if board_b["id"] == board_a["id"]:
             raise MatchExcludedError("duplicate_board_id")
 
-        normalized = _normalize_boards(board_a, board_b)
+        normalized = _normalize_boards(board_a, board_b, end_time=end_time)
         entry = _MatchCacheEntry(
             stored_at=time.monotonic(),
             normalized=deepcopy(normalized),
@@ -129,10 +150,19 @@ class ChessComMatchupService:
             },
         }
 
-    async def guest_matchups(self) -> dict[str, Any]:
+    async def guest_matchups(
+        self,
+        *,
+        refresh: bool = False,
+        exclude_game_ids: Iterable[int] = (),
+    ) -> dict[str, Any]:
         self._ensure_enabled()
+        excluded_ids = {
+            value for value in exclude_game_ids
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0
+        }
         cached = self._guest_cache
-        if cached and time.monotonic() - cached.stored_at < self.settings.chesscom_match_cache_ttl_seconds:
+        if not refresh and cached and time.monotonic() - cached.stored_at < self.settings.chesscom_match_cache_ttl_seconds:
             payload = deepcopy(cached.payload)
             payload["cached"] = True
             return payload
@@ -140,11 +170,11 @@ class ChessComMatchupService:
         async with self._guest_build_lock:
             self._ensure_enabled()
             cached = self._guest_cache
-            if cached and time.monotonic() - cached.stored_at < self.settings.chesscom_match_cache_ttl_seconds:
+            if not refresh and cached and time.monotonic() - cached.stored_at < self.settings.chesscom_match_cache_ttl_seconds:
                 payload = deepcopy(cached.payload)
                 payload["cached"] = True
                 return payload
-            payload = await self._build_guest_matchups()
+            payload = await self._build_guest_matchups(excluded_ids)
             self._guest_cache = _GuestListCacheEntry(time.monotonic(), deepcopy(payload))
             return payload
 
@@ -157,46 +187,34 @@ class ChessComMatchupService:
             return None
         return cached
 
-    async def _build_guest_matchups(self) -> dict[str, Any]:
+    async def _build_guest_matchups(self, currently_shown_ids: set[int] | None = None) -> dict[str, Any]:
+        currently_shown_ids = currently_shown_ids or set()
+        now = int(time.time())
         usernames = self._configured_seed_usernames()
         configured_count = len(usernames)
-        leaderboard_loaded = False
         seed_source = "players_of_interest" if usernames else "leaderboard_top_50"
 
-        matches: list[dict[str, Any]] = []
+        candidates: list[_GuestCandidate] = []
+        qualified: list[_QualifiedGuestMatch] = []
         examined = 0
         excluded: dict[str, int] = {}
         seen_public_ids: set[int] = set()
         seen_pairs: set[frozenset[int]] = set()
+        processed_public_ids: set[int] = set()
         players_sampled: list[str] = []
-        players_represented: list[str] = []
 
-        candidate_index = 0
-        while len(matches) < 5 and examined < self.settings.chesscom_guest_max_matches_examined:
-            if candidate_index >= len(usernames):
-                if leaderboard_loaded:
-                    break
-                leaderboard_usernames = await self._leaderboard_seed_usernames()
-                leaderboard_loaded = True
-                known = {username.lower() for username in usernames}
-                usernames.extend(username for username in leaderboard_usernames if username.lower() not in known)
-                seed_source = "players_of_interest_then_leaderboard_top_50" if configured_count else "leaderboard_top_50"
-                if candidate_index >= len(usernames):
-                    break
-            username = usernames[candidate_index]
-            candidate_index += 1
+        async def collect_candidates(username: str) -> None:
             players_sampled.append(username)
-            qualifying_for_player = 0
             try:
                 archive_index = await self._get_json(
                     f"https://api.chess.com/pub/player/{username.lower()}/games/archives"
                 )
             except MatchUpstreamError:
-                continue
+                return
             archive_urls = archive_index.get("archives")
             if not isinstance(archive_urls, list):
                 _count(excluded, "archive_shape")
-                continue
+                return
             recent_urls = _recent_archive_urls(
                 archive_urls,
                 username,
@@ -215,69 +233,148 @@ class ChessComMatchupService:
                     _count(excluded, "archive_shape")
                     continue
                 for game in reversed(games):
-                    if (
-                        len(matches) >= 5
-                        or qualifying_for_player >= _MAX_MATCHES_PER_SEED_PLAYER
-                        or examined >= self.settings.chesscom_guest_max_matches_examined
-                    ):
-                        break
                     if not isinstance(game, dict) or game.get("rules") != "bughouse":
                         continue
                     numeric_id = _public_live_game_id(game.get("url"))
                     if numeric_id is None or numeric_id in seen_public_ids:
                         continue
                     seen_public_ids.add(numeric_id)
-                    examined += 1
-                    try:
-                        match = await self.normalized_match(numeric_id)
-                    except MatchExcludedError as exc:
-                        _count(excluded, exc.reason)
+                    end_time = _strict_int(game.get("end_time"))
+                    if end_time is None or end_time <= 0:
+                        _count(excluded, "missing_end_time")
                         continue
-                    except MatchUpstreamError:
-                        _count(excluded, "callback_unavailable")
+                    age_seconds = now - end_time
+                    if age_seconds < -300:
+                        _count(excluded, "future_end_time")
                         continue
-                    pair = frozenset(match["game_ids"].values())
-                    if pair in seen_pairs:
-                        _count(excluded, "duplicate_match")
+                    if age_seconds > _GUEST_FRESHNESS_WINDOWS_HOURS[-1] * 3600:
+                        _count(excluded, "outside_48h")
                         continue
-                    seen_pairs.add(pair)
-                    if min(match["ply_counts"].values()) < 20:
-                        _count(excluded, "under_20_plies")
-                        continue
-                    matches.append(match)
-                    qualifying_for_player += 1
-                    if qualifying_for_player == 1:
-                        players_represented.append(username)
-                if (
-                    len(matches) >= 5
-                    or qualifying_for_player >= _MAX_MATCHES_PER_SEED_PLAYER
-                    or examined >= self.settings.chesscom_guest_max_matches_examined
-                ):
+                    candidates.append(_GuestCandidate(numeric_id, end_time, username))
+
+        async def process_window(window_hours: int, *, include_known_current: bool = False) -> None:
+            nonlocal examined
+            for candidate in candidates:
+                if examined >= self.settings.chesscom_guest_max_matches_examined:
                     break
-            if len(matches) >= 5 or examined >= self.settings.chesscom_guest_max_matches_examined:
+                if candidate.numeric_id in processed_public_ids:
+                    continue
+                if now - candidate.end_time > window_hours * 3600:
+                    continue
+                if candidate.numeric_id in currently_shown_ids and not include_known_current:
+                    continue
+                processed_public_ids.add(candidate.numeric_id)
+                examined += 1
+                try:
+                    match = await self.normalized_match(candidate.numeric_id, end_time=candidate.end_time)
+                except MatchExcludedError as exc:
+                    _count(excluded, exc.reason)
+                    continue
+                except MatchUpstreamError:
+                    _count(excluded, "callback_unavailable")
+                    continue
+                pair = frozenset(match["game_ids"].values())
+                if pair in seen_pairs:
+                    _count(excluded, "duplicate_match")
+                    continue
+                seen_pairs.add(pair)
+                if min(match["ply_counts"].values()) < 20:
+                    _count(excluded, "under_20_plies")
+                    continue
+                qualified.append(_QualifiedGuestMatch(
+                    match=match,
+                    seed_username=candidate.seed_username,
+                    was_currently_shown=bool(pair & currently_shown_ids),
+                ))
+
+        def select_matches(*, include_current: bool = False) -> list[_QualifiedGuestMatch] | None:
+            eligible = [item for item in qualified if not item.was_currently_shown]
+            if include_current:
+                eligible.extend(item for item in qualified if item.was_currently_shown)
+            selected: list[_QualifiedGuestMatch] = []
+            per_player: dict[str, int] = {}
+            for item in eligible:
+                player_key = item.seed_username.lower()
+                if per_player.get(player_key, 0) >= _MAX_MATCHES_PER_SEED_PLAYER:
+                    continue
+                per_player[player_key] = per_player.get(player_key, 0) + 1
+                selected.append(item)
+                if len(selected) == _GUEST_MATCH_TARGET:
+                    break
+            represented = {item.seed_username.lower() for item in selected}
+            return selected if len(selected) == _GUEST_MATCH_TARGET and len(represented) >= _MIN_REPRESENTED_SEED_PLAYERS else None
+
+        selected: list[_QualifiedGuestMatch] | None = None
+        selection_window_hours = _GUEST_FRESHNESS_WINDOWS_HOURS[0]
+
+        for username in usernames:
+            await collect_candidates(username)
+            await process_window(selection_window_hours)
+            selected = select_matches()
+            if selected:
                 break
+
+        if selected is None:
+            leaderboard_usernames = await self._leaderboard_seed_usernames()
+            known = {username.lower() for username in usernames}
+            fallback_usernames = [username for username in leaderboard_usernames if username.lower() not in known]
+            usernames.extend(fallback_usernames)
+            seed_source = "players_of_interest_then_leaderboard_top_50" if configured_count else "leaderboard_top_50"
+            for username in fallback_usernames:
+                await collect_candidates(username)
+                await process_window(selection_window_hours)
+                selected = select_matches()
+                if selected:
+                    break
+
+        logger.info(
+            "Guest matchup freshness window: hours=%d qualifying=%d selected=%d",
+            selection_window_hours,
+            len(qualified),
+            len(selected or []),
+        )
+        if selected is None:
+            for selection_window_hours in _GUEST_FRESHNESS_WINDOWS_HOURS[1:]:
+                await process_window(selection_window_hours)
+                selected = select_matches()
+                logger.info(
+                    "Guest matchup freshness window: hours=%d qualifying=%d selected=%d",
+                    selection_window_hours,
+                    len(qualified),
+                    len(selected or []),
+                )
+                if selected:
+                    break
+
+        if selected is None and currently_shown_ids:
+            selection_window_hours = _GUEST_FRESHNESS_WINDOWS_HOURS[-1]
+            await process_window(selection_window_hours, include_known_current=True)
+            selected = select_matches(include_current=True)
 
         excluded_total = sum(excluded.values())
         logger.info(
-            "Guest matchup list assembled: examined=%d excluded=%d qualifying=%d exclusions=%s",
+            "Guest matchup list assembled: examined=%d excluded=%d qualifying=%d window_hours=%d exclusions=%s",
             examined,
             excluded_total,
-            len(matches),
+            len(qualified),
+            selection_window_hours,
             excluded,
         )
-        if len(matches) < 5 or len(players_represented) < _MIN_REPRESENTED_SEED_PLAYERS:
+        if selected is None:
             raise MatchUpstreamError(
                 "Guest matchup diversity target was unavailable "
-                f"(matches={len(matches)}, represented={len(players_represented)}, examined={examined})"
+                f"(qualifying={len(qualified)}, examined={examined}, window_hours={selection_window_hours})"
             )
+        players_represented = list(dict.fromkeys(item.seed_username for item in selected))
         return {
-            "matches": matches[:5],
+            "matches": [item.match for item in selected],
             "examined": examined,
             "excluded": excluded_total,
             "exclusion_counts": excluded,
             "players_sampled": players_sampled,
             "players_represented": players_represented,
             "seed_source": seed_source,
+            "selection_window_hours": selection_window_hours,
             "cached": False,
         }
 
@@ -340,7 +437,10 @@ def _validated_board(raw: dict[str, Any]) -> dict[str, Any]:
     ply_count = _strict_int(game.get("plyCount"))
     reason = game.get("gameEndReason")
     winner_color = game.get("colorOfWinner")
+    end_time = _callback_end_time(game)
     if game_id is None or game_id <= 0 or ply_count is None or ply_count < 0:
+        raise MatchExcludedError("callback_shape")
+    if end_time is None:
         raise MatchExcludedError("callback_shape")
     if not isinstance(uuid, str) or not _UUID_RE.fullmatch(uuid):
         raise MatchExcludedError("callback_shape")
@@ -376,6 +476,7 @@ def _validated_board(raw: dict[str, Any]) -> dict[str, Any]:
         "ply_count": ply_count,
         "reason": reason,
         "winner_color": winner_color,
+        "end_time": end_time,
         "players": by_color,
     }
 
@@ -423,7 +524,12 @@ def _replay_board_payload(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _normalize_boards(board_a: dict[str, Any], board_b: dict[str, Any]) -> dict[str, Any]:
+def _normalize_boards(
+    board_a: dict[str, Any],
+    board_b: dict[str, Any],
+    *,
+    end_time: int | None = None,
+) -> dict[str, Any]:
     reason_a = board_a["reason"]
     reason_b = board_b["reason"]
     if reason_a in _DRAW_CODES or reason_b in _DRAW_CODES:
@@ -456,6 +562,7 @@ def _normalize_boards(board_a: dict[str, Any], board_b: dict[str, Any]) -> dict[
     relative_loser = _relative_seat(highest_seat, loser_seat)
     return {
         "game_ids": {"A": board_a["id"], "B": board_b["id"]},
+        "end_time": end_time if end_time is not None else max(board_a["end_time"], board_b["end_time"]),
         "seats": seats,
         "ply_counts": {"A": board_a["ply_count"], "B": board_b["ply_count"]},
         "decisive_board": decisive_board,
@@ -498,6 +605,32 @@ def _strict_number(value: Any) -> int | float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         return None
     return value
+
+
+def _callback_end_time(game: dict[str, Any]) -> int | None:
+    numeric = _strict_int(game.get("endTime"))
+    if numeric is not None and numeric > 0:
+        return numeric
+    headers = game.get("pgnHeaders")
+    if not isinstance(headers, dict):
+        return None
+    date = headers.get("Date")
+    end_time = headers.get("EndTime")
+    if not isinstance(date, str) or not isinstance(end_time, str):
+        return None
+    match = re.fullmatch(r"(\d{1,2}:\d{2}:\d{2})(?: GMT([+-]\d{4}))?", end_time.strip())
+    if not re.fullmatch(r"\d{4}\.\d{2}\.\d{2}", date.strip()) or not match:
+        return None
+    offset = match.group(2) or "+0000"
+    try:
+        parsed = datetime.strptime(
+            f"{date.strip()} {match.group(1)} {offset}",
+            "%Y.%m.%d %H:%M:%S %z",
+        )
+    except ValueError:
+        return None
+    timestamp = int(parsed.timestamp())
+    return timestamp if timestamp > 0 else None
 
 
 def _unique_valid_usernames(values: Iterable[Any]) -> list[str]:

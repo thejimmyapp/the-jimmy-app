@@ -4,6 +4,7 @@ export type MatchSeat = "A-white" | "A-black" | "B-white" | "B-black";
 
 export interface NormalizedMatch {
   game_ids: Record<BoardId, number>;
+  end_time: number;
   seats: Record<MatchSeat, { name: string; rating: number }>;
   ply_counts: Record<BoardId, number>;
   decisive_board: BoardId;
@@ -26,6 +27,7 @@ export interface GuestMatchupList {
   players_sampled: string[];
   players_represented: string[];
   seed_source: "players_of_interest" | "leaderboard_top_50" | "players_of_interest_then_leaderboard_top_50";
+  selection_window_hours: 1 | 3 | 12 | 48;
   cached: boolean;
 }
 
