@@ -64,7 +64,7 @@ describe("guest replay workspace integration", () => {
     vi.clearAllMocks();
   });
 
-  it("walks spawn to the list, opens both real boards, pockets, Moves, and keyboard replay", async () => {
+  it("features an original Board B player and keeps global replay mounted across Tab board focus", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
 
@@ -72,15 +72,42 @@ describe("guest replay workspace integration", () => {
     const list = await screen.findByRole("listbox", { name: "Guest matchups" });
     fireEvent.keyDown(list, { key: "Enter" });
 
-    expect(await screen.findByText("BOARD A · GUEST MATCH")).toBeTruthy();
-    const boardAElement = screen.getByLabelText("BOARD A · GUEST MATCH chessboard");
+    expect(await screen.findByText("BOARD A · FEATURED PLAYER")).toBeTruthy();
+    const boardAElement = screen.getByLabelText("BOARD A · FEATURED PLAYER chessboard");
+    const primaryPanel = boardAElement.closest(".board-panel") as HTMLElement;
     expect(within(boardAElement).getAllByRole("button")).toHaveLength(64);
+    expect(within(boardAElement).getAllByRole("button")[0].getAttribute("aria-label")?.startsWith("a8")).toBe(true);
+    expect(within(primaryPanel).getByText(String(boardB.headers.White))).toBeTruthy();
+    expect(primaryPanel.getAttribute("data-keyboard-focus")).toBe("active");
     expect(screen.getByRole("tab", { name: "Moves" }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByLabelText("Synchronized move history")).toBeTruthy();
+    const timeline = screen.getByLabelText("Synchronized move history");
+    expect(timeline).toBeTruthy();
     expect(useCoachStore.getState().game?.timeline).toHaveLength(boardA.plyCount + boardB.plyCount + 1);
+    const firstOriginalBoardBMove = useCoachStore.getState().game?.timeline.find((frame) => frame.board === "B")?.move;
+    expect(firstOriginalBoardBMove).toBeTruthy();
+    expect(within(timeline.querySelectorAll(".move-track")[0] as HTMLElement).getByText(firstOriginalBoardBMove!)).toBeTruthy();
+    const analyze = screen.getByRole("button", { name: /Analyze with Fairy-Stockfish/ }) as HTMLButtonElement;
+    const coach = screen.getByRole("button", { name: /Team Coach/ }) as HTMLButtonElement;
+    expect(analyze.disabled).toBe(true);
+    expect(analyze.classList.contains("capability-locked")).toBe(true);
+    expect(coach.disabled).toBe(true);
+    expect(coach.classList.contains("capability-locked")).toBe(true);
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(useCoachStore.getState().globalPly).toBe(1);
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Partner" }).getAttribute("aria-selected")).toBe("true"));
+    const boardBElement = screen.getByLabelText("BOARD B · PARTNER BOARD chessboard");
+    const partnerPanel = boardBElement.closest(".board-panel") as HTMLElement;
+    expect(within(boardBElement).getAllByRole("button")[0].getAttribute("aria-label")?.startsWith("h1")).toBe(true);
+    expect(within(partnerPanel).getByText(String(boardA.headers.Black))).toBeTruthy();
+    expect(primaryPanel.getAttribute("data-keyboard-focus")).toBe("inactive");
+    expect(partnerPanel.getAttribute("data-keyboard-focus")).toBe("active");
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(useCoachStore.getState().globalPly).toBe(2);
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Moves" }).getAttribute("aria-selected")).toBe("true"));
+    expect(primaryPanel.getAttribute("data-keyboard-focus")).toBe("active");
     const firstPocketPly = useCoachStore.getState().game?.timeline.findIndex((frame) =>
       frame.board_a.white_pocket !== "-"
       || frame.board_a.black_pocket !== "-"
@@ -88,12 +115,12 @@ describe("guest replay workspace integration", () => {
       || frame.board_b.black_pocket !== "-",
     ) ?? -1;
     expect(firstPocketPly).toBeGreaterThan(0);
-    for (let ply = 1; ply < firstPocketPly; ply += 1) fireEvent.keyDown(window, { key: "ArrowRight" });
+    for (let ply = useCoachStore.getState().globalPly; ply < firstPocketPly; ply += 1) fireEvent.keyDown(window, { key: "ArrowRight" });
     await waitFor(() => expect(useCoachStore.getState().globalPly).toBe(firstPocketPly));
     expect(document.querySelectorAll(".pocket-rail span").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("tab", { name: "Partner" }));
-    expect(screen.getByLabelText("BOARD B · PARTNER BOARD chessboard")).toBeTruthy();
+    expect(boardBElement).toBeTruthy();
     expect(screen.getAllByLabelText(/droppers$/)).toHaveLength(4);
     expect(useCoachStore.getState().game?.cross_board_ordering).toEqual({ method: "clock-inferred", exact: false });
   });

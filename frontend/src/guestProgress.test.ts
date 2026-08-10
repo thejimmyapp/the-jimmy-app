@@ -48,7 +48,9 @@ describe("versioned guest progress", () => {
     expect(progress.capabilities.rail_onboarding).toBe("unlocked");
     expect(progress.capabilities.rail_statistics).toBe("locked");
     expect(progress.capabilities.dock_review).toBe("locked");
-    expect(Object.keys(progress.capabilities)).toHaveLength(9);
+    expect(progress.capabilities.board_analysis).toBe("locked");
+    expect(progress.capabilities.team_coach).toBe("locked");
+    expect(Object.keys(progress.capabilities)).toHaveLength(11);
   });
 
   it("counts qualifying distinct games without over-counting duplicates", () => {

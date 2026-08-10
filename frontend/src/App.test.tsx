@@ -191,7 +191,7 @@ describe("URL-first exact review", () => {
 
     await waitFor(() => expect(useCoachStore.getState().guestMatch).toEqual(guestMatch));
     expect(useCoachStore.getState().game?.timeline.length).toBeGreaterThan(100);
-    expect(screen.getByText("BOARD A · GUEST MATCH")).toBeTruthy();
+    expect(screen.getByText("BOARD A · FEATURED PLAYER")).toBeTruthy();
     expect(screen.getByText("BOARD B · PARTNER BOARD")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Review" }) as HTMLButtonElement).disabled).toBe(false);
     expect(statistics.disabled).toBe(true);
@@ -199,6 +199,8 @@ describe("URL-first exact review", () => {
     expect(stored.capabilities?.rail_review).toBe("unlocked");
     expect(stored.capabilities?.dock_review).toBe("unlocked");
     expect(stored.capabilities?.rail_statistics).toBe("locked");
+    expect(stored.capabilities?.board_analysis).toBe("locked");
+    expect(stored.capabilities?.team_coach).toBe("locked");
     expect(apiMock.guestMatchups).toHaveBeenCalledOnce();
     expect(apiMock.chessComMatchReplay).toHaveBeenCalledWith(guestMatch.game_ids.A);
     expect(apiMock.resolveGame).not.toHaveBeenCalled();
