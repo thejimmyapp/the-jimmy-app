@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guestBoardPresentation, sourceBoardForDisplay } from "./guestBoardPresentation";
+import { guestBoardPresentation } from "./guestBoardPresentation";
 import type { NormalizedMatch } from "./types";
 
 const match = (seat: NormalizedMatch["highest_rated"]["seat"]): NormalizedMatch => ({
@@ -19,15 +19,33 @@ const match = (seat: NormalizedMatch["highest_rated"]["seat"]): NormalizedMatch 
 });
 
 describe("guest board presentation", () => {
-  it("promotes original Board B to display Board A and preserves featured color orientation", () => {
-    expect(guestBoardPresentation(match("B-white"))).toEqual({
-      primarySourceBoard: "B",
-      partnerSourceBoard: "A",
-      primaryOrientation: "white",
-      partnerOrientation: "black",
-    });
-    expect(guestBoardPresentation(match("B-black")).primaryOrientation).toBe("black");
-    expect(sourceBoardForDisplay(match("B-white"), "A")).toBe("B");
-    expect(sourceBoardForDisplay(match("B-white"), "B")).toBe("A");
+  it("stages an original Board B featured player and orients their team at the bottom", () => {
+    const presentation = guestBoardPresentation(match("B-white"));
+    expect(presentation.featuredSourceBoard).toBe("B");
+    expect(presentation.stagedSourceBoard).toBe("B");
+    expect(presentation.dockSourceBoard).toBe("A");
+    expect(presentation.stagedOrientation).toBe("white");
+    expect(presentation.dockOrientation).toBe("black");
+    expect(guestBoardPresentation(match("B-black")).stagedOrientation).toBe("black");
+  });
+
+  it("names the lower combined-rating board Second Board and swaps names with the surfaces", () => {
+    const presentation = guestBoardPresentation(match("B-white"));
+    expect(presentation.sourceNames).toEqual({ A: "Second Board", B: "First Board" });
+    expect(presentation.stagedName).toBe("First Board");
+    expect(presentation.dockName).toBe("Second Board");
+
+    const swapped = guestBoardPresentation(match("B-white"), true);
+    expect(swapped.stagedSourceBoard).toBe("A");
+    expect(swapped.stagedName).toBe("Second Board");
+    expect(swapped.dockName).toBe("First Board");
+    expect(swapped.stagedOrientation).toBe("black");
+  });
+
+  it("breaks equal-rating ties by naming the featured player's board First", () => {
+    const tied = match("B-white");
+    tied.seats["A-white"].rating = 2;
+    tied.seats["A-black"].rating = 5;
+    expect(guestBoardPresentation(tied).sourceNames).toEqual({ A: "Second Board", B: "First Board" });
   });
 });

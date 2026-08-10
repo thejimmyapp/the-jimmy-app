@@ -30,7 +30,7 @@ const match: NormalizedMatch = {
     "A-white": { name: String(boardA.headers.White), rating: Number(boardA.headers.WhiteElo) },
     "A-black": { name: String(boardA.headers.Black), rating: Number(boardA.headers.BlackElo) },
     "B-white": { name: String(boardB.headers.White), rating: Number(boardB.headers.WhiteElo) },
-    "B-black": { name: String(boardB.headers.Black), rating: Number(boardB.headers.BlackElo) },
+    "B-black": { name: String(boardB.headers.Black), rating: 1000 },
   },
   ply_counts: { A: boardA.plyCount, B: boardB.plyCount },
   decisive_board: "A",
@@ -64,7 +64,7 @@ describe("guest replay workspace integration", () => {
     vi.clearAllMocks();
   });
 
-  it("features an original Board B player and keeps global replay mounted across Tab board focus", async () => {
+  it("stages a featured player on the rating-derived Second Board and preserves named focus through swaps", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
 
@@ -72,14 +72,15 @@ describe("guest replay workspace integration", () => {
     const list = await screen.findByRole("listbox", { name: "Guest matchups" });
     fireEvent.keyDown(list, { key: "Enter" });
 
-    expect(await screen.findByText("BOARD A · FEATURED PLAYER")).toBeTruthy();
-    const boardAElement = screen.getByLabelText("BOARD A · FEATURED PLAYER chessboard");
-    const primaryPanel = boardAElement.closest(".board-panel") as HTMLElement;
-    expect(within(boardAElement).getAllByRole("button")).toHaveLength(64);
-    expect(within(boardAElement).getAllByRole("button")[0].getAttribute("aria-label")?.startsWith("a8")).toBe(true);
-    expect(within(primaryPanel).getByText(String(boardB.headers.White))).toBeTruthy();
-    expect(primaryPanel.getAttribute("data-keyboard-focus")).toBe("active");
+    const stagedSecondBoard = await screen.findByLabelText("Second Board chessboard");
+    const stagedSecondPanel = stagedSecondBoard.closest(".board-panel") as HTMLElement;
+    expect(screen.queryByText("BOARD A · FEATURED PLAYER")).toBeNull();
+    expect(within(stagedSecondBoard).getAllByRole("button")).toHaveLength(64);
+    expect(within(stagedSecondBoard).getAllByRole("button")[0].getAttribute("aria-label")?.startsWith("a8")).toBe(true);
+    expect(within(stagedSecondPanel).getByText(String(boardB.headers.White))).toBeTruthy();
+    expect(stagedSecondPanel.getAttribute("data-keyboard-focus")).toBe("active");
     expect(screen.getByRole("tab", { name: "Moves" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "First Board" }).getAttribute("aria-selected")).toBe("false");
     const timeline = screen.getByLabelText("Synchronized move history");
     expect(timeline).toBeTruthy();
     expect(useCoachStore.getState().game?.timeline).toHaveLength(boardA.plyCount + boardB.plyCount + 1);
@@ -96,18 +97,39 @@ describe("guest replay workspace integration", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(useCoachStore.getState().globalPly).toBe(1);
     fireEvent.keyDown(window, { key: "Tab" });
-    await waitFor(() => expect(screen.getByRole("tab", { name: "Partner" }).getAttribute("aria-selected")).toBe("true"));
-    const boardBElement = screen.getByLabelText("BOARD B · PARTNER BOARD chessboard");
-    const partnerPanel = boardBElement.closest(".board-panel") as HTMLElement;
-    expect(within(boardBElement).getAllByRole("button")[0].getAttribute("aria-label")?.startsWith("h1")).toBe(true);
-    expect(within(partnerPanel).getByText(String(boardA.headers.Black))).toBeTruthy();
-    expect(primaryPanel.getAttribute("data-keyboard-focus")).toBe("inactive");
-    expect(partnerPanel.getAttribute("data-keyboard-focus")).toBe("active");
+    await waitFor(() => expect(screen.getByRole("tab", { name: "First Board" }).getAttribute("aria-selected")).toBe("true"));
+    const dockFirstBoard = screen.getByLabelText("First Board chessboard");
+    const dockFirstPanel = dockFirstBoard.closest(".board-panel") as HTMLElement;
+    expect(within(dockFirstBoard).getAllByRole("button")[0].getAttribute("aria-label")?.startsWith("h1")).toBe(true);
+    expect(within(dockFirstPanel).getByText(String(boardA.headers.Black))).toBeTruthy();
+    expect(stagedSecondPanel.getAttribute("data-keyboard-focus")).toBe("inactive");
+    expect(dockFirstPanel.getAttribute("data-keyboard-focus")).toBe("active");
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(useCoachStore.getState().globalPly).toBe(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Swap staged board" }));
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Second Board" }).getAttribute("aria-selected")).toBe("false"));
+    expect(screen.getByRole("tab", { name: "Moves" }).getAttribute("aria-selected")).toBe("true");
+    const stagedFirstBoard = screen.getByLabelText("First Board chessboard");
+    const stagedFirstPanel = stagedFirstBoard.closest(".board-panel") as HTMLElement;
+    expect(within(stagedFirstBoard).getAllByRole("button")[0].getAttribute("aria-label")?.startsWith("h1")).toBe(true);
+    expect(within(stagedFirstPanel).getByText(String(boardA.headers.Black))).toBeTruthy();
+    expect(stagedFirstPanel.getAttribute("data-keyboard-focus")).toBe("active");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Second Board" }));
+    const dockSecondBoard = screen.getByLabelText("Second Board chessboard");
+    const dockSecondPanel = dockSecondBoard.closest(".board-panel") as HTMLElement;
+    expect(within(dockSecondBoard).getAllByRole("button")[0].getAttribute("aria-label")?.startsWith("a8")).toBe(true);
+    expect(within(dockSecondPanel).getByText(String(boardB.headers.White))).toBeTruthy();
+    expect(dockSecondPanel.getAttribute("data-keyboard-focus")).toBe("active");
+
+    fireEvent.click(screen.getByRole("button", { name: "Swap staged board" }));
+    await waitFor(() => expect(screen.getByRole("tab", { name: "First Board" }).getAttribute("aria-selected")).toBe("false"));
+    expect(screen.getByRole("tab", { name: "Moves" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByLabelText("Second Board chessboard").closest(".board-panel")?.getAttribute("data-keyboard-focus")).toBe("active");
+
     fireEvent.keyDown(window, { key: "Tab" });
-    await waitFor(() => expect(screen.getByRole("tab", { name: "Moves" }).getAttribute("aria-selected")).toBe("true"));
-    expect(primaryPanel.getAttribute("data-keyboard-focus")).toBe("active");
+    await waitFor(() => expect(screen.getByRole("tab", { name: "First Board" }).getAttribute("aria-selected")).toBe("true"));
     const firstPocketPly = useCoachStore.getState().game?.timeline.findIndex((frame) =>
       frame.board_a.white_pocket !== "-"
       || frame.board_a.black_pocket !== "-"
@@ -119,8 +141,8 @@ describe("guest replay workspace integration", () => {
     await waitFor(() => expect(useCoachStore.getState().globalPly).toBe(firstPocketPly));
     expect(document.querySelectorAll(".pocket-rail span").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Partner" }));
-    expect(boardBElement).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "First Board" }));
+    expect(screen.getByLabelText("First Board chessboard")).toBeTruthy();
     expect(screen.getAllByLabelText(/droppers$/)).toHaveLength(4);
     expect(useCoachStore.getState().game?.cross_board_ordering).toEqual({ method: "clock-inferred", exact: false });
   });

@@ -1155,6 +1155,8 @@ body { background: #050910; }
 .app-stage,
 .app-dock { min-width: 0; min-height: 0; }
 .app-rail { grid-column: 1; display: flex; flex-direction: column; align-items: center; gap: var(--grid-y); padding: 7px 0; border: 1px solid #1f2c40; border-radius: 3px; background: #0a101b; }
+.app-rail-locked-content { width: 100%; min-height: 0; flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--grid-y); }
+.app-rail-locked-content[aria-hidden="true"] { opacity: .48; filter: grayscale(1); }
 .rail-brand { display: grid; place-items: center; height: 34px; }
 .rail-brand .brand-mark { width: 26px; height: 26px; font-size: 11px; }
 .rail-nav,
@@ -1162,11 +1164,11 @@ body { background: #050910; }
 .rail-actions { margin-top: auto; }
 .rail-nav button,
 .rail-actions button,
-.rail-actions a,
+.rail-blocks-link,
 .rail-overflow > summary { width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 1px solid #27384f; border-radius: 3px; background: #101a28; color: #9fb1c8; cursor: pointer; list-style: none; }
-.rail-actions a { text-decoration: none; }
+.rail-blocks-link { flex: 0 0 auto; text-decoration: none; }
 .rail-blocks-glyph { font-size: 17px; line-height: 1; }
-.rail-actions a:hover { border-color: #8b6fc0; background: #211a32; color: #d7c7f5; }
+.rail-blocks-link:hover { border-color: #8b6fc0; background: #211a32; color: #d7c7f5; }
 .rail-nav button.active { border-color: #2b8796; background: #14303d; color: var(--cyan); box-shadow: inset -2px 0 var(--cyan); }
 .rail-nav button:disabled,
 .rail-actions button:disabled { cursor: not-allowed; opacity: .4; }
@@ -1318,6 +1320,9 @@ body { background: #050910; }
   letter-spacing: .12em;
 }
 .utility-titlebar button { display: flex; align-items: center; gap: 5px; border: 0; background: transparent; color: #a9bdd3; font-size: 9px; cursor: pointer; }
+.utility-titlebar .board-swap-button { min-width: 32px; justify-content: center; border: 1px solid #315168; border-radius: 3px; background: #102333; color: #8eeef5; font-size: 15px; font-weight: 900; }
+.utility-titlebar .board-swap-button:hover,
+.utility-titlebar .board-swap-button:focus-visible { border-color: var(--cyan); color: #d5fbff; }
 .utility-titlebar-actions { display: flex; align-items: center; gap: 5px; }
 .utility-primary-tabs,
 .utility-secondary-tabs { flex: 0 0 auto; display: grid; border-bottom: 1px solid #253247; background: #0e1724; }
@@ -1340,9 +1345,9 @@ body { background: #050910; }
 .utility-secondary-tabs .chat-unread { position: absolute; right: 3px; top: 3px; }
 .utility-pane { min-width: 0; min-height: 0; flex: 1; overflow: auto; }
 .moves-pane.inactive { position: absolute; inset: 112px 0 0; visibility: hidden; pointer-events: none; }
-.partner-pane { padding: var(--grid-y) var(--grid-x); }
-.partner-pane:not(.active) { position: absolute; inset: 112px 0 0; visibility: hidden; pointer-events: none; }
-.partner-pane > .board-panel { margin: 0 auto; }
+.board-pane { padding: var(--grid-y) var(--grid-x); }
+.board-pane:not(.active) { position: absolute; inset: 112px 0 0; visibility: hidden; pointer-events: none; }
+.board-pane > .board-panel { margin: 0 auto; }
 .games-pane,
 .library-pane,
 .collaborate-pane { display: flex; flex-direction: column; }
@@ -1372,12 +1377,12 @@ body { background: #050910; }
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 88px minmax(0, 1fr);
   grid-template-rows: minmax(84px, 1fr) minmax(84px, 1fr);
   gap: var(--grid-y) var(--grid-x);
   overflow: hidden;
 }
-.timeline-panel .track-label { border: 1px solid #28364b; background: #0e1928; }
+.timeline-panel .track-label { padding: 4px; border: 1px solid #28364b; background: #0e1928; text-align: center; }
 .timeline-panel .move-track { min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 2px; overflow-y: auto; overflow-x: hidden; }
 .timeline-panel .move-track button { min-width: 0; min-height: 30px; }
 
@@ -1593,7 +1598,6 @@ body { background: #050910; }
 .rail-nav button.capability-locked,
 .rail-actions button.capability-locked,
 .utility-primary-tabs button.capability-locked { color: #647184; opacity: .48; filter: grayscale(1); cursor: not-allowed; }
-.app-rail[inert] .rail-blocks-link { color: #647184; opacity: .48; filter: grayscale(1); cursor: default; }
 .coach-button.capability-locked,
 .analyze-button.capability-locked { position: relative; color: #647184; opacity: .48; filter: grayscale(1); cursor: not-allowed; }
 .capability-lock-badge { position: absolute; right: 2px; bottom: 2px; padding: 1px; border-radius: 2px; background: #111a27; color: #9ba7b8; }
@@ -1609,7 +1613,7 @@ body { background: #050910; }
 .app-dock .utility-primary-tabs button,
 .app-dock .utility-secondary-tabs button { font-size: 11px; }
 .app-dock .moves-pane.inactive,
-.app-dock .partner-pane:not(.active) { inset: 124px 0 0; }
+.app-dock .board-pane:not(.active) { inset: 124px 0 0; }
 .app-dock .timeline.timeline-panel { gap: 12px 6px; padding: 12px; }
 .app-dock .timeline-panel .mode-badge { font-size: 11px; }
 .app-dock .timeline-panel .timeline-tracks { grid-template-rows: minmax(96px, 1fr) minmax(96px, 1fr); gap: 8px 6px; }

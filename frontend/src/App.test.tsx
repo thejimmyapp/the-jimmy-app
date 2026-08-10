@@ -35,11 +35,11 @@ vi.mock("./socket", () => ({
   sendRoomEvent: vi.fn(),
 }));
 vi.mock("./components/BoardPanel", () => ({
-  BoardPanel: ({ title, unavailable, beforeAnalyze }: { title: string; unavailable?: boolean; beforeAnalyze?: () => Promise<boolean> }) => (
-    <div><span>{title}</span>{unavailable && <span>Partner board was not included in the available Chess.com data.</span>}{beforeAnalyze && <button onClick={() => void beforeAnalyze()}>Run mocked analysis</button>}</div>
+  BoardPanel: ({ title, showTitle = true, unavailable, beforeAnalyze }: { title: string; showTitle?: boolean; unavailable?: boolean; beforeAnalyze?: () => Promise<boolean> }) => (
+    <div data-testid={`board-${title}`}>{showTitle && <span>{title}</span>}{unavailable && <span>Second board was not included in the available Chess.com data.</span>}{beforeAnalyze && <button onClick={() => void beforeAnalyze()}>Run mocked analysis</button>}</div>
   ),
 }));
-vi.mock("./components/SidePanel", () => ({ SidePanel: ({ partnerContent }: { partnerContent: ReactNode }) => <div>Games panel{partnerContent}</div> }));
+vi.mock("./components/SidePanel", () => ({ SidePanel: ({ boardContent }: { boardContent: ReactNode }) => <div>Games panel{boardContent}</div> }));
 vi.mock("./components/Timeline", () => ({ Timeline: () => <div>Timeline</div> }));
 
 const completeGame: GamePayload = {
@@ -147,16 +147,19 @@ describe("URL-first exact review", () => {
     apiMock.enrichChessCom.mockResolvedValue({ checked: 0, enriched: 0, remaining_without_second_board: 0, credentials_stored: false });
   });
 
-  it("renders RAIL and DOCK inert and keeps them out of the accessibility tree during onboarding", () => {
+  it("locks RAIL chrome and DOCK while leaving only the easel accessible during onboarding", () => {
     const { container } = renderApp();
     const rail = container.querySelector(".app-rail");
+    const lockedRailContent = container.querySelector(".app-rail-locked-content");
     const dock = container.querySelector(".app-dock");
-    expect(rail?.hasAttribute("inert")).toBe(true);
+    expect(rail?.hasAttribute("inert")).toBe(false);
+    expect(lockedRailContent?.hasAttribute("inert")).toBe(true);
     expect(dock?.hasAttribute("inert")).toBe(true);
-    expect(rail?.getAttribute("aria-hidden")).toBe("true");
+    expect(lockedRailContent?.getAttribute("aria-hidden")).toBe("true");
     expect(dock?.getAttribute("aria-hidden")).toBe("true");
     expect(screen.queryByRole("navigation", { name: "Main views" })).toBeNull();
     expect(screen.queryByRole("complementary", { name: "Task tools" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Open building blocks" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Privacy" })).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: /Click me\?/ }));
   });
@@ -177,7 +180,8 @@ describe("URL-first exact review", () => {
     renderApp();
 
     await waitFor(() => expect(apiMock.game).toHaveBeenCalledWith(42));
-    expect(await screen.findByText("BOARD A · YOUR BOARD")).toBeTruthy();
+    expect(await screen.findByTestId("board-First Board")).toBeTruthy();
+    expect(screen.queryByText("First Board")).toBeNull();
     expect(new URLSearchParams(location.search).get("game")).toBe("42");
   });
 
@@ -191,8 +195,10 @@ describe("URL-first exact review", () => {
 
     await waitFor(() => expect(useCoachStore.getState().guestMatch).toEqual(guestMatch));
     expect(useCoachStore.getState().game?.timeline.length).toBeGreaterThan(100);
-    expect(screen.getByText("BOARD A · FEATURED PLAYER")).toBeTruthy();
-    expect(screen.getByText("BOARD B · PARTNER BOARD")).toBeTruthy();
+    expect(screen.getByTestId("board-First Board")).toBeTruthy();
+    expect(screen.getByText("Second Board")).toBeTruthy();
+    expect(screen.queryByText("BOARD A · FEATURED PLAYER")).toBeNull();
+    expect(screen.queryByText("BOARD B · PARTNER BOARD")).toBeNull();
     expect((screen.getByRole("button", { name: "Review" }) as HTMLButtonElement).disabled).toBe(false);
     expect(statistics.disabled).toBe(true);
     const stored = JSON.parse(localStorage.getItem(GUEST_PROGRESS_KEY) ?? "{}") as { capabilities?: Record<string, string> };
@@ -210,7 +216,7 @@ describe("URL-first exact review", () => {
   it("requires and persists the versioned acknowledgement only when analysis is requested", async () => {
     history.replaceState(null, "", "/?game=42");
     renderApp();
-    expect(await screen.findByText("BOARD A · YOUR BOARD")).toBeTruthy();
+    expect(await screen.findByTestId("board-First Board")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: /analysis acknowledgement/i })).toBeNull();
     fireEvent.click(screen.getAllByRole("button", { name: "Run mocked analysis" })[0]);
     const continueButton = screen.getByRole("button", { name: "Continue to analysis" }) as HTMLButtonElement;
@@ -249,7 +255,8 @@ describe("URL-first exact review", () => {
     fireEvent.change(screen.getByRole("textbox", { name: /Sign in/ }), { target: { value: "x" } });
     const unmute = await screen.findByRole("button", { name: "unmute" });
     expect(container.querySelector(".app-shell")?.classList.contains("word-vertigo-sequence")).toBe(true);
-    expect(container.querySelector(".app-rail")?.hasAttribute("inert")).toBe(true);
+    expect(container.querySelector(".app-rail")?.hasAttribute("inert")).toBe(false);
+    expect(container.querySelector(".app-rail-locked-content")?.hasAttribute("inert")).toBe(true);
     expect(container.querySelector(".app-dock")?.hasAttribute("inert")).toBe(false);
     expect(container.querySelector(".app-dock-content")?.hasAttribute("inert")).toBe(true);
     fireEvent.click(unmute);
@@ -257,7 +264,7 @@ describe("URL-first exact review", () => {
     await waitFor(() => expect(useCoachStore.getState().guestMatch).toEqual(selectedMatch));
     expect(apiMock.guestMatchups).toHaveBeenCalledOnce();
     expect(apiMock.chessComMatchReplay).toHaveBeenCalledWith(selectedMatch.game_ids.A);
-    expect(screen.getByText("BOARD A · FEATURED PLAYER")).toBeTruthy();
+    expect(screen.getByTestId("board-First Board")).toBeTruthy();
     random.mockRestore();
   });
 });
