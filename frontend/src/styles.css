@@ -1678,22 +1678,6 @@ body { background: #050910; }
   background: #080d16;
 }
 .onboarding-entry-copy { max-width: 620px; text-align: center; }
-.onboarding-map-shell:not(.guest-matchup-surface) > .onboarding-entry-copy { position: relative; isolation: isolate; }
-.onboarding-map-shell:not(.guest-matchup-surface) > .onboarding-entry-copy::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  z-index: -1;
-  width: 210px;
-  height: 82px;
-  transform: translateX(-50%);
-  clip-path: inset(0 0 48% 0);
-  background: radial-gradient(ellipse at 50% 100%, transparent 0 31%, #9d4edd 32% 37%, #4361ee 38% 43%, #2ec4b6 44% 49%, #ffe66d 50% 55%, #ff9f1c 56% 61%, #ff4d6d 62% 67%, transparent 68%);
-  opacity: .72;
-  pointer-events: none;
-}
-.onboarding-map-shell:not(.guest-matchup-surface) > .onboarding-entry-copy > * { position: relative; z-index: 1; }
 .onboarding-map-shell:not(.guest-matchup-surface) > .onboarding-entry-copy p,
 .onboarding-map-shell:not(.guest-matchup-surface) .onboarding-entry-node small { overflow-wrap: anywhere; }
 .onboarding-entry-copy > span { color: var(--cyan); font-size: 9px; font-weight: 900; letter-spacing: .14em; }
