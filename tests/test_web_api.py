@@ -153,6 +153,29 @@ def test_room_websocket_relays_versioned_event() -> None:
             assert receive_event_type(socket, "timeline.seek")["payload"]["global_ply"] == 12
 
 
+def test_room_websocket_persists_quest_deadline_for_invitees() -> None:
+    with TestClient(app) as client:
+        room = client.post("/api/rooms", json={"game_id": None}).json()
+        joined = client.post(f"/api/rooms/{room['id']}/join", json={"display_name": "Guest 1"}).json()
+        deadline = 1_786_337_100_000
+        with client.websocket_connect(f"/ws/rooms/{room['id']}?client_id={joined['client_id']}&display_name=Guest%201") as socket:
+            assert socket.receive_json()["type"] == "room.snapshot"
+            event = {
+                "version": 1,
+                "event_id": str(uuid4()),
+                "room_id": room["id"],
+                "sender_id": joined["client_id"],
+                "timestamp": datetime.now(UTC).isoformat(),
+                "type": "quest.status",
+                "payload": {"deadline": deadline, "completed": False},
+            }
+            socket.send_json(event)
+            assert receive_event_type(socket, "quest.status")["payload"]["deadline"] == deadline
+
+        state = client.get(f"/api/rooms/{room['id']}").json()
+        assert state["snapshot"]["quest.status"]["payload"]["deadline"] == deadline
+
+
 class DiskFullSession:
     def add(self, _: object) -> None:
         pass

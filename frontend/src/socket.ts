@@ -53,10 +53,16 @@ const applyVariation = (event?: RoomEventPayload) => {
   }
 };
 
+const applyQuestStatus = (event?: RoomEventPayload) => {
+  const deadline = Number(event?.payload?.deadline);
+  useCoachStore.getState().setRoomQuestDeadline(Number.isSafeInteger(deadline) && deadline > 0 ? deadline : null);
+};
+
 export const applyRoomSnapshot = async (snapshot: RoomSnapshot, fallbackGameId?: number | null) => {
   await loadSharedGame(snapshot["game.select"]?.payload?.game_id ?? snapshot.room?.game_id ?? fallbackGameId);
   applySeek(snapshot["timeline.seek"]);
   applyVariation(latestEvent(snapshot, ["variation.create", "variation.update", "variation.return_to_game"]));
+  applyQuestStatus(snapshot["quest.status"]);
   useCoachStore.getState().setParticipants(snapshot.presence ?? []);
   snapshot.annotations?.forEach((item) => useCoachStore.getState().addAnnotation(item));
   snapshot.messages?.forEach((item) => useCoachStore.getState().addMessage(item));
@@ -84,6 +90,7 @@ export const connectRoomSocket = (roomId: string, clientId: string, displayName 
       store.addMessage(chatItem);
       window.dispatchEvent(new CustomEvent("thejimmyapp:chat-message", { detail: chatItem }));
     }
+    if (event.type === "quest.status") applyQuestStatus({ type: event.type, payload: event.payload });
     if (event.type === "variation.create" || event.type === "variation.update") {
       const boardA = event.payload?.board_a;
       const boardB = event.payload?.board_b;
@@ -92,6 +99,11 @@ export const connectRoomSocket = (roomId: string, clientId: string, displayName 
     if (event.type === "variation.return_to_game") store.returnToGame();
   };
   return socket;
+};
+
+export const disconnectRoomSocket = () => {
+  socket?.close();
+  socket = null;
 };
 
 export const sendRoomEvent = (type: string, payload: Record<string, unknown>) => {

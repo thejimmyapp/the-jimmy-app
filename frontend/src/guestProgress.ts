@@ -1,9 +1,10 @@
 import type { BoardId, MatchSeat, ReviewLesson } from "./types";
 
 const LEGACY_GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v1";
-export const GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v2";
+const PRE_QUEST_GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v2";
+export const GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v3";
 export const ANALYSIS_ACKNOWLEDGEMENT_KEY = "thejimmyapp.analysisAcknowledgement.v1";
-export const GUEST_PROGRESS_VERSION = 2 as const;
+export const GUEST_PROGRESS_VERSION = 3 as const;
 export const ANALYSIS_ACKNOWLEDGEMENT_VERSION = "analysis-limits-2026-08-06";
 
 export type MapNodeId = "start" | "analyze" | "library" | "partner";
@@ -18,6 +19,7 @@ export const capabilityKeys = [
   "dock_games",
   "dock_library",
   "dock_collaborate",
+  "dock_quest",
   "board_analysis",
   "team_coach",
 ] as const;
@@ -36,6 +38,7 @@ export const initialCapabilityMap = (): CapabilityMap => ({
   dock_games: "locked",
   dock_library: "locked",
   dock_collaborate: "locked",
+  dock_quest: "locked",
   board_analysis: "locked",
   team_coach: "locked",
 });
@@ -80,6 +83,8 @@ export interface GuestProgress {
   mapNode: MapNodeId;
   savedLessons: SavedLesson[];
   savedMoments: SavedMoment[];
+  questDeadline: number | null;
+  questCompleted: boolean;
   capabilities: CapabilityMap;
 }
 
@@ -89,6 +94,8 @@ export const emptyGuestProgress = (): GuestProgress => ({
   mapNode: "start",
   savedLessons: [],
   savedMoments: [],
+  questDeadline: null,
+  questCompleted: false,
   capabilities: initialCapabilityMap(),
 });
 
@@ -137,21 +144,28 @@ const isSavedMoment = (value: unknown): value is SavedMoment => {
 };
 
 const parseProgress = (raw: string): GuestProgress => {
-  const parsed = JSON.parse(raw) as Partial<GuestProgress> & { version?: number };
-  if (parsed.version !== 1 && parsed.version !== GUEST_PROGRESS_VERSION) return emptyGuestProgress();
+  const parsed = JSON.parse(raw) as Omit<Partial<GuestProgress>, "version"> & { version?: number };
+  if (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== GUEST_PROGRESS_VERSION) return emptyGuestProgress();
+  const savedMoments = parsed.version >= 2 && Array.isArray(parsed.savedMoments) ? parsed.savedMoments.filter(isSavedMoment) : [];
+  const questCompleted = parsed.version === GUEST_PROGRESS_VERSION ? parsed.questCompleted === true : savedMoments.length >= 3;
+  const storedDeadline = Number(parsed.questDeadline);
+  const capabilities = loadCapabilities(parsed.capabilities);
+  if (questCompleted) capabilities.dock_quest = "unlocked";
   return {
     version: GUEST_PROGRESS_VERSION,
     firstGameOpened: parsed.firstGameOpened === true,
     mapNode: mapNodes.has(parsed.mapNode as MapNodeId) ? parsed.mapNode as MapNodeId : "start",
     savedLessons: Array.isArray(parsed.savedLessons) ? parsed.savedLessons.filter(isSavedLesson) : [],
-    savedMoments: parsed.version === GUEST_PROGRESS_VERSION && Array.isArray(parsed.savedMoments) ? parsed.savedMoments.filter(isSavedMoment) : [],
-    capabilities: loadCapabilities(parsed.capabilities),
+    savedMoments,
+    questDeadline: !questCompleted && parsed.version === GUEST_PROGRESS_VERSION && Number.isSafeInteger(storedDeadline) && storedDeadline > 0 ? storedDeadline : null,
+    questCompleted,
+    capabilities,
   };
 };
 
 export const loadGuestProgress = (): GuestProgress => {
   try {
-    const raw = localStorage.getItem(GUEST_PROGRESS_KEY) ?? localStorage.getItem(LEGACY_GUEST_PROGRESS_KEY);
+    const raw = localStorage.getItem(GUEST_PROGRESS_KEY) ?? localStorage.getItem(PRE_QUEST_GUEST_PROGRESS_KEY) ?? localStorage.getItem(LEGACY_GUEST_PROGRESS_KEY);
     if (!raw) return emptyGuestProgress();
     return parseProgress(raw);
   } catch {
@@ -219,6 +233,7 @@ export const acceptAnalysisAcknowledgement = () => {
 
 export const clearGuestProgress = () => {
   localStorage.removeItem(GUEST_PROGRESS_KEY);
+  localStorage.removeItem(PRE_QUEST_GUEST_PROGRESS_KEY);
   localStorage.removeItem(LEGACY_GUEST_PROGRESS_KEY);
   localStorage.removeItem(ANALYSIS_ACKNOWLEDGEMENT_KEY);
 };

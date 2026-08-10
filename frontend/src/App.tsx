@@ -19,9 +19,10 @@ import { ReviewLesson } from "./components/ReviewLesson";
 import { SidePanel } from "./components/SidePanel";
 import { StatsDashboard } from "./components/StatsDashboard";
 import { TeamCoach } from "./components/TeamCoach";
-import { acceptAnalysisAcknowledgement, hasAnalysisAcknowledgement, isCapabilityLocked, lessonStorageId, loadGuestProgress, qualifyingGameCount, savedLessonFrom, savedMomentCount, savedMomentKey, storeGuestProgress, type CapabilityKey, type GuestProgress, type MomentGlyph, type SavedLesson, type SavedMoment } from "./guestProgress";
+import { acceptAnalysisAcknowledgement, clearGuestProgress, emptyGuestProgress, hasAnalysisAcknowledgement, isCapabilityLocked, lessonStorageId, loadGuestProgress, qualifyingGameCount, savedLessonFrom, savedMomentCount, savedMomentKey, storeGuestProgress, type CapabilityKey, type GuestProgress, type MomentGlyph, type SavedLesson, type SavedMoment } from "./guestProgress";
 import { captureMomentContext, matchForSavedMoment, playerNamesForMoment, savedMomentFromCapture, type MomentCapture } from "./learningMoments";
-import { applyRoomSnapshot, connectRoomSocket, sendRoomEvent } from "./socket";
+import { completeGuestQuestIfReady, formatQuestCountdown, questMomentProgress, questRemainingSeconds, startGuestQuest } from "./quest";
+import { applyRoomSnapshot, connectRoomSocket, disconnectRoomSocket, sendRoomEvent } from "./socket";
 import { currentPosition, useCoachStore } from "./store";
 import { replayNotices } from "./replayIntegrity";
 import type { BoardId, GameSummary, NormalizedMatch } from "./types";
@@ -98,6 +99,7 @@ export default function App() {
   const [wordVertigoActive, setWordVertigoActive] = useState(false);
   const [boardsSwapped, setBoardsSwapped] = useState(false);
   const [momentCapture, setMomentCapture] = useState<MomentCapture | null>(null);
+  const [questNow, setQuestNow] = useState(Date.now);
   const analysisResolverRef = useRef<((accepted: boolean) => void) | null>(null);
   const [reviewGameId, setReviewGameId] = useState<number | null>(() => {
     if (store.roomId) return null;
@@ -131,7 +133,7 @@ export default function App() {
   const roomQuery = useQuery({ queryKey: ["room", store.roomId], queryFn: () => api.room(store.roomId as string), enabled: Boolean(store.roomId) });
   const restoredGameQuery = useQuery({ queryKey: ["game", reviewGameId], queryFn: () => api.game(reviewGameId as number), enabled: Boolean(reviewGameId && !store.roomId && !store.game) });
   useEffect(() => { if (gamesQuery.data) useCoachStore.getState().setGames(gamesQuery.data.games); }, [gamesQuery.data]);
-  useEffect(() => { if (roomQuery.data) void applyRoomSnapshot(roomQuery.data.snapshot, roomQuery.data.game_id); }, [roomQuery.data]);
+  useEffect(() => { if (roomQuery.data && useCoachStore.getState().roomId) void applyRoomSnapshot(roomQuery.data.snapshot, roomQuery.data.game_id); }, [roomQuery.data]);
   useEffect(() => { if (restoredGameQuery.data) openGame(restoredGameQuery.data); }, [openGame, restoredGameQuery.data]);
   const gameMutation = useMutation({ mutationFn: api.game, onSuccess: openGame });
   const resolveMutation = useMutation({
@@ -171,7 +173,11 @@ export default function App() {
   const roomMutation = useMutation({ mutationFn: () => api.createRoom(store.game?.game.id), onSuccess: async (room) => {
     joinedRoomRef.current = room.id;
     setShareCopied(false);
-    const joined = await api.joinRoom(room.id, store.username || "Coach"); store.setRoom(room.id, joined.client_id, joined.display_name); history.replaceState(null, "", room.share_path); connectRoomSocket(room.id, joined.client_id, joined.display_name);
+    const joined = await api.joinRoom(room.id, store.username || "Coach"); store.setRoom(room.id, joined.client_id, joined.display_name); history.replaceState(null, "", room.share_path);
+    const roomSocket = connectRoomSocket(room.id, joined.client_id, joined.display_name);
+    if (guestProgress.questDeadline !== null || guestProgress.questCompleted) {
+      roomSocket.addEventListener("open", () => sendRoomEvent("quest.status", { deadline: guestProgress.questDeadline, completed: guestProgress.questCompleted }), { once: true });
+    }
   }});
   useEffect(() => {
     if (!roomId || joinedRoomRef.current === roomId) return;
@@ -215,6 +221,13 @@ export default function App() {
     return [savedMomentKey(moment), playerNamesForMoment(currentMatch ?? matchForSavedMoment(availableMomentMatches, moment))];
   }));
   const momentCount = savedMomentCount(guestProgress);
+  const questProgress = questMomentProgress(guestProgress);
+  const questRemaining = questRemainingSeconds(guestProgress.questDeadline, questNow);
+  const questCountdown = questRemaining === null ? null : formatQuestCountdown(questRemaining);
+  const roomQuestDeadline = store.roomQuestDeadline;
+  const sharedQuestDeadline = roomQuestDeadline ?? (store.guestMatch ? guestProgress.questDeadline : null);
+  const roomQuestRemaining = questRemainingSeconds(sharedQuestDeadline, questNow);
+  const setRoomQuestDeadline = store.setRoomQuestDeadline;
   const selectGame = (game: GameSummary) => { gameMutation.mutate(game.id); sendRoomEvent("game.select", { game_id: game.id }); };
   const openImport = () => { setManualImportOpen(true); setConnectOpen(true); };
   const connect = (event: FormEvent) => { event.preventDefault(); const clean = usernameDraft.trim(); if (!clean) return; store.setUsername(clean); connectMutation.mutate(clean); };
@@ -264,6 +277,63 @@ export default function App() {
     setMomentCapture(null);
   }, [store.game?.game.id, store.guestMatch?.highest_rated.seat]);
 
+  const resetGuestSession = useCallback(() => {
+    disconnectRoomSocket();
+    clearGuestProgress();
+    setGuestProgress(emptyGuestProgress());
+    useCoachStore.setState({
+      game: null,
+      guestMatch: null,
+      globalPly: 0,
+      mode: "review",
+      explorationStartPly: null,
+      explorationPositions: null,
+      explorationHistory: [],
+      explorationFuture: [],
+      variationMoves: [],
+      variationFutureMoves: [],
+      roomId: null,
+      participants: [],
+      annotations: [],
+      messages: [],
+      roomQuestDeadline: null,
+    });
+    setOnboardingPhase("entry");
+    setWordVertigoActive(false);
+    setArchiveOpen(false);
+    setConnectOpen(false);
+    setCoachOpen(false);
+    setView("review");
+    setReviewGameId(null);
+    setMomentCapture(null);
+    const browserUrl = new URL(location.href);
+    browserUrl.searchParams.delete("game");
+    browserUrl.searchParams.delete("room");
+    history.replaceState(null, "", `${browserUrl.pathname}${browserUrl.search}${browserUrl.hash}`);
+  }, []);
+
+  useEffect(() => {
+    const timerRunning = (guestProgress.questDeadline !== null && !guestProgress.questCompleted) || sharedQuestDeadline !== null;
+    if (!timerRunning) return;
+    const tick = () => setQuestNow(Date.now());
+    tick();
+    const timer = window.setInterval(tick, 250);
+    return () => window.clearInterval(timer);
+  }, [guestProgress.questCompleted, guestProgress.questDeadline, sharedQuestDeadline]);
+
+  useEffect(() => {
+    if (guestProgress.questDeadline !== null && !guestProgress.questCompleted && questRemaining === 0) resetGuestSession();
+  }, [guestProgress.questCompleted, guestProgress.questDeadline, questRemaining, resetGuestSession]);
+
+  useEffect(() => {
+    if (roomQuestDeadline !== null && roomQuestRemaining === 0) setRoomQuestDeadline(null);
+  }, [roomQuestDeadline, roomQuestRemaining, setRoomQuestDeadline]);
+
+  useEffect(() => {
+    if (!store.roomId || !store.guestMatch) return;
+    sendRoomEvent("quest.status", { deadline: guestProgress.questDeadline, completed: guestProgress.questCompleted });
+  }, [guestProgress.questCompleted, guestProgress.questDeadline, store.guestMatch, store.roomId]);
+
   const openMomentEditor = useCallback(() => {
     const current = useCoachStore.getState();
     if (current.mode !== "review") return;
@@ -295,7 +365,7 @@ export default function App() {
     const replay = reconstructGuestMatch(source);
     setGuestReplay(source.match, replay.game);
     setView("review");
-    updateGuestProgress((current) => ({
+    updateGuestProgress((current) => startGuestQuest({
       ...current,
       firstGameOpened: true,
       mapNode: "analyze",
@@ -310,7 +380,7 @@ export default function App() {
   const saveLearningMoment = (glyph: MomentGlyph, note: string) => {
     if (!momentCapture) return;
     const moment = savedMomentFromCapture(momentCapture, glyph, note);
-    updateGuestProgress((current) => ({
+    updateGuestProgress((current) => completeGuestQuestIfReady({
       ...current,
       savedMoments: [...current.savedMoments, moment],
       capabilities: { ...current.capabilities, dock_library: "unlocked" },
@@ -373,7 +443,8 @@ export default function App() {
   };
 
   const goToMap = () => {
-    useCoachStore.setState({ game: null, guestMatch: null, roomId: null, participants: [], globalPly: 0 });
+    disconnectRoomSocket();
+    useCoachStore.setState({ game: null, guestMatch: null, roomId: null, participants: [], globalPly: 0, roomQuestDeadline: null });
     setOnboardingPhase("entry");
     setWordVertigoActive(false);
     setArchiveOpen(false);
@@ -444,7 +515,7 @@ export default function App() {
           {store.game ? <div className="boards-grid"><BoardPanel boardId={stagedSourceBoard} position={stagedPosition} orientation={stagedOrientation} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "A"} title={stagedBoardName} showTitle={false} onCaptureMoment={store.guestMatch ? openMomentEditor : undefined} captureMomentDisabled={!captureMomentContext(store.guestMatch, store.game, store.globalPly, stagedSourceBoard)} playerTop={stagedPlayerTop} playerBottom={stagedPlayerBottom} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}
         </div>
       </section> : <StatsDashboard username={store.username} />}
-      dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" activeBoard={activeReviewBoard} boardFocusEnabled={Boolean(store.guestMatch)} onActiveBoardChange={setActiveReviewBoard} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} onSwapBoards={store.guestMatch ? () => setBoardsSwapped((current) => !current) : undefined} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} savedMoments={guestProgress.savedMoments} savedMomentCount={momentCount} momentPlayers={momentPlayers} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} onOpenSavedMoment={openSavedMoment} onRemoveSavedMoment={removeSavedMoment} infoContent={reviewInfo} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button disabled={guestCoachLocked} className={`coach-button ${guestCoachLocked ? "capability-locked" : ""}`} title={guestCoachLocked ? "Team Coach unlocks in a future guest capability" : "Run the coupled Bughouse coaching pipeline"} onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach{guestCoachLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>}</> : undefined} boardContent={store.game ? <BoardPanel boardId={dockSourceBoard} position={dockPosition} orientation={dockOrientation} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "B"} title={dockBoardName} playerTop={dockBoardAvailable ? dockPlayerTop : "Diagonal Opponent Unknown"} playerBottom={dockBoardAvailable ? dockPlayerBottom : "Partner Unknown"} unavailable={!dockBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : undefined} />}
+      dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" activeBoard={activeReviewBoard} boardFocusEnabled={Boolean(store.guestMatch)} onActiveBoardChange={setActiveReviewBoard} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} onSwapBoards={store.guestMatch ? () => setBoardsSwapped((current) => !current) : undefined} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} savedMoments={guestProgress.savedMoments} savedMomentCount={momentCount} questCountdown={questCountdown} questCompleted={guestProgress.questCompleted} questProgress={questProgress} roomQuestRemainingSeconds={roomQuestRemaining} momentPlayers={momentPlayers} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} onOpenSavedMoment={openSavedMoment} onRemoveSavedMoment={removeSavedMoment} infoContent={reviewInfo} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button disabled={guestCoachLocked} className={`coach-button ${guestCoachLocked ? "capability-locked" : ""}`} title={guestCoachLocked ? "Team Coach unlocks in a future guest capability" : "Run the coupled Bughouse coaching pipeline"} onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach{guestCoachLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>}</> : undefined} boardContent={store.game ? <BoardPanel boardId={dockSourceBoard} position={dockPosition} orientation={dockOrientation} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "B"} title={dockBoardName} playerTop={dockBoardAvailable ? dockPlayerTop : "Diagonal Opponent Unknown"} playerBottom={dockBoardAvailable ? dockPlayerBottom : "Partner Unknown"} unavailable={!dockBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : undefined} />}
     />
     {store.game && <TeamCoach open={coachOpen} onClose={() => setCoachOpen(false)} boardA={sourceBoardA} boardB={sourceBoardB} />}
       {momentCapture && document.getElementById("app-stage-panel") && createPortal(<MomentEditor capture={momentCapture} onSave={saveLearningMoment} onCancel={() => setMomentCapture(null)} />, document.getElementById("app-stage-panel")!)}

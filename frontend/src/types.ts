@@ -171,6 +171,7 @@ export interface RoomSnapshot {
   "variation.create"?: RoomEventPayload;
   "variation.update"?: RoomEventPayload;
   "variation.return_to_game"?: RoomEventPayload;
+  "quest.status"?: RoomEventPayload;
 }
 
 export interface RoomPayload {

@@ -19,6 +19,7 @@ vi.mock("./api", async (importOriginal) => {
 vi.mock("./socket", () => ({
   applyRoomSnapshot: vi.fn(),
   connectRoomSocket: vi.fn(),
+  disconnectRoomSocket: vi.fn(),
   sendRoomEvent: vi.fn(),
 }));
 

@@ -1,12 +1,13 @@
 import { Bell, BookOpen, Home, LockKeyhole, Search, Send, Trash2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { isCapabilityLocked, savedMomentKey, type CapabilityKey, type CapabilityMap, type SavedLesson, type SavedMoment } from "../guestProgress";
+import { QUEST_COPY, QUEST_TARGET_MOMENTS, questRoomMessage } from "../quest";
 import { sendRoomEvent } from "../socket";
 import { useCoachStore } from "../store";
 import type { BoardId, GameSummary } from "../types";
 import { Timeline } from "./Timeline";
 
-type PrimaryTab = "review" | "games" | "library" | "collaborate";
+type PrimaryTab = "review" | "games" | "library" | "collaborate" | "quest";
 type ReviewTab = "info" | "moves" | "board";
 type CollaborateTab = "chat" | "notes";
 
@@ -18,6 +19,10 @@ interface Props {
   savedLessons: SavedLesson[];
   savedMoments?: SavedMoment[];
   savedMomentCount?: number;
+  questCountdown?: string | null;
+  questCompleted?: boolean;
+  questProgress?: number;
+  roomQuestRemainingSeconds?: number | null;
   momentPlayers?: Record<string, string>;
   qualifyingGames: number;
   onOpenSavedLesson: (lesson: SavedLesson) => Promise<boolean>;
@@ -44,9 +49,10 @@ const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
   games: "dock_games",
   library: "dock_library",
   collaborate: "dock_collaborate",
+  quest: "dock_quest",
 };
 
-export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
+export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, questCountdown = null, questCompleted = false, questProgress = Math.min(QUEST_TARGET_MOMENTS, savedMomentCount), roomQuestRemainingSeconds = null, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
   const [reviewTab, setReviewTab] = useState<ReviewTab | null>(null);
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
@@ -145,11 +151,17 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
     <aside className={`side-panel utility-panel ${isCapabilityLocked(capabilities, primaryCapability[primaryTab]) ? "capability-locked" : ""}`} aria-label="Review utility panel" data-saved-moment-count={savedMomentCount}>
       <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><div className="utility-titlebar-actions">{onSwapBoards && <button type="button" className="board-swap-button" aria-label="Swap staged board" title="Swap staged board" onClick={swapBoards}><span aria-hidden="true">↹⇄</span></button>}{dockActions}<button type="button" onClick={onMap}><Home size={13} /> Map</button></div></div>
       <div className="utility-primary-tabs" role="tablist" aria-label="Review tools">
-        {(["review", "games", "library", "collaborate"] as PrimaryTab[]).map((tab) => {
+        {(["review", "games", "library", "collaborate", "quest"] as PrimaryTab[]).map((tab) => {
           const locked = isCapabilityLocked(capabilities, primaryCapability[tab]);
-          return <button key={tab} role="tab" aria-selected={primaryTab === tab} disabled={locked} className={`${primaryTab === tab ? "active" : ""} ${locked ? "capability-locked" : ""}`} onClick={() => choosePrimary(tab)}>{tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</> : tab === "library" ? <>Library{savedMomentCount > 0 && <span className="library-count">{savedMomentCount}</span>}</> : tab[0].toUpperCase() + tab.slice(1)}{locked && <LockKeyhole className="capability-lock-badge" size={11} aria-hidden="true" />}</button>;
+          const label = tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</>
+            : tab === "library" ? <>Library{savedMomentCount > 0 && <span className="library-count">{savedMomentCount}</span>}</>
+              : tab === "quest" ? (questCompleted ? "Complete" : questCountdown ?? "Quest")
+                : tab[0].toUpperCase() + tab.slice(1);
+          return <button key={tab} role="tab" aria-selected={primaryTab === tab} disabled={locked && tab !== "quest"} className={`${primaryTab === tab ? "active" : ""} ${locked ? "capability-locked" : ""} ${locked && tab === "quest" ? "quest-preview" : ""}`} onClick={() => choosePrimary(tab)}>{label}{locked && <LockKeyhole className="capability-lock-badge" size={11} aria-hidden="true" />}</button>;
         })}
       </div>
+
+      {roomId && roomQuestRemainingSeconds !== null && roomQuestRemainingSeconds > 0 && <div className="quest-room-notice" role="status">{questRoomMessage(roomQuestRemainingSeconds)}</div>}
 
       {primaryTab === "review" && <div className="utility-secondary-tabs" role="tablist" aria-label="Review views">
         {(["info", "moves", "board"] as ReviewTab[]).map((tab) => <button key={tab} role="tab" aria-selected={reviewTab === tab} className={reviewTab === tab ? "active" : ""} onClick={() => chooseReview(tab)}>{tab === "board" ? dockBoardName : tab[0].toUpperCase() + tab.slice(1)}</button>)}
@@ -202,6 +214,14 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
           </article>)}
           {!savedMoments.length && !savedLessons.length && <div className="empty-panel">No saved learning moments yet.</div>}
         </div>
+      </div>}
+
+      {primaryTab === "quest" && <div className="utility-pane quest-pane">
+        <div className="quest-progress" role="progressbar" aria-label="Quest learning moments" aria-valuemin={0} aria-valuemax={QUEST_TARGET_MOMENTS} aria-valuenow={questProgress}>
+          <strong>{questProgress}/{QUEST_TARGET_MOMENTS}</strong>
+          <span><i style={{ width: `${questProgress / QUEST_TARGET_MOMENTS * 100}%` }} /></span>
+        </div>
+        <p>{QUEST_COPY}</p>
       </div>}
 
       {primaryTab === "collaborate" && <div className="utility-pane collaborate-pane">
