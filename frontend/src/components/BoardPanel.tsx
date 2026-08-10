@@ -5,6 +5,7 @@ import { isMeaningfulChessVector, parseEngineBestmove } from "../boardInteractio
 import { sendRoomEvent } from "../socket";
 import { currentPosition, useCoachStore } from "../store";
 import type { Annotation, BoardId, ExplorationMoveResult, ReplayPosition } from "../types";
+import { FutureComponentPlaceholder } from "./FutureComponentPlaceholder";
 
 const pieces: Record<string, string> = {
   K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘", P: "♙",
@@ -316,7 +317,7 @@ export function BoardPanel({ boardId, position, pairedPosition, orientation, pie
   };
 
   return (
-    <section className={`board-panel board-layout-${layout} ${mode === "exploration" ? "is-exploring" : ""} ${unavailable ? "is-unavailable" : ""} ${keyboardFocused ? "board-focus-active" : ""}`} data-keyboard-focus={keyboardFocused ? "active" : "inactive"}>
+    <section className={`board-panel board-layout-${layout} ${mode === "exploration" ? "is-exploring" : ""} ${unavailable ? "is-unavailable" : ""} ${keyboardFocused ? "board-focus-active" : ""} ${layout === "primary" && analysisLocked ? "has-engine-placeholders" : ""}`} data-keyboard-focus={keyboardFocused ? "active" : "inactive"}>
       <div className="board-heading">{showTitle && <strong>{title}</strong>}{onCaptureMoment && <button type="button" className="moment-capture-button" onClick={onCaptureMoment} disabled={captureMomentDisabled} aria-label="Save current learning moment" title="Save current learning moment (m)"><kbd>m</kbd> moment</button>}{keyboardFocused && <span className="board-focus-badge">KEYBOARD FOCUS</span>}<span>{position?.side_to_move ?? "Unavailable"} to move</span></div>
       <PlayerBar name={playerTop} clock={orientation === "white" ? position?.black_clock : position?.white_clock} />
       <div className={`board-stage ${layout === "standard" ? "horizontal-pockets" : "vertical-pockets"}`}>
@@ -385,6 +386,22 @@ export function BoardPanel({ boardId, position, pairedPosition, orientation, pie
         {analysis.status === "completed" && analysis.pv?.length ? <span className="analysis-pv" title={analysis.pv.join(" ")}>PV {analysis.pv.slice(0, 4).join(" ")}</span> : null}
         {analysis.status === "failed" ? <span className="analysis-error" title={analysis.error}>{analysis.error}</span> : <span className="interaction-status">{interactionStatus}</span>}
       </div>
+      {layout === "primary" && analysisLocked && (
+        <section className="engine-analysis-placeholders" aria-label="Locked future engine analysis placeholders">
+          <FutureComponentPlaceholder
+            imageSrc="/placeholders/specimen-12-eval-row.jpg"
+            alt="Specimen of a future engine evaluation row"
+            label="FUTURE EVALUATION ROW"
+            caption="PLACEHOLDER · future engine analysis · see /blocks"
+          />
+          <FutureComponentPlaceholder
+            imageSrc="/placeholders/specimen-21-analysis-panel.jpg"
+            alt="Specimen of a future engine analysis panel"
+            label="FUTURE ANALYSIS PANEL"
+            caption="PLACEHOLDER · future engine analysis · see /blocks"
+          />
+        </section>
+      )}
       {unavailable && (
         <div className={`board-panel-unavailable ${oneBoardAccepted ? "one-board-accepted" : ""}`} role="status">
           <strong>Second Board is unavailable</strong>
