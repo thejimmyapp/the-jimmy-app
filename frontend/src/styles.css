@@ -1139,8 +1139,8 @@ body { background: #050910; }
 }
 
 .app-shell:not(.puzzle-shell) {
-  width: min(100vw, var(--canvas-cap));
-  height: min(100dvh, var(--canvas-height-cap));
+  width: 100vw;
+  height: 100dvh;
   min-height: 0;
   display: grid;
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
@@ -1162,7 +1162,11 @@ body { background: #050910; }
 .rail-actions { margin-top: auto; }
 .rail-nav button,
 .rail-actions button,
+.rail-actions a,
 .rail-overflow > summary { width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 1px solid #27384f; border-radius: 3px; background: #101a28; color: #9fb1c8; cursor: pointer; list-style: none; }
+.rail-actions a { text-decoration: none; }
+.rail-blocks-glyph { font-size: 17px; line-height: 1; }
+.rail-actions a:hover { border-color: #8b6fc0; background: #211a32; color: #d7c7f5; }
 .rail-nav button.active { border-color: #2b8796; background: #14303d; color: var(--cyan); box-shadow: inset -2px 0 var(--cyan); }
 .rail-nav button:disabled,
 .rail-actions button:disabled { cursor: not-allowed; opacity: .4; }
@@ -1193,8 +1197,8 @@ body { background: #050910; }
   background: radial-gradient(circle at 48% 40%, #111e2c 0, #080d16 68%);
 }
 .app-stage .workspace .boards-grid {
-  width: min(100%, calc(min(100dvh, var(--canvas-height-cap)) - (var(--outer-buffer) * 2)));
-  max-width: 790px;
+  width: min(100%, calc(100dvh - (var(--outer-buffer) * 2) - 68px));
+  max-width: none;
   min-width: 0;
   min-height: 0;
   display: block;
@@ -1580,6 +1584,7 @@ body { background: #050910; }
 .rail-nav button.capability-locked,
 .rail-actions button.capability-locked,
 .utility-primary-tabs button.capability-locked { color: #647184; opacity: .48; filter: grayscale(1); cursor: not-allowed; }
+.app-rail[inert] .rail-blocks-link { color: #647184; opacity: .48; filter: grayscale(1); cursor: default; }
 .capability-lock-badge { position: absolute; right: 2px; bottom: 2px; padding: 1px; border-radius: 2px; background: #111a27; color: #9ba7b8; }
 .utility-panel.capability-locked > *:not(.utility-primary-tabs) { opacity: .42; filter: grayscale(1); }
 .utility-primary-tabs button.capability-locked .capability-lock-badge { right: 4px; bottom: 4px; }
