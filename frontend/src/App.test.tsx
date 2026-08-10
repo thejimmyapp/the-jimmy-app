@@ -169,7 +169,7 @@ describe("URL-first exact review", () => {
   it("keeps the building-blocks rail link unlocked and opens it in a new tab", () => {
     const { container } = renderApp();
     const link = container.querySelector<HTMLAnchorElement>(".rail-blocks-link");
-    expect(link?.getAttribute("href")).toBe("/blocks");
+    expect(link?.getAttribute("href")).toBe("/blocks/index.html");
     expect(link?.getAttribute("target")).toBe("_blank");
     expect(link?.getAttribute("rel")).toBe("noreferrer");
     expect(link?.textContent).toBe("🎨");

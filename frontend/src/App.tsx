@@ -495,7 +495,7 @@ export default function App() {
       pieceSize={pieceSize}
       onboardingLocked={showOnboarding}
       dockOverlayActive={showOnboarding && wordVertigoActive}
-      railUnlockedAction={<a className="rail-blocks-link" href="/blocks" target="_blank" rel="noreferrer" aria-label="Open building blocks" title="Open building blocks"><span className="rail-blocks-glyph" aria-hidden="true">🎨</span></a>}
+      railUnlockedAction={<a className="rail-blocks-link" href="/blocks/index.html" target="_blank" rel="noreferrer" aria-label="Open building blocks" title="Open building blocks"><span className="rail-blocks-glyph" aria-hidden="true">🎨</span></a>}
       rail={<>
         <div className={`rail-brand ${capabilityLocked("rail_onboarding") ? "capability-locked" : ""}`} title="The Jimmy App"><span className="brand-mark">J</span></div>
         <nav className="rail-nav" aria-label="Main views">

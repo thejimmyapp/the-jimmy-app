@@ -41,6 +41,19 @@ These captures are intentionally limited to the three study-annotation behaviors
 | 23 | `specimen-23-lichess-glyph-picker.png` | [Official Lichess study article](https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA); [exact image asset](https://image.lichess1.org/display?h=0&op=resize&path=lichess:ublog:V0KrLSkA:3tK73MEvpZ4L:F7R4Wkq2.png&w=800&sig=84e9dcfd188a05e9960b2484973e8a0a47f2d5cd) | Named move glyph choices, including `!`, `?`, `!!`, `??`, and `!?`, plus position/observation annotations. |
 | 24 | `specimen-24-lichess-position-variations.png` | [Lichess forum source page](https://lichess.org/forum/lichess-feedback/showing-of-possible-options-gone-from-studies); [original community screenshot](https://i.imgur.com/1JOtKQS.png) | Alternate continuations shown as sibling choices at the current study path. The stored image is a lossless crop to the move panel and fork control; no pixels were otherwise altered. |
 
+## Bv2 paired-viewer capture
+
+Specimen 25 was captured on 2026-08-09 from the public viewer with the requested match loaded and
+both linked boards visible.
+
+| Block | File | Exact source | Intended lesson |
+|---|---|---|---|
+| 25 | `specimen-25-bmacho-loaded-match.jpg` | [bmacho Bughouse Viewer — match 180616071971](https://bmacho.github.io/bughouse-viewer/view.html?game_id=180616071971) | Preserve both boards, four player identities and ratings, clocks, pockets, paired navigation, position addressing, variations, and a position comment around one learning moment. Viewer piece graphics have unclear provenance and remain reference-only. |
+
+## Design backlog
+
+block 13 to be redesigned as lichess-study × chess.com hybrid card (owner redline era).
+
 ### AGPL source-code boundary
 
 The narrowly selected upstream excerpts are stored only in [`LICHESS-STUDY-ANNOTATION-AGPL-REFERENCE.md`](./specimens/LICHESS-STUDY-ANNOTATION-AGPL-REFERENCE.md). They are pinned to Lichess `lila` revision [`9d0e1761e0841b1018a0b2b19e08fc9b397f5689`](https://github.com/lichess-org/lila/tree/9d0e1761e0841b1018a0b2b19e08fc9b397f5689), whose repository license is [GNU Affero General Public License v3](https://github.com/lichess-org/lila/blob/9d0e1761e0841b1018a0b2b19e08fc9b397f5689/LICENSE).
@@ -53,7 +66,7 @@ Every excerpt in that file is headed **AGPL-3.0 REFERENCE — REIMPLEMENT, NEVER
 
 It intentionally omits unrelated Lichess study modules and infrastructure.
 
-Numbering registry: blocks 1–11 canonical, 12–16 Bv2, 17–21 curated, 22–24 Bv2 annotation. The next specimen number is 25.
+Numbering registry: blocks 1–11 canonical, 12–16 Bv2, 17–21 curated, 22–24 Bv2 annotation, 25 Bv2 paired viewer. The next specimen number is 26.
 
 ## Storage boundary
 
