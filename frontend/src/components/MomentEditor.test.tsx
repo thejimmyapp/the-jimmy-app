@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MomentEditor } from "./MomentEditor";
 
@@ -14,6 +14,10 @@ describe("moment editor", () => {
     render(<MomentEditor capture={capture} onSave={onSave} onCancel={vi.fn()} />);
     const first = screen.getByRole("radio", { name: "!!" });
     expect(document.activeElement).toBe(first);
+    const placeholder = screen.getByText("PLACEHOLDER · future richer annotations · see /blocks").closest("figure");
+    expect(placeholder?.getAttribute("aria-disabled")).toBe("true");
+    expect(within(placeholder as HTMLElement).getByText("RICHER ANNOTATIONS COMING")).toBeTruthy();
+    expect(placeholder?.querySelectorAll("button, input, textarea, a, [tabindex]")).toHaveLength(0);
 
     fireEvent.keyDown(first, { key: "ArrowRight" });
     const selected = screen.getByRole("radio", { name: "!" });

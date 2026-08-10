@@ -93,6 +93,11 @@ describe("guest replay workspace integration", () => {
     const coach = screen.getByRole("button", { name: /Team Coach/ }) as HTMLButtonElement;
     expect(analyze.disabled).toBe(true);
     expect(analyze.classList.contains("capability-locked")).toBe(true);
+    const enginePlaceholderCaptions = screen.getAllByText("PLACEHOLDER · future engine analysis · see /blocks");
+    expect(enginePlaceholderCaptions).toHaveLength(2);
+    expect(enginePlaceholderCaptions.every((caption) => caption.closest("figure")?.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(screen.getByAltText("Specimen of a future engine evaluation row").getAttribute("src")).toBe("/placeholders/specimen-12-eval-row.jpg");
+    expect(screen.getByAltText("Specimen of a future engine analysis panel").getAttribute("src")).toBe("/placeholders/specimen-21-analysis-panel.jpg");
     expect(coach.disabled).toBe(true);
     expect(coach.classList.contains("capability-locked")).toBe(true);
 

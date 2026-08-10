@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { momentGlyphs, type MomentGlyph } from "../guestProgress";
 import type { MomentCapture } from "../learningMoments";
+import { FutureComponentPlaceholder } from "./FutureComponentPlaceholder";
 
 interface Props {
   capture: MomentCapture;
@@ -62,6 +63,13 @@ export function MomentEditor({ capture, onSave, onCancel }: Props) {
         <div className="moment-glyph-picker" role="radiogroup" aria-label="Move glyph">
           {momentGlyphs.map((item, index) => <button ref={(node) => { glyphButtons.current[index] = node; }} type="button" role="radio" aria-checked={glyph === item} className={glyph === item ? "active" : ""} key={item} onClick={() => setGlyph(item)} onKeyDown={(event) => chooseWithArrow(event, index)}>{item}</button>)}
         </div>
+        <FutureComponentPlaceholder
+          imageSrc="/placeholders/specimen-23-lichess-glyph-picker.png"
+          alt="Specimen of a richer future annotation picker"
+          label="RICHER ANNOTATIONS COMING"
+          caption="PLACEHOLDER · future richer annotations · see /blocks"
+          variant="strip"
+        />
         <label htmlFor="moment-note">Note<textarea id="moment-note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="what it does / why it stood out" maxLength={1000} required /></label>
         <div className="moment-editor-actions">
           <button type="button" onClick={onCancel}>Cancel</button>
