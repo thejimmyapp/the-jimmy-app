@@ -136,6 +136,7 @@
   .specimen-section{grid-column:1/-1;border-color:#7a5a1e}
   .specimen-section>h2{color:#e8b93c}
   .specimen-intro{font-size:12px;color:var(--txt2);max-width:920px}
+  .license-boundary{font-size:11.5px;color:#d7b966;border-left:3px solid #7a5a1e;padding-left:10px;max-width:980px}
   .specimen-list{display:flex;flex-direction:column;gap:20px;margin-top:2px}
   .specimen{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
   .specimen-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:10px}
@@ -182,7 +183,7 @@
       <h2 id="sources-matrix-title">6×6 clickable sources matrix</h2>
       <p>Filled cells open the cited design reference in a new tab. Empty cells remain visibly reserved so the catalog records its own growth.</p>
     </div>
-    <span class="source-matrix-count">16 filled · 20 reserved</span>
+    <span class="source-matrix-count">20 filled · 16 reserved</span>
   </header>
   <div class="source-matrix">
     <a class="source-cell filled" href="https://www.chess.com/member/beemoor" target="_blank" rel="noopener noreferrer"><b>profile</b><span>01</span></a>
@@ -201,10 +202,10 @@
     <a class="source-cell filled" href="https://www.chess.com/analysis/game/live/172758001776/analysis" target="_blank" rel="noopener noreferrer"><b>clock fade</b><span>14</span></a>
     <a class="source-cell filled" href="https://www.chess.com/analysis/game/live/172758001776/analysis" target="_blank" rel="noopener noreferrer"><b>active clock</b><span>15</span></a>
     <a class="source-cell filled" href="https://www.chess.com/analysis/game/live/172758001776/analysis" target="_blank" rel="noopener noreferrer"><b>analysis dock</b><span>16</span></a>
-    <div class="source-cell reserved" aria-label="Reserved source slot 17"><b>reserved</b><span>17</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 18"><b>reserved</b><span>18</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 19"><b>reserved</b><span>19</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 20"><b>reserved</b><span>20</span></div>
+    <a class="source-cell filled" href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA" target="_blank" rel="noopener noreferrer"><b>position notes</b><span>17</span></a>
+    <a class="source-cell filled" href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA" target="_blank" rel="noopener noreferrer"><b>glyph picker</b><span>18</span></a>
+    <a class="source-cell filled" href="https://lichess.org/forum/lichess-feedback/showing-of-possible-options-gone-from-studies" target="_blank" rel="noopener noreferrer"><b>variation fork</b><span>19</span></a>
+    <a class="source-cell filled" href="https://github.com/lichess-org/lila/tree/9d0e1761e0841b1018a0b2b19e08fc9b397f5689/ui/analyse/src/study" target="_blank" rel="noopener noreferrer"><b>AGPL source</b><span>20</span></a>
     <div class="source-cell reserved" aria-label="Reserved source slot 21"><b>reserved</b><span>21</span></div>
     <div class="source-cell reserved" aria-label="Reserved source slot 22"><b>reserved</b><span>22</span></div>
     <div class="source-cell reserved" aria-label="Reserved source slot 23"><b>reserved</b><span>23</span></div>
@@ -352,8 +353,9 @@
 </section>
 
 <section class="specimen-section" aria-labelledby="temporary-specimens">
-  <h2 id="temporary-specimens">12–21 · Screenshot specimens — temporary reference (R24)</h2>
-  <p class="specimen-intro">Captured third-party UI is retained here only as a build target. These pixels never migrate into app components. Registry: 1–11 canonical · 12–16 Bv2 · 17–21 curated · next specimen is 22.</p>
+  <h2 id="temporary-specimens">12–24 · Screenshot specimens — temporary reference (R24)</h2>
+  <p class="specimen-intro">Captured third-party UI is retained here only as a build target. These pixels never migrate into app components. Registry: 1–11 canonical · 12–16 Bv2 · 17–21 curated · 22–24 Bv2 annotation · next specimen is 25.</p>
+  <p class="license-boundary"><strong>License boundary:</strong> Lichess code references are AGPL-3.0 and exist only as clearly headed excerpts in <code>docs/specimens/</code>. No Lichess code is embedded on this page or elsewhere under <code>frontend/</code> or <code>backend/</code>; any future feature must be reimplemented from behavior, never pasted.</p>
 
   <div class="specimen-list">
     <figure class="specimen">
@@ -454,6 +456,36 @@
       <p class="specimen-copy">Tab triplet, engine header, ranked eval lines, game result header, move classifications, per-move time bars, jump controls, and New/Save/Review footer form one vertically ordered dock. Target: the engine-card group and Moves-tab upgrade, rebuilt in project tokens.</p>
       <div class="specimen-window"><img src="./specimens/specimen-21-analysis-panel.jpg" width="1265" height="3239" loading="lazy" alt="Tall Chess.com analysis dock with tabs, engine lines, classified move list, time bars, navigation, and action footer"></div>
       <p class="specimen-meta">Source: <a href="https://www.chess.com/analysis/game/live/172758001776/analysis">Chess.com game analysis</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
+    </figure>
+
+    <figure class="specimen">
+      <figcaption class="specimen-head">
+        <span class="specimen-title">22 · Position-bound comment display</span>
+        <span class="temporary">Temporary reference</span>
+      </figcaption>
+      <p class="specimen-copy">The selected position carries authored prose with visible attribution and edit/delete affordances. Target lesson only: a learning-moment note belongs to one position in one game, rather than to the game as an unanchored whole.</p>
+      <img src="./specimens/specimen-22-lichess-position-comments.png" width="800" height="326" loading="lazy" alt="Historical Lichess study capture showing two comments attached to the selected move, each with author attribution and editing controls">
+      <p class="specimen-meta">Source: <a href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA">Lichess — Study chess, the lichess way</a> · Official historical capture · Temporary structure reference only · Do not migrate this asset.</p>
+    </figure>
+
+    <figure class="specimen">
+      <figcaption class="specimen-head">
+        <span class="specimen-title">23 · Study glyph picker</span>
+        <span class="temporary">Temporary reference</span>
+      </figcaption>
+      <p class="specimen-copy">Move glyphs are compact, named choices: <strong>!</strong>, <strong>?</strong>, <strong>!!</strong>, <strong>??</strong>, and <strong>!?</strong>, alongside position and observation annotations. Target lesson only: the chosen glyph is position context for a learning moment, not decorative text.</p>
+      <img src="./specimens/specimen-23-lichess-glyph-picker.png" width="800" height="373" loading="lazy" alt="Historical Lichess study annotation picker with named move glyphs including good move, mistake, brilliant move, blunder, and interesting move">
+      <p class="specimen-meta">Source: <a href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA">Lichess — Study chess, the lichess way</a> · Official historical capture · Temporary structure reference only · Do not migrate this asset.</p>
+    </figure>
+
+    <figure class="specimen">
+      <figcaption class="specimen-head">
+        <span class="specimen-title">24 · Alternate lines at the current position</span>
+        <span class="temporary">Temporary reference</span>
+      </figcaption>
+      <p class="specimen-copy">A tightly cropped historical study view shows alternate continuations presented as sibling choices beneath the move panel at the current path. Target lesson only: related lines branch from a position and remain navigable as alternatives.</p>
+      <img src="./specimens/specimen-24-lichess-position-variations.png" width="220" height="470" loading="lazy" alt="Cropped historical Lichess study move panel with two alternate continuation choices attached below the current variation">
+      <p class="specimen-meta">Source: <a href="https://lichess.org/forum/lichess-feedback/showing-of-possible-options-gone-from-studies">Lichess forum — Showing of possible options gone from studies</a> · Historical community capture, cropped to the variation control · Temporary structure reference only · Do not migrate this asset.</p>
     </figure>
   </div>
 </section>

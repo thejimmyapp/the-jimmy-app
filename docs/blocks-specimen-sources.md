@@ -31,11 +31,34 @@ The owner-curated registry is recorded in [`CLAUDE-SPECIMENS-INDEX.md`](./specim
 | 20 | `specimen-20-clock-bottom-active.jpg` | [Chess.com game analysis](https://www.chess.com/analysis/game/live/172758001776/analysis) | Active player clock with a bright face; paired with block 19. |
 | 21 | `specimen-21-analysis-panel.jpg` | [Chess.com game analysis](https://www.chess.com/analysis/game/live/172758001776/analysis) | Full analysis dock hierarchy, eval lines, classified moves, time bars, and footer actions. |
 
-Numbering registry: blocks 1–11 canonical, 12–16 Bv2, 17–21 curated. The next specimen number is 22.
+## Bv2 targeted Lichess study annotations
+
+These captures are intentionally limited to the three study-annotation behaviors requested for design research. They are historical visual references, not claims about the current pixel styling of Lichess. All were collected on 2026-08-09.
+
+| Block | File | Exact source | Intended lesson |
+|---|---|---|---|
+| 22 | `specimen-22-lichess-position-comments.png` | [Official Lichess study article](https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA); [exact image asset](https://image.lichess1.org/display?h=0&op=resize&path=lichess:ublog:V0KrLSkA:mCmtVUyF7u02:dochdTaC.png&w=800&sig=b66e182153e8367768a0a58a54a9bdc5487af7b2) | Author-attributed prose attached to the selected position, with edit/delete affordances. |
+| 23 | `specimen-23-lichess-glyph-picker.png` | [Official Lichess study article](https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA); [exact image asset](https://image.lichess1.org/display?h=0&op=resize&path=lichess:ublog:V0KrLSkA:3tK73MEvpZ4L:F7R4Wkq2.png&w=800&sig=84e9dcfd188a05e9960b2484973e8a0a47f2d5cd) | Named move glyph choices, including `!`, `?`, `!!`, `??`, and `!?`, plus position/observation annotations. |
+| 24 | `specimen-24-lichess-position-variations.png` | [Lichess forum source page](https://lichess.org/forum/lichess-feedback/showing-of-possible-options-gone-from-studies); [original community screenshot](https://i.imgur.com/1JOtKQS.png) | Alternate continuations shown as sibling choices at the current study path. The stored image is a lossless crop to the move panel and fork control; no pixels were otherwise altered. |
+
+### AGPL source-code boundary
+
+The narrowly selected upstream excerpts are stored only in [`LICHESS-STUDY-ANNOTATION-AGPL-REFERENCE.md`](./specimens/LICHESS-STUDY-ANNOTATION-AGPL-REFERENCE.md). They are pinned to Lichess `lila` revision [`9d0e1761e0841b1018a0b2b19e08fc9b397f5689`](https://github.com/lichess-org/lila/tree/9d0e1761e0841b1018a0b2b19e08fc9b397f5689), whose repository license is [GNU Affero General Public License v3](https://github.com/lichess-org/lila/blob/9d0e1761e0841b1018a0b2b19e08fc9b397f5689/LICENSE).
+
+Every excerpt in that file is headed **AGPL-3.0 REFERENCE — REIMPLEMENT, NEVER PASTE INTO APP**. It records only:
+
+- glyph selection and position-bound toggling;
+- comment identity, position path, and textarea behavior;
+- sibling-variation rendering and adding a continuation at a selected tree path.
+
+It intentionally omits unrelated Lichess study modules and infrastructure.
+
+Numbering registry: blocks 1–11 canonical, 12–16 Bv2, 17–21 curated, 22–24 Bv2 annotation. The next specimen number is 25.
 
 ## Storage boundary
 
 - `docs/specimens/` is the source/provenance collection.
 - `frontend/public/blocks/specimens/` is the standalone route's static copy.
+- Lichess AGPL-3.0 source excerpts exist only in `docs/specimens/LICHESS-STUDY-ANNOTATION-AGPL-REFERENCE.md`; the public route contains links and behavioral descriptions, not source code.
 - No specimen is imported by React, included under `frontend/src/components/`, or used by `/` or `/extraction`.
 - Future components may copy structural lessons only and must use original project tokens and assets.
