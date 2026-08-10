@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { guestMatchupsQuery } from "../guestMatchupsQuery";
+import { api } from "../api";
+import { formatRelativeAge } from "../guestMatchAge";
+import { guestMatchupsQuery, guestMatchupsQueryKey } from "../guestMatchupsQuery";
 import type { NormalizedMatch } from "../types";
 
 interface Props {
@@ -19,8 +21,20 @@ export function GuestMatchupList({ onSelect }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [selecting, setSelecting] = useState(false);
   const [selectionError, setSelectionError] = useState("");
+  const queryClient = useQueryClient();
   const query = useQuery({ ...guestMatchupsQuery, retry: false });
   const matches = query.data?.matches ?? [];
+  const regenerate = useMutation({
+    mutationFn: () => api.guestMatchups({
+      refresh: true,
+      excludeGameIds: matches.flatMap((match) => [match.game_ids.A, match.game_ids.B]),
+    }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(guestMatchupsQueryKey, data);
+      setActiveIndex(0);
+      setSelectionError("");
+    },
+  });
 
   useLayoutEffect(() => {
     (matches.length ? listRef.current : surfaceRef.current)?.focus();
@@ -36,11 +50,6 @@ export function GuestMatchupList({ onSelect }: Props) {
   }, [matches.length]);
 
   const handleListKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Tab") {
-      event.preventDefault();
-      listRef.current?.focus();
-      return;
-    }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       const direction = event.key === "ArrowDown" ? 1 : -1;
@@ -61,8 +70,7 @@ export function GuestMatchupList({ onSelect }: Props) {
   };
 
   const handleSurfaceKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === "Tab") event.preventDefault();
-    if (event.key === "Enter" && query.isError) {
+    if (event.target === event.currentTarget && event.key === "Enter" && query.isError) {
       event.preventDefault();
       void query.refetch();
     }
@@ -85,28 +93,38 @@ export function GuestMatchupList({ onSelect }: Props) {
       {query.isError && <div className="guest-matchup-status guest-matchup-error" role="alert">Matchups unavailable. Press Enter to retry.</div>}
       {selecting && <div className="guest-matchup-status" role="status">Verifying both boards…</div>}
       {selectionError && <div className="guest-matchup-status guest-matchup-error" role="alert">{selectionError}</div>}
+      {regenerate.isError && <div className="guest-matchup-status guest-matchup-error" role="alert">Could not regenerate matchups. Try again.</div>}
       {matches.length > 0 && (
-        <div
-          ref={listRef}
-          className="guest-matchup-list"
-          role="listbox"
-          aria-label="Guest matchups"
-          aria-activedescendant={`guest-matchup-${activeIndex}`}
-          tabIndex={0}
-          onKeyDown={handleListKeyDown}
-        >
-          {matches.map((match, index) => (
-            <article
-              id={`guest-matchup-${index}`}
-              key={`${match.game_ids.A}-${match.game_ids.B}`}
-              role="option"
-              aria-selected={index === activeIndex}
-              className={`guest-matchup-card ${index === activeIndex ? "active" : ""}`}
-            >
-              <strong>{cardText(match)}</strong>
-              <small>Boards {match.game_ids.A} / {match.game_ids.B} · {match.ply_counts.A}/{match.ply_counts.B} plies</small>
-            </article>
-          ))}
+        <div className="guest-matchup-list-shell">
+          <div
+            ref={listRef}
+            className="guest-matchup-list"
+            role="listbox"
+            aria-label="Guest matchups"
+            aria-activedescendant={`guest-matchup-${activeIndex}`}
+            tabIndex={0}
+            onKeyDown={handleListKeyDown}
+          >
+            {matches.map((match, index) => (
+              <article
+                id={`guest-matchup-${index}`}
+                key={`${match.game_ids.A}-${match.game_ids.B}`}
+                role="option"
+                aria-selected={index === activeIndex}
+                className={`guest-matchup-card ${index === activeIndex ? "active" : ""}`}
+              >
+                <strong>{cardText(match)}</strong>
+                <small>Boards {match.game_ids.A} / {match.game_ids.B} · {match.ply_counts.A}/{match.ply_counts.B} plies · {formatRelativeAge(match.end_time)}</small>
+              </article>
+            ))}
+          </div>
+          <div className="guest-matchup-list-tools">
+            <button type="button" className="guest-matchup-regenerate" disabled={regenerate.isPending || selecting} onClick={() => regenerate.mutate()}>{regenerate.isPending ? "Regenerating…" : "Regenerate list"}</button>
+            <details className="guest-matchup-explainer">
+              <summary>why is this the list of options</summary>
+              <p>Because it's a quest. Five fresh games from strong and interesting bughouse players, played recently. More options does not mean more good.</p>
+            </details>
+          </div>
         </div>
       )}
     </section>

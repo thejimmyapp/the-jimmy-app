@@ -15,9 +15,10 @@ interface AppShellProps {
 
 export function AppShell({ rail, railUnlockedAction, stage, dock, className = "", boardTheme, pieceStyle, pieceSize, onboardingLocked = false, dockOverlayActive = false }: AppShellProps) {
   const wholeDockLocked = onboardingLocked && !dockOverlayActive;
+  // Internal QA reference: the board layout was originally evaluated at 175% browser zoom.
   return (
     <main className={`app-shell app-shell-rail-stage-dock ${className}`} data-board-theme={boardTheme} data-piece-style={pieceStyle} data-piece-size={pieceSize}>
-      <div className="small-screen-message" role="status"><strong>Widen the window to at least 992px to use The Jimmy App.</strong><span>Board sizing is designed to work best at 175% browser zoom, matching the Chess.com Bughouse play page.</span></div>
+      <div className="small-screen-message" role="status"><strong>Widen the window to at least 992px to use The Jimmy App.</strong></div>
       <aside className="app-rail" aria-label="Application navigation">
         <div className="app-rail-locked-content" inert={onboardingLocked || undefined} aria-hidden={onboardingLocked || undefined}>{rail}</div>
         {railUnlockedAction}

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BarChart3, Bot, Check, Copy, ExternalLink, FileInput, Home, LockKeyhole, LogOut, Palette, Radio, Redo2, RotateCcw, Settings, ShieldCheck, Swords, Undo2, UserRoundPlus, Users, X } from "lucide-react";
+import { BarChart3, Bot, Check, Copy, ExternalLink, FileInput, Home, LockKeyhole, LogOut, Palette, Radio, Redo2, RotateCcw, Settings, ShieldCheck, Swords, Undo2, UserRoundPlus, Users, X } from "lucide-react";
 import { CSSProperties, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./api";
@@ -10,12 +10,13 @@ import { guestBoardPresentation } from "./guestBoardPresentation";
 import { guestMatchupsQuery } from "./guestMatchupsQuery";
 import { BoardPanel } from "./components/BoardPanel";
 import { AppShell } from "./components/AppShell";
-import { AnalysisAcknowledgement, AnalysisLimitations } from "./components/AnalysisAcknowledgement";
+import { AnalysisAcknowledgement } from "./components/AnalysisAcknowledgement";
 import { LegalLinks } from "./components/LegalLinks";
 import { GuestMatchupList } from "./components/GuestMatchupList";
 import { OnboardingMap } from "./components/OnboardingMap";
 import { MomentEditor } from "./components/MomentEditor";
 import { ReviewLesson } from "./components/ReviewLesson";
+import { ReplayLimitationsExpander } from "./components/ReplayLimitationsExpander";
 import { SidePanel } from "./components/SidePanel";
 import { StatsDashboard } from "./components/StatsDashboard";
 import { TeamCoach } from "./components/TeamCoach";
@@ -479,10 +480,8 @@ export default function App() {
   const reviewInfo = store.game ? <>
     {store.game.outcome && <div className={`review-summary ${store.game.game.result}`} role="status"><span>GAME RESULT</span><strong>{store.game.outcome.summary}</strong><small>{store.game.outcome.detail}</small></div>}
     {store.game.lesson && <ReviewLesson lesson={store.game.lesson} saved={lessonSaved} onToggleSave={toggleCurrentLesson} onReview={(globalPly) => { store.seek(globalPly); sendRoomEvent("timeline.seek", { global_ply: globalPly }); }} />}
-    {integrityNotices.length > 0 && <div className="replay-integrity" role="status"><AlertTriangle size={15} /><strong>REPLAY LIMITS</strong><span>{integrityNotices.join(" ")}</span></div>}
-    <AnalysisLimitations compact />
+    <ReplayLimitationsExpander notices={integrityNotices} />
     <section className="game-metadata"><span>GAME METADATA</span><dl><div><dt>Game</dt><dd>{store.game.game.id}</dd></div><div><dt>Played</dt><dd>{String(store.game.game.played_at ?? "Unknown").slice(0, 10)}</dd></div><div><dt>Result</dt><dd>{String(store.game.game.result ?? "Unknown")}</dd></div><div><dt>Two-board replay</dt><dd>{store.game.second_board_available ? "Available" : "Unavailable"}</dd></div>{store.game.cross_board_ordering && <div><dt>Cross-board order</dt><dd>{store.game.cross_board_ordering.exact ? "Exact" : "Clock-inferred (not exact)"}</dd></div>}</dl></section>
-    <p className="zoom-note">Board sizing is designed to work best at 175% browser zoom, matching the Chess.com Bughouse play page.</p>
   </> : <div className="empty-panel">Select a game to see review information.</div>;
   const capabilityLocked = (key: CapabilityKey) => isCapabilityLocked(guestProgress.capabilities, key);
   const guestAnalysisLocked = Boolean(store.guestMatch && capabilityLocked("board_analysis"));

@@ -1,6 +1,8 @@
 import { api } from "./api";
 
+export const guestMatchupsQueryKey = ["guest-matchups"] as const;
+
 export const guestMatchupsQuery = {
-  queryKey: ["guest-matchups"] as const,
-  queryFn: api.guestMatchups,
+  queryKey: guestMatchupsQueryKey,
+  queryFn: () => api.guestMatchups(),
 };

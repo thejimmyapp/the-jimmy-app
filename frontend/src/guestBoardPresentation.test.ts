@@ -4,6 +4,7 @@ import type { NormalizedMatch } from "./types";
 
 const match = (seat: NormalizedMatch["highest_rated"]["seat"]): NormalizedMatch => ({
   game_ids: { A: 1, B: 2 },
+  end_time: 1_786_320_000,
   seats: {
     "A-white": { name: "A white", rating: 1 },
     "A-black": { name: "A black", rating: 2 },

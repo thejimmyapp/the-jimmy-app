@@ -19,6 +19,7 @@ const position: ReplayPosition = {
 
 const match: NormalizedMatch = {
   game_ids: { A: 101, B: 102 },
+  end_time: 1_786_320_000,
   seats: {
     "A-white": { name: "Alpha", rating: 2200 },
     "A-black": { name: "Beta", rating: 2100 },

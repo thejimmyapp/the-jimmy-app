@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -14,6 +15,9 @@ from backend.chesscom_matchups import (
 from backend.config import Settings
 
 
+NOW = 1_786_320_000
+
+
 def callback_board(
     game_id: int,
     uuid: str,
@@ -25,7 +29,9 @@ def callback_board(
     reason: str,
     plies: int = 40,
     result_message: str = "ignored free-form text",
+    end_time: int = NOW,
 ) -> dict[str, Any]:
+    ended = datetime.fromtimestamp(end_time, UTC)
     return {
         "game": {
             "id": game_id,
@@ -40,6 +46,8 @@ def callback_board(
             "timeIncrement1": 0.0,
             "pgnHeaders": {
                 "FEN": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                "Date": ended.strftime("%Y.%m.%d"),
+                "EndTime": ended.strftime("%H:%M:%S GMT+0000"),
                 "White": white[0],
                 "Black": black[0],
                 "WhiteElo": white[1],
@@ -98,6 +106,7 @@ def test_match_proxy_fetches_partner_sequentially_normalizes_and_caches_raw_pair
     assert partner_lookup == match
     assert match == {
         "game_ids": {"A": 180443871315, "B": 180443871317},
+        "end_time": NOW,
         "seats": {
             "A-white": {"name": "vjbaker", "rating": 2799},
             "A-black": {"name": "larso", "rating": 2677},
@@ -135,6 +144,8 @@ def test_match_proxy_fetches_partner_sequentially_normalizes_and_caches_raw_pair
             "Black": "larso",
             "WhiteElo": 2799,
             "BlackElo": 2677,
+            "Date": datetime.fromtimestamp(NOW, UTC).strftime("%Y.%m.%d"),
+            "EndTime": datetime.fromtimestamp(NOW, UTC).strftime("%H:%M:%S GMT+0000"),
             "Result": "0-1",
             "TimeControl": "180",
         },
@@ -157,7 +168,8 @@ def test_match_proxy_fails_closed_for_unknown_terminal_code_even_if_message_look
         asyncio.run(service.normalized_match(42))
 
 
-def test_guest_list_filters_short_match_logs_counts_and_reuses_assembled_cache() -> None:
+def test_guest_list_widens_to_three_hours_filters_short_match_and_reuses_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.chesscom_matchups.time.time", lambda: NOW)
     requests: list[str] = []
     callback_payloads: dict[str, dict[str, Any]] = {}
     games_by_player = {
@@ -204,7 +216,11 @@ def test_guest_list_filters_short_match_logs_counts_and_reuses_assembled_cache()
         elif path.endswith("/games/2026/08"):
             username = path.split("/")[3]
             payload = {"games": [
-                {"rules": "bughouse", "url": f"https://www.chess.com/game/live/{game_id}"}
+                {
+                    "rules": "bughouse",
+                    "url": f"https://www.chess.com/game/live/{game_id}",
+                    "end_time": NOW - (30 * 60 if game_id in {101, 102} else 2 * 3600),
+                }
                 for game_id in games_by_player[username]
             ]}
         else:
@@ -228,6 +244,8 @@ def test_guest_list_filters_short_match_logs_counts_and_reuses_assembled_cache()
     assert first["players_sampled"] == ["Missing", "NoGames", "Alpha", "Beta", "Gamma"]
     assert first["players_represented"] == ["Alpha", "Beta", "Gamma"]
     assert first["seed_source"] == "players_of_interest_then_leaderboard_top_50"
+    assert first["selection_window_hours"] == 3
+    assert {match["end_time"] for match in first["matches"]} == {NOW - 30 * 60, NOW - 2 * 3600}
     assert sum(1 for match in first["matches"] if match["game_ids"]["A"] in games_by_player["alpha"]) == 2
     assert sum(1 for match in first["matches"] if match["game_ids"]["A"] in games_by_player["beta"]) == 2
     assert sum(1 for match in first["matches"] if match["game_ids"]["A"] in games_by_player["gamma"]) == 1
@@ -242,6 +260,91 @@ def test_configured_players_of_interest_preserve_priority_order() -> None:
     )
 
     assert service._configured_seed_usernames() == ["Gamma", "Alpha", "Beta"]
+
+
+def test_guest_refresh_bypasses_list_cache_and_prefers_non_current_pairs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.chesscom_matchups.time.time", lambda: NOW)
+    players = {
+        "alpha": [201, 202],
+        "beta": [203, 204],
+        "gamma": [205, 206],
+        "delta": [207, 208],
+        "epsilon": [209, 210],
+    }
+    callbacks: dict[str, dict[str, Any]] = {}
+    requests: list[str] = []
+    for game_id in range(201, 211):
+        primary_uuid = f"{game_id:08x}-0000-4000-8000-{game_id:012x}"
+        partner_id = game_id + 1000
+        partner_uuid = f"{partner_id:08x}-0000-4000-8000-{partner_id:012x}"
+        callbacks[str(game_id)] = callback_board(
+            game_id,
+            primary_uuid,
+            partner_uuid,
+            white=(f"High{game_id}", 2500),
+            black=(f"Low{game_id}", 2100),
+            winner="white",
+            reason="checkmated",
+        )
+        callbacks[partner_uuid] = callback_board(
+            partner_id,
+            partner_uuid,
+            primary_uuid,
+            white=(f"PartnerOpponent{game_id}", 2000),
+            black=(f"Partner{game_id}", 2200),
+            winner="black",
+            reason="bughousepartnerlose",
+        )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(str(request.url))
+        path = request.url.path
+        if path.endswith("/games/archives"):
+            username = path.split("/")[3]
+            payload = {"archives": [f"https://api.chess.com/pub/player/{username}/games/2026/08"]}
+        elif path.endswith("/games/2026/08"):
+            username = path.split("/")[3]
+            payload = {"games": [
+                {
+                    "rules": "bughouse",
+                    "url": f"https://www.chess.com/game/live/{game_id}",
+                    "end_time": NOW - 10 * 60,
+                }
+                for game_id in players[username]
+            ]}
+        elif path == "/pub/leaderboards":
+            payload = {"live_bughouse": [{"username": name} for name in players]}
+        else:
+            payload = callbacks[path.rsplit("/", 1)[-1]]
+        return httpx.Response(200, json=payload, request=request)
+
+    service = ChessComMatchupService(
+        Settings(
+            chesscom_players_of_interest="Alpha, Beta, Gamma, Delta, Epsilon",
+            chesscom_guest_max_archives_per_player=1,
+            chesscom_guest_max_matches_examined=20,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    first = asyncio.run(service.guest_matchups())
+    first_request_count = len(requests)
+    current_ids = {
+        game_id
+        for match in first["matches"]
+        for game_id in match["game_ids"].values()
+    }
+    refreshed = asyncio.run(service.guest_matchups(refresh=True, exclude_game_ids=current_ids))
+    refreshed_ids = {
+        game_id
+        for match in refreshed["matches"]
+        for game_id in match["game_ids"].values()
+    }
+
+    assert len(requests) > first_request_count
+    assert current_ids.isdisjoint(refreshed_ids)
+    assert refreshed["cached"] is False
+    assert refreshed["selection_window_hours"] == 1
+    assert refreshed["players_represented"] == ["Gamma", "Delta", "Epsilon"]
 
 
 def test_kill_switch_disables_match_and_guest_routes_before_network_access() -> None:

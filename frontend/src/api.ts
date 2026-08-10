@@ -30,7 +30,13 @@ const json = async <T>(responsePromise: Promise<Response>): Promise<T> => {
 export const api = {
   chessComMatch: (gameId: number) => json<NormalizedMatch>(fetch(`/api/chesscom/matches/${gameId}`)),
   chessComMatchReplay: (gameId: number) => json<GuestMatchReplaySource>(fetch(`/api/chesscom/matches/${gameId}/replay`)),
-  guestMatchups: () => json<GuestMatchupList>(fetch("/api/chesscom/guest-matchups")),
+  guestMatchups: ({ refresh = false, excludeGameIds = [] }: { refresh?: boolean; excludeGameIds?: number[] } = {}) => {
+    const params = new URLSearchParams();
+    if (refresh) params.set("refresh", "true");
+    excludeGameIds.forEach((gameId) => params.append("exclude_game_id", String(gameId)));
+    const query = params.size ? `?${params.toString()}` : "";
+    return json<GuestMatchupList>(fetch(`/api/chesscom/guest-matchups${query}`));
+  },
   connectChessCom: (username: string) =>
     json<{ public_profile_connected: boolean; bughouse_games_found: number; new_games_stored: number }>(
       fetch("/api/chesscom/connect", {

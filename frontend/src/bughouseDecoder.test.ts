@@ -35,6 +35,7 @@ const boardSource = (overrides: Partial<CallbackReplayBoard> & Pick<CallbackRepl
 
 const normalizedMatch = (a: CallbackReplayBoard, b: CallbackReplayBoard): NormalizedMatch => ({
   game_ids: { A: a.id, B: b.id },
+  end_time: 1_786_320_000,
   seats: {
     "A-white": { name: String(a.headers.White ?? "A White"), rating: Number(a.headers.WhiteElo ?? 2000) },
     "A-black": { name: String(a.headers.Black ?? "A Black"), rating: Number(a.headers.BlackElo ?? 1900) },
