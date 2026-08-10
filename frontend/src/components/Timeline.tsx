@@ -2,11 +2,22 @@ import { Pause, Play, SkipBack, SkipForward, StepBack, StepForward } from "lucid
 import { useCallback, useEffect, useState } from "react";
 import { sendRoomEvent } from "../socket";
 import { useCoachStore } from "../store";
+import { sourceBoardForDisplay } from "../guestBoardPresentation";
+import type { BoardId } from "../types";
 
-export function Timeline({ variant = "full" }: { variant?: "full" | "panel" }) {
-  const { game, globalPly, seek, mode } = useCoachStore();
+interface Props {
+  variant?: "full" | "panel";
+  activeBoard?: BoardId;
+  boardFocusEnabled?: boolean;
+  onActiveBoardChange?: (board: BoardId) => void;
+}
+
+export function Timeline({ variant = "full", activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange }: Props) {
+  const { game, guestMatch, globalPly, seek, mode } = useCoachStore();
   const [playing, setPlaying] = useState(false);
   const max = Math.max(0, game?.timeline.length ? game.timeline.length - 1 : (game?.positions_a.length ?? 1) - 1);
+  const displayBoardASource = sourceBoardForDisplay(guestMatch, "A");
+  const displayBoardBSource = sourceBoardForDisplay(guestMatch, "B");
   useEffect(() => {
     if (!playing || globalPly >= max) return;
     const timer = window.setTimeout(() => {
@@ -22,7 +33,10 @@ export function Timeline({ variant = "full" }: { variant?: "full" | "panel" }) {
       const target = event.target;
       const isTyping = target instanceof HTMLElement && (target.isContentEditable || target.matches("input, textarea, select"));
       if (!game || mode !== "review" || isTyping) return;
-      if (event.key === "ArrowLeft") {
+      if (event.key === "Tab" && boardFocusEnabled) {
+        event.preventDefault();
+        onActiveBoardChange?.(activeBoard === "A" ? "B" : "A");
+      } else if (event.key === "ArrowLeft") {
         event.preventDefault();
         move(globalPly - 1);
       } else if (event.key === "ArrowRight") {
@@ -32,7 +46,7 @@ export function Timeline({ variant = "full" }: { variant?: "full" | "panel" }) {
     };
     window.addEventListener("keydown", handleArrowNavigation);
     return () => window.removeEventListener("keydown", handleArrowNavigation);
-  }, [game, globalPly, mode, move]);
+  }, [activeBoard, boardFocusEnabled, game, globalPly, mode, move, onActiveBoardChange]);
   return (
     <section className={`timeline ${variant === "panel" ? "timeline-panel" : ""}`} aria-label="Synchronized move history">
       <div className="timeline-left">
@@ -43,11 +57,11 @@ export function Timeline({ variant = "full" }: { variant?: "full" | "panel" }) {
           <button onClick={() => move(globalPly + 1)} aria-label="Next"><StepForward size={17} /></button>
           <button onClick={() => move(max)} aria-label="End"><SkipForward size={17} /></button>
         </div>
-        <div className={`mode-badge ${mode}`}><span />{mode === "review" ? `GAME REVIEW · MOVE ${globalPly}` : `EXPLORATION · MOVE ${globalPly}`}</div>
+        <div className={`mode-badge ${mode}`}><span />{mode === "review" ? `GAME REVIEW · MOVE ${globalPly}${boardFocusEnabled ? ` · BOARD ${activeBoard} FOCUS` : ""}` : `EXPLORATION · MOVE ${globalPly}`}</div>
       </div>
       <div className="timeline-tracks">
-        <div className="track-label">A</div><div className="move-track">{game?.timeline.filter((item) => item.board === "A").map((item) => <button className={item.global_ply === globalPly ? "active" : ""} key={item.global_ply} onClick={() => move(item.global_ply)}>{item.move}</button>)}</div>
-        <div className="track-label">B</div><div className="move-track">{game?.timeline.filter((item) => item.board === "B").map((item) => <button className={item.global_ply === globalPly ? "active" : ""} key={item.global_ply} onClick={() => move(item.global_ply)}>{item.move}</button>)}</div>
+        <div className={`track-label ${activeBoard === "A" && boardFocusEnabled ? "focus-active" : ""}`}>A</div><div className="move-track">{game?.timeline.filter((item) => item.board === displayBoardASource).map((item) => <button className={item.global_ply === globalPly ? "active" : ""} key={item.global_ply} onClick={() => move(item.global_ply)}>{item.move}</button>)}</div>
+        <div className={`track-label ${activeBoard === "B" && boardFocusEnabled ? "focus-active" : ""}`}>B</div><div className="move-track">{game?.timeline.filter((item) => item.board === displayBoardBSource).map((item) => <button className={item.global_ply === globalPly ? "active" : ""} key={item.global_ply} onClick={() => move(item.global_ply)}>{item.move}</button>)}</div>
       </div>
       <div className="timeline-position"><strong>{mode === "review" ? "GAME" : "VAR"}</strong><span>{globalPly}/{max}</span></div>
     </section>

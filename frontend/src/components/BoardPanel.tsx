@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BrainCircuit, ExternalLink, FileInput } from "lucide-react";
+import { BrainCircuit, ExternalLink, FileInput, LockKeyhole } from "lucide-react";
 import { api } from "../api";
 import { isMeaningfulChessVector, parseEngineBestmove } from "../boardInteractions";
 import { sendRoomEvent } from "../socket";
@@ -51,6 +51,8 @@ interface Props {
   onAnalysisChange?: (board: BoardId, analysis: BoardAnalysisState) => void;
   layout?: "standard" | "primary" | "compact";
   beforeAnalyze?: () => Promise<boolean>;
+  keyboardFocused?: boolean;
+  analysisLocked?: boolean;
 }
 
 export type BoardAnalysisState = {
@@ -65,7 +67,7 @@ export type BoardAnalysisState = {
   error?: string;
 };
 
-export function BoardPanel({ boardId, position, pairedPosition, orientation, pieceStyle, title, playerTop, playerBottom, unavailable = false, onImportBothBoards, externalFallbackUrl, locked = false, onMoveIntent, onAnalysisChange, layout = "standard", beforeAnalyze }: Props) {
+export function BoardPanel({ boardId, position, pairedPosition, orientation, pieceStyle, title, playerTop, playerBottom, unavailable = false, onImportBothBoards, externalFallbackUrl, locked = false, onMoveIntent, onAnalysisChange, layout = "standard", beforeAnalyze, keyboardFocused = false, analysisLocked = false }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const lastWheelAt = useRef(0);
   const [arrowStart, setArrowStart] = useState<string | null>(null);
@@ -275,7 +277,7 @@ export function BoardPanel({ boardId, position, pairedPosition, orientation, pie
   };
 
   const analyze = async () => {
-    if (!game || !position || unavailable || mode === "exploration") return;
+    if (!game || !position || unavailable || mode === "exploration" || analysisLocked) return;
     if (beforeAnalyze && !(await beforeAnalyze())) return;
     setAnalysis({ status: "queued", queuePosition: 1 });
     try {
@@ -311,8 +313,8 @@ export function BoardPanel({ boardId, position, pairedPosition, orientation, pie
   };
 
   return (
-    <section className={`board-panel board-layout-${layout} ${mode === "exploration" ? "is-exploring" : ""} ${unavailable ? "is-unavailable" : ""}`}>
-      <div className="board-heading"><strong>{title}</strong><span>{position?.side_to_move ?? "Unavailable"} to move</span></div>
+    <section className={`board-panel board-layout-${layout} ${mode === "exploration" ? "is-exploring" : ""} ${unavailable ? "is-unavailable" : ""} ${keyboardFocused ? "board-focus-active" : ""}`} data-keyboard-focus={keyboardFocused ? "active" : "inactive"}>
+      <div className="board-heading"><strong>{title}</strong>{keyboardFocused && <span className="board-focus-badge">KEYBOARD FOCUS</span>}<span>{position?.side_to_move ?? "Unavailable"} to move</span></div>
       <PlayerBar name={playerTop} clock={orientation === "white" ? position?.black_clock : position?.white_clock} />
       <div className={`board-stage ${layout === "standard" ? "horizontal-pockets" : "vertical-pockets"}`}>
         {layout !== "standard" && <div className="pocket-stack">
@@ -374,8 +376,8 @@ export function BoardPanel({ boardId, position, pairedPosition, orientation, pie
       </div>
       <PlayerBar name={playerBottom} clock={orientation === "white" ? position?.white_clock : position?.black_clock} bottom />
       <div className={`board-footer analysis-${analysis.status}`}>
-        <button className="analyze-button" title={mode === "exploration" ? "Return to the completed game before running engine analysis" : "Queue this completed-game position for Fairy-Stockfish"} onClick={analyze} disabled={!game || !position || unavailable || mode === "exploration" || analysis.status === "queued" || analysis.status === "running"}>
-          <BrainCircuit size={15} /> <AnalysisLabel analysis={analysis} />
+        <button className={`analyze-button ${analysisLocked ? "capability-locked" : ""}`} title={analysisLocked ? "Fairy-Stockfish unlocks in a future guest capability" : mode === "exploration" ? "Return to the completed game before running engine analysis" : "Queue this completed-game position for Fairy-Stockfish"} onClick={analyze} disabled={!game || !position || unavailable || mode === "exploration" || analysis.status === "queued" || analysis.status === "running" || analysisLocked}>
+          <BrainCircuit size={15} /> <AnalysisLabel analysis={analysis} />{analysisLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}
         </button>
         {analysis.status === "completed" && analysis.pv?.length ? <span className="analysis-pv" title={analysis.pv.join(" ")}>PV {analysis.pv.slice(0, 4).join(" ")}</span> : null}
         {analysis.status === "failed" ? <span className="analysis-error" title={analysis.error}>{analysis.error}</span> : <span className="interaction-status">{interactionStatus}</span>}

@@ -17,6 +17,8 @@ export const capabilityKeys = [
   "dock_games",
   "dock_library",
   "dock_collaborate",
+  "board_analysis",
+  "team_coach",
 ] as const;
 
 export type CapabilityKey = (typeof capabilityKeys)[number];
@@ -33,6 +35,8 @@ export const initialCapabilityMap = (): CapabilityMap => ({
   dock_games: "locked",
   dock_library: "locked",
   dock_collaborate: "locked",
+  board_analysis: "locked",
+  team_coach: "locked",
 });
 
 export const isCapabilityLocked = (capabilities: CapabilityMap, key: CapabilityKey) => capabilities[key] === "locked";

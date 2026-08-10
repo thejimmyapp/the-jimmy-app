@@ -3,7 +3,7 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "re
 import { isCapabilityLocked, type CapabilityKey, type CapabilityMap, type SavedLesson } from "../guestProgress";
 import { sendRoomEvent } from "../socket";
 import { useCoachStore } from "../store";
-import type { GameSummary } from "../types";
+import type { BoardId, GameSummary } from "../types";
 import { Timeline } from "./Timeline";
 
 type PrimaryTab = "review" | "games" | "library" | "collaborate";
@@ -24,6 +24,9 @@ interface Props {
   dockActions?: ReactNode;
   dockPanel?: ReactNode;
   capabilities: CapabilityMap;
+  activeBoard?: BoardId;
+  boardFocusEnabled?: boolean;
+  onActiveBoardChange?: (board: BoardId) => void;
 }
 
 const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
@@ -33,7 +36,7 @@ const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
   collaborate: "dock_collaborate",
 };
 
-export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review", dockActions, dockPanel, capabilities }: Props) {
+export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
   const [reviewTab, setReviewTab] = useState<ReviewTab>("partner");
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
@@ -60,11 +63,12 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
     if (guestMatch) {
       setPrimaryTab("review");
       setReviewTab("moves");
+      if (boardFocusEnabled) onActiveBoardChange?.("A");
     } else if (game) {
       setPrimaryTab("review");
       setReviewTab("partner");
     }
-  }, [game, guestMatch]);
+  }, [boardFocusEnabled, game, guestMatch, onActiveBoardChange]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -107,6 +111,18 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
     if (tab === "collaborate" && collaborateTab === "chat") setUnreadChat(0);
   };
 
+  const chooseReview = (tab: ReviewTab) => {
+    setReviewTab(tab);
+    if (boardFocusEnabled) onActiveBoardChange?.(tab === "partner" ? "B" : "A");
+  };
+
+  const changeBoardFocus = (board: BoardId) => {
+    onActiveBoardChange?.(board);
+    if (!boardFocusEnabled) return;
+    setPrimaryTab("review");
+    setReviewTab(board === "B" ? "partner" : "moves");
+  };
+
   return (
     <aside className={`side-panel utility-panel ${isCapabilityLocked(capabilities, primaryCapability[primaryTab]) ? "capability-locked" : ""}`} aria-label="Review utility panel">
       <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><div className="utility-titlebar-actions">{dockActions}<button type="button" onClick={onMap}><Home size={13} /> Map</button></div></div>
@@ -118,7 +134,7 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
       </div>
 
       {primaryTab === "review" && <div className="utility-secondary-tabs" role="tablist" aria-label="Review views">
-        {(["moves", "partner", "info"] as ReviewTab[]).map((tab) => <button key={tab} role="tab" aria-selected={reviewTab === tab} className={reviewTab === tab ? "active" : ""} onClick={() => setReviewTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
+        {(["moves", "partner", "info"] as ReviewTab[]).map((tab) => <button key={tab} role="tab" aria-selected={reviewTab === tab} className={reviewTab === tab ? "active" : ""} onClick={() => chooseReview(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
       </div>}
       {primaryTab === "collaborate" && <div className="utility-secondary-tabs" role="tablist" aria-label="Collaboration views">
         {(["chat", "notes"] as CollaborateTab[]).map((tab) => <button key={tab} role="tab" aria-selected={collaborateTab === tab} className={collaborateTab === tab ? "active" : ""} onClick={() => setCollaborateTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}{tab === "chat" && unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</button>)}
@@ -126,7 +142,7 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
 
       <div className={`utility-pane partner-pane ${primaryTab === "review" && reviewTab === "partner" ? "active" : ""}`} aria-hidden={!(primaryTab === "review" && reviewTab === "partner")}>{partnerContent}</div>
 
-      <div className={`utility-pane moves-pane ${primaryTab === "review" && reviewTab === "moves" ? "active" : "inactive"}`} aria-hidden={!(primaryTab === "review" && reviewTab === "moves")}><Timeline variant="panel" /></div>
+      <div className={`utility-pane moves-pane ${primaryTab === "review" && reviewTab === "moves" ? "active" : "inactive"}`} aria-hidden={!(primaryTab === "review" && reviewTab === "moves")}><Timeline variant="panel" activeBoard={activeBoard} boardFocusEnabled={boardFocusEnabled} onActiveBoardChange={changeBoardFocus} /></div>
       {primaryTab === "review" && reviewTab === "info" && <div className="utility-pane info-pane">{infoContent}</div>}
 
       {primaryTab === "games" && <div className="utility-pane games-pane">
