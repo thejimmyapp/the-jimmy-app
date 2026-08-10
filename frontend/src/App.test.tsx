@@ -231,14 +231,33 @@ describe("URL-first exact review", () => {
     expect(screen.queryByRole("heading", { name: "Review the game you just played." })).toBeNull();
   });
 
-  it("validates and commits the username stub without unlocking or network activity", () => {
-    renderApp();
-    const username = screen.getByRole("textbox", { name: /Sign in/ });
-    fireEvent.change(username, { target: { value: "Jimmy_42" } });
-    fireEvent.keyDown(username, { key: "Enter" });
-    expect(localStorage.getItem(GUEST_PROGRESS_KEY)).toBeNull();
-    expect(apiMock.resolveGame).not.toHaveBeenCalled();
-    expect(apiMock.connectChessCom).not.toHaveBeenCalled();
-    expect(apiMock.importPgn).not.toHaveBeenCalled();
+  it("uses the existing guest selection path when word vertigo unmute escapes", async () => {
+    const selectedMatch: NormalizedMatch = {
+      ...guestMatch,
+      game_ids: { A: guestMatch.game_ids.A + 2, B: guestMatch.game_ids.B + 2 },
+    };
+    const fixture = replayFixtures.matches[0].boards;
+    apiMock.chessComMatchReplay.mockResolvedValueOnce({
+      match: selectedMatch,
+      boards: {
+        A: { ...fixture.A, id: selectedMatch.game_ids.A } as CallbackReplayBoard,
+        B: { ...fixture.B, id: selectedMatch.game_ids.B } as CallbackReplayBoard,
+      },
+    });
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.21);
+    const { container } = renderApp();
+    fireEvent.change(screen.getByRole("textbox", { name: /Sign in/ }), { target: { value: "x" } });
+    const unmute = await screen.findByRole("button", { name: "unmute" });
+    expect(container.querySelector(".app-shell")?.classList.contains("word-vertigo-sequence")).toBe(true);
+    expect(container.querySelector(".app-rail")?.hasAttribute("inert")).toBe(true);
+    expect(container.querySelector(".app-dock")?.hasAttribute("inert")).toBe(false);
+    expect(container.querySelector(".app-dock-content")?.hasAttribute("inert")).toBe(true);
+    fireEvent.click(unmute);
+
+    await waitFor(() => expect(useCoachStore.getState().guestMatch).toEqual(selectedMatch));
+    expect(apiMock.guestMatchups).toHaveBeenCalledOnce();
+    expect(apiMock.chessComMatchReplay).toHaveBeenCalledWith(selectedMatch.game_ids.A);
+    expect(screen.getByText("BOARD A · FEATURED PLAYER")).toBeTruthy();
+    random.mockRestore();
   });
 });

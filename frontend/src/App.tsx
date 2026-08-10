@@ -7,6 +7,7 @@ import { MatchReconstructionError, reconstructGuestMatch } from "./bughouseDecod
 import { buildChessComConnectorPrompt } from "./chesscomConnectorPrompt";
 import { bmachoUrlFromChessComUrl } from "./chesscomGameUrl";
 import { guestBoardPresentation } from "./guestBoardPresentation";
+import { guestMatchupsQuery } from "./guestMatchupsQuery";
 import { BoardPanel } from "./components/BoardPanel";
 import { AppShell } from "./components/AppShell";
 import { AnalysisAcknowledgement, AnalysisLimitations } from "./components/AnalysisAcknowledgement";
@@ -92,6 +93,7 @@ export default function App() {
   const [guestProgress, setGuestProgress] = useState<GuestProgress>(loadGuestProgress);
   const [acknowledgementOpen, setAcknowledgementOpen] = useState(false);
   const [onboardingPhase, setOnboardingPhase] = useState<"entry" | "matchups">("entry");
+  const [wordVertigoActive, setWordVertigoActive] = useState(false);
   const analysisResolverRef = useRef<((accepted: boolean) => void) | null>(null);
   const [reviewGameId, setReviewGameId] = useState<number | null>(() => {
     if (store.roomId) return null;
@@ -251,10 +253,6 @@ export default function App() {
     setOnboardingPhase("matchups");
   }, []);
 
-  const onUsernameSubmit = useCallback(() => {
-    // Username lookup remains a named, syntactically validated stub.
-  }, []);
-
   const selectGuestMatch = useCallback(async (match: NormalizedMatch) => {
     const source = await api.chessComMatchReplay(match.game_ids.A);
     if (source.match.game_ids.A !== match.game_ids.A || source.match.game_ids.B !== match.game_ids.B) {
@@ -274,6 +272,13 @@ export default function App() {
       },
     }));
   }, [setGuestReplay, updateGuestProgress]);
+
+  const escapeWordVertigo = useCallback(async () => {
+    const matchupList = await queryClient.fetchQuery(guestMatchupsQuery);
+    if (!matchupList.matches.length) return;
+    const randomIndex = Math.floor(Math.random() * matchupList.matches.length);
+    await selectGuestMatch(matchupList.matches[randomIndex]);
+  }, [queryClient, selectGuestMatch]);
 
   const toggleCurrentLesson = () => {
     if (!store.game || !store.game.lesson) return;
@@ -303,6 +308,7 @@ export default function App() {
   const goToMap = () => {
     useCoachStore.setState({ game: null, guestMatch: null, roomId: null, participants: [], globalPly: 0 });
     setOnboardingPhase("entry");
+    setWordVertigoActive(false);
     setArchiveOpen(false);
     setView("review");
     setReviewGameId(null);
@@ -345,11 +351,12 @@ export default function App() {
   return (
     <>
     <AppShell
-      className={`${view === "stats" ? "stats-view" : ""} ${showOnboarding ? "review-entry-shell" : ""}`}
+      className={`${view === "stats" ? "stats-view" : ""} ${showOnboarding ? "review-entry-shell" : ""} ${wordVertigoActive ? "word-vertigo-sequence" : ""}`}
       boardTheme={boardTheme}
       pieceStyle={pieceStyle}
       pieceSize={pieceSize}
       onboardingLocked={showOnboarding}
+      dockOverlayActive={showOnboarding && wordVertigoActive}
       rail={<>
         <div className={`rail-brand ${capabilityLocked("rail_onboarding") ? "capability-locked" : ""}`} title="The Jimmy App"><span className="brand-mark">J</span></div>
         <nav className="rail-nav" aria-label="Main views">
@@ -363,7 +370,7 @@ export default function App() {
           <button disabled={capabilityLocked("rail_chesscom")} className={capabilityLocked("rail_chesscom") ? "capability-locked" : ""} aria-label="Connect Chess.com" title="Connect Chess.com" onClick={() => setConnectOpen(true)}><Radio size={17} />{capabilityLocked("rail_chesscom") && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>
         </div>
       </>}
-      stage={showOnboarding ? (onboardingPhase === "entry" ? <OnboardingMap onGuestSpawn={onGuestSpawn} onUsernameSubmit={onUsernameSubmit} /> : <GuestMatchupList onSelect={selectGuestMatch} />) : view === "review" ? <section className="workspace">
+      stage={showOnboarding ? (onboardingPhase === "entry" ? <OnboardingMap onGuestSpawn={onGuestSpawn} onWordVertigoActiveChange={setWordVertigoActive} onWordVertigoUnmute={escapeWordVertigo} /> : <GuestMatchupList onSelect={selectGuestMatch} />) : view === "review" ? <section className="workspace">
         <div className={`boards-zone ${store.game ? "has-game" : ""}`}>
           {store.mode === "exploration" && <div className="stage-actions"><button title="Undo exploration move" onClick={store.undoExploration}><Undo2 size={16} /></button>{store.explorationFuture.length > 0 && <button title="Redo exploration move" onClick={store.redoExploration}><Redo2 size={16} /></button>}<button title="Return to game" onClick={() => { store.returnToGame(); sendRoomEvent("variation.return_to_game", {}); }}><RotateCcw size={16} /></button></div>}
           {store.game ? <div className="boards-grid"><BoardPanel boardId={primarySourceBoard} position={primaryPosition} orientation={primaryOrientation} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "A"} title={store.guestMatch ? "BOARD A · FEATURED PLAYER" : "BOARD A · YOUR BOARD"} playerTop={primaryPlayerTop} playerBottom={primaryPlayerBottom} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { api } from "../api";
+import { guestMatchupsQuery } from "../guestMatchupsQuery";
 import type { NormalizedMatch } from "../types";
 
 interface Props {
@@ -19,7 +19,7 @@ export function GuestMatchupList({ onSelect }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [selecting, setSelecting] = useState(false);
   const [selectionError, setSelectionError] = useState("");
-  const query = useQuery({ queryKey: ["guest-matchups"], queryFn: api.guestMatchups, retry: false });
+  const query = useQuery({ ...guestMatchupsQuery, retry: false });
   const matches = query.data?.matches ?? [];
 
   useLayoutEffect(() => {

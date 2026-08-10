@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "feature": "word_vertigo",
+    "authored_by": "Claude (review gate), owner-directed 2026-08-10",
+    "usage": "Entry-screen right card. Word chosen by first typed character. Blurb = template with {WORD} and {PRONUNCIATION} substituted, revealed at variable typewriter speed.",
+    "note": "Words are deliberately obscure; several are real, some are not; the app never claims otherwise. No audio exists anywhere in this feature by design."
+  },
+  "template": "Ah. You typed a letter. The word is {WORD}. It is pronounced {PRONUNCIATION}, according to audio you cannot currently hear. Please reflect, during the remaining time, on the following highly optimistic predictions: colleagues will describe you as 'suddenly magnetic.' A stranger at a bus stop will ask if you went to graduate school. Someone named Doug will nod slowly. If you deploy {WORD} casually in conversation — mid-sentence, unbothered, like it lives in your mouth rent-free — witnesses will assume you own hardcover books and floss vertically. This is your future. Wait for it.",
+  "words": {
+    "a": { "word": "anhemabiaophoia", "pronunciation": "an-hem-uh-BY-uh-oh-FOY-uh" },
+    "b": { "word": "borborygmus", "pronunciation": "bor-buh-RIG-mus" },
+    "c": { "word": "cachinnation", "pronunciation": "kak-ih-NAY-shun" },
+    "d": { "word": "defenestration", "pronunciation": "dee-fen-ih-STRAY-shun" },
+    "e": { "word": "eleemosynary", "pronunciation": "el-ih-MOS-ih-nair-ee" },
+    "f": { "word": "floccinaucinihilipilification", "pronunciation": "FLOK-sih-NAW-sih-NY-hil-ih-PIL-ih-fih-KAY-shun" },
+    "g": { "word": "gongoozler", "pronunciation": "gon-GOOZ-ler" },
+    "h": { "word": "honorificabilitudinitatibus", "pronunciation": "on-or-IF-ih-kah-bil-ih-TOO-din-ih-TAH-tih-bus" },
+    "i": { "word": "impignorate", "pronunciation": "im-PIG-nor-ayt" },
+    "j": { "word": "jentacular", "pronunciation": "jen-TAK-yoo-lar" },
+    "k": { "word": "kakorrhaphiophobia", "pronunciation": "kak-or-AF-ee-oh-FOH-bee-uh" },
+    "l": { "word": "logorrhea", "pronunciation": "log-uh-REE-uh" },
+    "m": { "word": "mumpsimus", "pronunciation": "MUMP-sih-mus" },
+    "n": { "word": "nudiustertian", "pronunciation": "noo-dee-us-TER-shun" },
+    "o": { "word": "omphaloskepsis", "pronunciation": "om-fah-loh-SKEP-sis" },
+    "p": { "word": "pneumonoultramicroscopicsilicovolcanoconiosis", "pronunciation": "NOO-moh-noh-UL-truh-MY-kroh-SKOP-ik-SIL-ih-koh-vol-KAY-noh-KOH-nee-OH-sis" },
+    "q": { "word": "quomodocunquize", "pronunciation": "kwoh-moh-doh-KUN-kwyz" },
+    "r": { "word": "rhinotillexomania", "pronunciation": "RY-noh-til-EX-oh-MAY-nee-uh" },
+    "s": { "word": "sesquipedalian", "pronunciation": "ses-kwih-peh-DAY-lee-un" },
+    "t": { "word": "triskaidekaphobia", "pronunciation": "tris-ky-dek-uh-FOH-bee-uh" },
+    "u": { "word": "ultracrepidarian", "pronunciation": "ul-truh-krep-ih-DAIR-ee-un" },
+    "v": { "word": "velleity", "pronunciation": "veh-LEE-ih-tee" },
+    "w": { "word": "widdershins", "pronunciation": "WID-er-shinz" },
+    "x": { "word": "xenodocheionology", "pronunciation": "zen-oh-doh-ky-on-OL-uh-jee" },
+    "y": { "word": "yclept", "pronunciation": "ih-KLEPT" },
+    "z": { "word": "zenzizenzizenzic", "pronunciation": "zen-zih-zen-zih-ZEN-zik" },
+    "fallback": { "word": "anhemabiaophoia", "pronunciation": "an-hem-uh-BY-uh-oh-FOY-uh" }
+  }
+}
