@@ -158,7 +158,7 @@ describe("URL-first exact review", () => {
     expect(screen.queryByRole("navigation", { name: "Main views" })).toBeNull();
     expect(screen.queryByRole("complementary", { name: "Task tools" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Privacy" })).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: /Guest Spawn/ }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /Click me\?/ }));
   });
 
   it("keeps the building-blocks rail link unlocked and opens it in a new tab", () => {
@@ -185,7 +185,7 @@ describe("URL-first exact review", () => {
     renderApp();
     const statistics = screen.getByRole("button", { name: "Statistics", hidden: true }) as HTMLButtonElement;
     expect(statistics.disabled).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: /Guest Spawn/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Click me\?/ }));
     const list = await screen.findByRole("listbox", { name: "Guest matchups" });
     fireEvent.keyDown(list, { key: "Enter" });
 
@@ -233,7 +233,7 @@ describe("URL-first exact review", () => {
 
   it("validates and commits the username stub without unlocking or network activity", () => {
     renderApp();
-    const username = screen.getByRole("textbox", { name: /Username/ });
+    const username = screen.getByRole("textbox", { name: /Sign in/ });
     fireEvent.change(username, { target: { value: "Jimmy_42" } });
     fireEvent.keyDown(username, { key: "Enter" });
     expect(localStorage.getItem(GUEST_PROGRESS_KEY)).toBeNull();

@@ -7,8 +7,8 @@ describe("locked-shell onboarding", () => {
 
   it("focuses Guest Spawn on load and traps Tab and arrows between the two nodes", () => {
     render(<OnboardingMap onGuestSpawn={vi.fn()} onUsernameSubmit={vi.fn()} />);
-    const guest = screen.getByRole("button", { name: /Guest Spawn/ });
-    const username = screen.getByRole("textbox", { name: /Username/ });
+    const guest = screen.getByRole("button", { name: /Click me\?/ });
+    const username = screen.getByRole("textbox", { name: /Sign in/ });
 
     expect(document.activeElement).toBe(guest);
     fireEvent.keyDown(guest, { key: "ArrowRight" });
@@ -27,8 +27,8 @@ describe("locked-shell onboarding", () => {
     const onGuestSpawn = vi.fn();
     const onUsernameSubmit = vi.fn();
     render(<OnboardingMap onGuestSpawn={onGuestSpawn} onUsernameSubmit={onUsernameSubmit} />);
-    const guest = screen.getByRole("button", { name: /Guest Spawn/ });
-    const username = screen.getByRole("textbox", { name: /Username/ });
+    const guest = screen.getByRole("button", { name: /Click me\?/ });
+    const username = screen.getByRole("textbox", { name: /Sign in/ });
 
     fireEvent.keyDown(guest, { key: "Enter" });
     expect(onGuestSpawn).toHaveBeenCalledOnce();
