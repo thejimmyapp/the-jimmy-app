@@ -94,6 +94,7 @@ export default function App() {
   const [acknowledgementOpen, setAcknowledgementOpen] = useState(false);
   const [onboardingPhase, setOnboardingPhase] = useState<"entry" | "matchups">("entry");
   const [wordVertigoActive, setWordVertigoActive] = useState(false);
+  const [boardsSwapped, setBoardsSwapped] = useState(false);
   const analysisResolverRef = useRef<((accepted: boolean) => void) | null>(null);
   const [reviewGameId, setReviewGameId] = useState<number | null>(() => {
     if (store.roomId) return null;
@@ -184,24 +185,26 @@ export default function App() {
   const userIsWhite = store.game?.game.user_color !== "black";
   const players = store.game?.players;
   const secondBoardAvailable = Boolean(store.game?.second_board_available);
-  const guestPresentation = store.guestMatch ? guestBoardPresentation(store.guestMatch) : null;
-  const primarySourceBoard: BoardId = guestPresentation?.primarySourceBoard ?? "A";
-  const partnerSourceBoard: BoardId = guestPresentation?.partnerSourceBoard ?? "B";
-  const primaryOrientation = guestPresentation?.primaryOrientation ?? (userIsWhite ? "white" : "black");
-  const partnerOrientation = guestPresentation?.partnerOrientation ?? (userIsWhite ? "black" : "white");
+  const guestPresentation = store.guestMatch ? guestBoardPresentation(store.guestMatch, boardsSwapped) : null;
+  const stagedSourceBoard: BoardId = guestPresentation?.stagedSourceBoard ?? "A";
+  const dockSourceBoard: BoardId = guestPresentation?.dockSourceBoard ?? "B";
+  const stagedOrientation = guestPresentation?.stagedOrientation ?? (userIsWhite ? "white" : "black");
+  const dockOrientation = guestPresentation?.dockOrientation ?? (userIsWhite ? "black" : "white");
+  const stagedBoardName = guestPresentation?.stagedName ?? "First Board";
+  const dockBoardName = guestPresentation?.dockName ?? "Second Board";
   const sourcePositions = { A: sourceBoardA, B: sourceBoardB };
-  const primaryPosition = sourcePositions[primarySourceBoard];
-  const partnerPosition = sourcePositions[partnerSourceBoard];
+  const stagedPosition = sourcePositions[stagedSourceBoard];
+  const dockPosition = sourcePositions[dockSourceBoard];
   const boardPlayers = {
     A: { white: players?.board_a_white ?? "White A", black: players?.board_a_black ?? "Black A" },
     B: { white: players?.board_b_white ?? "White B", black: players?.board_b_black ?? "Black B" },
   };
   const oppositeColor = (color: "white" | "black") => color === "white" ? "black" : "white";
-  const primaryPlayerBottom = boardPlayers[primarySourceBoard][primaryOrientation];
-  const primaryPlayerTop = boardPlayers[primarySourceBoard][oppositeColor(primaryOrientation)];
-  const partnerPlayerBottom = boardPlayers[partnerSourceBoard][partnerOrientation];
-  const partnerPlayerTop = boardPlayers[partnerSourceBoard][oppositeColor(partnerOrientation)];
-  const partnerBoardAvailable = partnerSourceBoard === "A" || secondBoardAvailable;
+  const stagedPlayerBottom = boardPlayers[stagedSourceBoard][stagedOrientation];
+  const stagedPlayerTop = boardPlayers[stagedSourceBoard][oppositeColor(stagedOrientation)];
+  const dockPlayerBottom = boardPlayers[dockSourceBoard][dockOrientation];
+  const dockPlayerTop = boardPlayers[dockSourceBoard][oppositeColor(dockOrientation)];
+  const dockBoardAvailable = dockSourceBoard === "A" || secondBoardAvailable;
   const selectGame = (game: GameSummary) => { gameMutation.mutate(game.id); sendRoomEvent("game.select", { game_id: game.id }); };
   const openImport = () => { setManualImportOpen(true); setConnectOpen(true); };
   const connect = (event: FormEvent) => { event.preventDefault(); const clean = usernameDraft.trim(); if (!clean) return; store.setUsername(clean); connectMutation.mutate(clean); };
@@ -247,6 +250,7 @@ export default function App() {
 
   useEffect(() => {
     setActiveReviewBoard("A");
+    setBoardsSwapped(false);
   }, [store.game?.game.id, store.guestMatch?.highest_rated.seat]);
 
   const onGuestSpawn = useCallback(() => {
@@ -357,6 +361,7 @@ export default function App() {
       pieceSize={pieceSize}
       onboardingLocked={showOnboarding}
       dockOverlayActive={showOnboarding && wordVertigoActive}
+      railUnlockedAction={<a className="rail-blocks-link" href="/blocks" target="_blank" rel="noreferrer" aria-label="Open building blocks" title="Open building blocks"><span className="rail-blocks-glyph" aria-hidden="true">🎨</span></a>}
       rail={<>
         <div className={`rail-brand ${capabilityLocked("rail_onboarding") ? "capability-locked" : ""}`} title="The Jimmy App"><span className="brand-mark">J</span></div>
         <nav className="rail-nav" aria-label="Main views">
@@ -364,7 +369,6 @@ export default function App() {
           <button disabled={capabilityLocked("rail_statistics")} className={`${view === "stats" ? "active" : ""} ${capabilityLocked("rail_statistics") ? "capability-locked" : ""}`} aria-label="Statistics" title="Statistics" onClick={() => setView("stats")}><BarChart3 size={17} />{capabilityLocked("rail_statistics") && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>
         </nav>
         <div className="rail-actions">
-          <a className="rail-blocks-link" href="/blocks" target="_blank" rel="noreferrer" aria-label="Open building blocks" title="Open building blocks"><span className="rail-blocks-glyph" aria-hidden="true">🎨</span></a>
           <button disabled={capabilityLocked("rail_onboarding")} className={capabilityLocked("rail_onboarding") ? "capability-locked" : ""} aria-label="Return to onboarding" title="Return to onboarding" onClick={goToMap}><Home size={17} /></button>
           <button disabled={capabilityLocked("rail_settings")} className={capabilityLocked("rail_settings") ? "capability-locked" : ""} aria-label="Board settings" title="Board settings" onClick={() => setSettingsOpen(true)}><Settings size={17} />{capabilityLocked("rail_settings") && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>
           <button disabled={capabilityLocked("rail_chesscom")} className={capabilityLocked("rail_chesscom") ? "capability-locked" : ""} aria-label="Connect Chess.com" title="Connect Chess.com" onClick={() => setConnectOpen(true)}><Radio size={17} />{capabilityLocked("rail_chesscom") && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>
@@ -373,10 +377,10 @@ export default function App() {
       stage={showOnboarding ? (onboardingPhase === "entry" ? <OnboardingMap onGuestSpawn={onGuestSpawn} onWordVertigoActiveChange={setWordVertigoActive} onWordVertigoUnmute={escapeWordVertigo} /> : <GuestMatchupList onSelect={selectGuestMatch} />) : view === "review" ? <section className="workspace">
         <div className={`boards-zone ${store.game ? "has-game" : ""}`}>
           {store.mode === "exploration" && <div className="stage-actions"><button title="Undo exploration move" onClick={store.undoExploration}><Undo2 size={16} /></button>{store.explorationFuture.length > 0 && <button title="Redo exploration move" onClick={store.redoExploration}><Redo2 size={16} /></button>}<button title="Return to game" onClick={() => { store.returnToGame(); sendRoomEvent("variation.return_to_game", {}); }}><RotateCcw size={16} /></button></div>}
-          {store.game ? <div className="boards-grid"><BoardPanel boardId={primarySourceBoard} position={primaryPosition} orientation={primaryOrientation} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "A"} title={store.guestMatch ? "BOARD A · FEATURED PLAYER" : "BOARD A · YOUR BOARD"} playerTop={primaryPlayerTop} playerBottom={primaryPlayerBottom} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}
+          {store.game ? <div className="boards-grid"><BoardPanel boardId={stagedSourceBoard} position={stagedPosition} orientation={stagedOrientation} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "A"} title={stagedBoardName} showTitle={false} playerTop={stagedPlayerTop} playerBottom={stagedPlayerBottom} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}
         </div>
       </section> : <StatsDashboard username={store.username} />}
-      dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" activeBoard={activeReviewBoard} boardFocusEnabled={Boolean(store.guestMatch)} onActiveBoardChange={setActiveReviewBoard} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} infoContent={reviewInfo} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button disabled={guestCoachLocked} className={`coach-button ${guestCoachLocked ? "capability-locked" : ""}`} title={guestCoachLocked ? "Team Coach unlocks in a future guest capability" : "Run the coupled Bughouse coaching pipeline"} onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach{guestCoachLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>}</> : undefined} partnerContent={store.game ? <BoardPanel boardId={partnerSourceBoard} position={partnerPosition} orientation={partnerOrientation} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "B"} title="BOARD B · PARTNER BOARD" playerTop={partnerBoardAvailable ? partnerPlayerTop : "Diagonal Opponent Unknown"} playerBottom={partnerBoardAvailable ? partnerPlayerBottom : "Partner Unknown"} unavailable={!partnerBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : <div className="empty-panel">Complete onboarding to open review tools.</div>} />}
+      dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" activeBoard={activeReviewBoard} boardFocusEnabled={Boolean(store.guestMatch)} onActiveBoardChange={setActiveReviewBoard} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} onSwapBoards={store.guestMatch ? () => setBoardsSwapped((current) => !current) : undefined} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} infoContent={reviewInfo} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button disabled={guestCoachLocked} className={`coach-button ${guestCoachLocked ? "capability-locked" : ""}`} title={guestCoachLocked ? "Team Coach unlocks in a future guest capability" : "Run the coupled Bughouse coaching pipeline"} onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach{guestCoachLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>}</> : undefined} boardContent={store.game ? <BoardPanel boardId={dockSourceBoard} position={dockPosition} orientation={dockOrientation} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "B"} title={dockBoardName} playerTop={dockBoardAvailable ? dockPlayerTop : "Diagonal Opponent Unknown"} playerBottom={dockBoardAvailable ? dockPlayerBottom : "Partner Unknown"} unavailable={!dockBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : undefined} />}
     />
     {store.game && <TeamCoach open={coachOpen} onClose={() => setCoachOpen(false)} boardA={sourceBoardA} boardB={sourceBoardB} />}
       <AnalysisAcknowledgement open={acknowledgementOpen} onClose={closeAcknowledgement} onContinue={continueAcknowledgement} />

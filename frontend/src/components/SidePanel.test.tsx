@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initialCapabilityMap, type SavedLesson } from "../guestProgress";
 import { useCoachStore } from "../store";
+import type { NormalizedMatch } from "../types";
 import { SidePanel } from "./SidePanel";
 
 const saved: SavedLesson = {
@@ -26,7 +27,7 @@ const renderPanel = (overrides: Partial<Parameters<typeof SidePanel>[0]> = {}) =
   const props: Parameters<typeof SidePanel>[0] = {
     onSelectGame: vi.fn(),
     loadingGame: false,
-    partnerContent: <div>Compact partner board</div>,
+    boardContent: <div>Compact second board</div>,
     infoContent: <div>Review information</div>,
     savedLessons: [saved],
     qualifyingGames: 1,
@@ -47,12 +48,21 @@ const renderPanel = (overrides: Partial<Parameters<typeof SidePanel>[0]> = {}) =
 };
 
 describe("review utility panel", () => {
-  beforeEach(() => useCoachStore.setState({ game: null, games: [], messages: [], roomId: null, globalPly: 0 }));
+  beforeEach(() => useCoachStore.setState({ game: null, guestMatch: null, games: [], messages: [], roomId: null, globalPly: 0 }));
   afterEach(cleanup);
 
-  it("defaults to Partner and preserves a collaboration draft across primary tabs", () => {
+  it("orders review tabs with Info first and leaves every sub-tab unselected without a game", () => {
+    renderPanel({ boardContent: undefined, capabilities: initialCapabilityMap() });
+    const container = document.body;
+    const labels = Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-label="Review views"] > button')).map((button) => button.textContent);
+    expect(labels).toEqual(["Info", "Moves", "Second Board"]);
+    expect(container.querySelector('[aria-label="Review views"] > button.active')).toBeNull();
+    expect(container.querySelector('[aria-label="Review views"] > button[aria-selected="true"]')).toBeNull();
+    expect(screen.queryByText("Complete onboarding to open review tools.")).toBeNull();
+  });
+
+  it("preserves a collaboration draft across primary tabs", () => {
     renderPanel();
-    expect(screen.getByText("Compact partner board")).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Collaborate" }));
     const composer = screen.getByPlaceholderText("Message your partner") as HTMLTextAreaElement;
     fireEvent.change(composer, { target: { value: "keep this draft" } });
@@ -61,10 +71,26 @@ describe("review utility panel", () => {
     expect((screen.getByPlaceholderText("Message your partner") as HTMLTextAreaElement).value).toBe("keep this draft");
   });
 
+  it("exposes a native swap button and keeps focus attached to the same named board", async () => {
+    useCoachStore.setState({ guestMatch: {} as NormalizedMatch });
+    const onSwapBoards = vi.fn();
+    const onActiveBoardChange = vi.fn();
+    renderPanel({ boardFocusEnabled: true, onSwapBoards, onActiveBoardChange });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Moves" }).getAttribute("aria-selected")).toBe("true"));
+
+    const swap = screen.getByRole("button", { name: "Swap staged board" });
+    expect(swap.getAttribute("type")).toBe("button");
+    fireEvent.click(swap);
+
+    expect(onSwapBoards).toHaveBeenCalledOnce();
+    expect(onActiveBoardChange).toHaveBeenLastCalledWith("B");
+    expect(screen.getByRole("tab", { name: "Second Board" }).getAttribute("aria-selected")).toBe("true");
+  });
+
   it("reopens a saved exact game reference and can remove it", async () => {
     const props = renderPanel();
     fireEvent.click(screen.getByRole("tab", { name: "Library" }));
-    expect(screen.getByText("1/3 games toward partner-board instructions")).toBeTruthy();
+    expect(screen.getByText("1/3 games toward second-board instructions")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Nxf7 → N@h6/ }));
     await waitFor(() => expect(props.onOpenSavedLesson).toHaveBeenCalledWith(saved));
     fireEvent.click(screen.getByRole("button", { name: "Remove saved lesson from game 42" }));

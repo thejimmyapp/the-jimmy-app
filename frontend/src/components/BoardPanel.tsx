@@ -36,6 +36,7 @@ interface Props {
   orientation: "white" | "black";
   pieceStyle: PieceStyleId;
   title: string;
+  showTitle?: boolean;
   playerTop: string;
   playerBottom: string;
   unavailable?: boolean;
@@ -67,7 +68,7 @@ export type BoardAnalysisState = {
   error?: string;
 };
 
-export function BoardPanel({ boardId, position, pairedPosition, orientation, pieceStyle, title, playerTop, playerBottom, unavailable = false, onImportBothBoards, externalFallbackUrl, locked = false, onMoveIntent, onAnalysisChange, layout = "standard", beforeAnalyze, keyboardFocused = false, analysisLocked = false }: Props) {
+export function BoardPanel({ boardId, position, pairedPosition, orientation, pieceStyle, title, showTitle = true, playerTop, playerBottom, unavailable = false, onImportBothBoards, externalFallbackUrl, locked = false, onMoveIntent, onAnalysisChange, layout = "standard", beforeAnalyze, keyboardFocused = false, analysisLocked = false }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const lastWheelAt = useRef(0);
   const [arrowStart, setArrowStart] = useState<string | null>(null);
@@ -314,7 +315,7 @@ export function BoardPanel({ boardId, position, pairedPosition, orientation, pie
 
   return (
     <section className={`board-panel board-layout-${layout} ${mode === "exploration" ? "is-exploring" : ""} ${unavailable ? "is-unavailable" : ""} ${keyboardFocused ? "board-focus-active" : ""}`} data-keyboard-focus={keyboardFocused ? "active" : "inactive"}>
-      <div className="board-heading"><strong>{title}</strong>{keyboardFocused && <span className="board-focus-badge">KEYBOARD FOCUS</span>}<span>{position?.side_to_move ?? "Unavailable"} to move</span></div>
+      <div className="board-heading">{showTitle && <strong>{title}</strong>}{keyboardFocused && <span className="board-focus-badge">KEYBOARD FOCUS</span>}<span>{position?.side_to_move ?? "Unavailable"} to move</span></div>
       <PlayerBar name={playerTop} clock={orientation === "white" ? position?.black_clock : position?.white_clock} />
       <div className={`board-stage ${layout === "standard" ? "horizontal-pockets" : "vertical-pockets"}`}>
         {layout !== "standard" && <div className="pocket-stack">
@@ -384,11 +385,11 @@ export function BoardPanel({ boardId, position, pairedPosition, orientation, pie
       </div>
       {unavailable && (
         <div className={`board-panel-unavailable ${oneBoardAccepted ? "one-board-accepted" : ""}`} role="status">
-          <strong>Board B is unavailable</strong>
-          <span>Partner board was not included in the available Chess.com data.</span>
+          <strong>Second Board is unavailable</strong>
+          <span>The second board was not included in the available Chess.com data.</span>
           {oneBoardAccepted ? (
             <>
-              <small>Continuing with Board A only.</small>
+              <small>Continuing with First Board only.</small>
               <button type="button" onClick={() => setOneBoardAccepted(false)}>Show recovery actions</button>
             </>
           ) : (

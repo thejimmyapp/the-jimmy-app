@@ -7,13 +7,13 @@ import type { BoardId, GameSummary } from "../types";
 import { Timeline } from "./Timeline";
 
 type PrimaryTab = "review" | "games" | "library" | "collaborate";
-type ReviewTab = "moves" | "partner" | "info";
+type ReviewTab = "info" | "moves" | "board";
 type CollaborateTab = "chat" | "notes";
 
 interface Props {
   onSelectGame: (game: GameSummary) => void;
   loadingGame: boolean;
-  partnerContent: ReactNode;
+  boardContent?: ReactNode;
   infoContent: ReactNode;
   savedLessons: SavedLesson[];
   qualifyingGames: number;
@@ -27,6 +27,11 @@ interface Props {
   activeBoard?: BoardId;
   boardFocusEnabled?: boolean;
   onActiveBoardChange?: (board: BoardId) => void;
+  stagedSourceBoard?: BoardId;
+  dockSourceBoard?: BoardId;
+  stagedBoardName?: string;
+  dockBoardName?: string;
+  onSwapBoards?: () => void;
 }
 
 const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
@@ -36,9 +41,9 @@ const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
   collaborate: "dock_collaborate",
 };
 
-export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange }: Props) {
+export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent, savedLessons, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
-  const [reviewTab, setReviewTab] = useState<ReviewTab>("partner");
+  const [reviewTab, setReviewTab] = useState<ReviewTab | null>(null);
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
@@ -66,7 +71,9 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
       if (boardFocusEnabled) onActiveBoardChange?.("A");
     } else if (game) {
       setPrimaryTab("review");
-      setReviewTab("partner");
+      setReviewTab("board");
+    } else {
+      setReviewTab(null);
     }
   }, [boardFocusEnabled, game, guestMatch, onActiveBoardChange]);
 
@@ -113,19 +120,24 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
 
   const chooseReview = (tab: ReviewTab) => {
     setReviewTab(tab);
-    if (boardFocusEnabled) onActiveBoardChange?.(tab === "partner" ? "B" : "A");
+    if (boardFocusEnabled) onActiveBoardChange?.(tab === "board" ? "B" : "A");
   };
 
   const changeBoardFocus = (board: BoardId) => {
     onActiveBoardChange?.(board);
     if (!boardFocusEnabled) return;
     setPrimaryTab("review");
-    setReviewTab(board === "B" ? "partner" : "moves");
+    setReviewTab(board === "B" ? "board" : "moves");
+  };
+
+  const swapBoards = () => {
+    onSwapBoards?.();
+    if (boardFocusEnabled) changeBoardFocus(activeBoard === "A" ? "B" : "A");
   };
 
   return (
     <aside className={`side-panel utility-panel ${isCapabilityLocked(capabilities, primaryCapability[primaryTab]) ? "capability-locked" : ""}`} aria-label="Review utility panel">
-      <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><div className="utility-titlebar-actions">{dockActions}<button type="button" onClick={onMap}><Home size={13} /> Map</button></div></div>
+      <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><div className="utility-titlebar-actions">{onSwapBoards && <button type="button" className="board-swap-button" aria-label="Swap staged board" title="Swap staged board" onClick={swapBoards}><span aria-hidden="true">↹⇄</span></button>}{dockActions}<button type="button" onClick={onMap}><Home size={13} /> Map</button></div></div>
       <div className="utility-primary-tabs" role="tablist" aria-label="Review tools">
         {(["review", "games", "library", "collaborate"] as PrimaryTab[]).map((tab) => {
           const locked = isCapabilityLocked(capabilities, primaryCapability[tab]);
@@ -134,15 +146,15 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
       </div>
 
       {primaryTab === "review" && <div className="utility-secondary-tabs" role="tablist" aria-label="Review views">
-        {(["moves", "partner", "info"] as ReviewTab[]).map((tab) => <button key={tab} role="tab" aria-selected={reviewTab === tab} className={reviewTab === tab ? "active" : ""} onClick={() => chooseReview(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
+        {(["info", "moves", "board"] as ReviewTab[]).map((tab) => <button key={tab} role="tab" aria-selected={reviewTab === tab} className={reviewTab === tab ? "active" : ""} onClick={() => chooseReview(tab)}>{tab === "board" ? dockBoardName : tab[0].toUpperCase() + tab.slice(1)}</button>)}
       </div>}
       {primaryTab === "collaborate" && <div className="utility-secondary-tabs" role="tablist" aria-label="Collaboration views">
         {(["chat", "notes"] as CollaborateTab[]).map((tab) => <button key={tab} role="tab" aria-selected={collaborateTab === tab} className={collaborateTab === tab ? "active" : ""} onClick={() => setCollaborateTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}{tab === "chat" && unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</button>)}
       </div>}
 
-      <div className={`utility-pane partner-pane ${primaryTab === "review" && reviewTab === "partner" ? "active" : ""}`} aria-hidden={!(primaryTab === "review" && reviewTab === "partner")}>{partnerContent}</div>
+      <div className={`utility-pane board-pane ${primaryTab === "review" && reviewTab === "board" ? "active" : ""}`} aria-hidden={!(primaryTab === "review" && reviewTab === "board")}>{boardContent}</div>
 
-      <div className={`utility-pane moves-pane ${primaryTab === "review" && reviewTab === "moves" ? "active" : "inactive"}`} aria-hidden={!(primaryTab === "review" && reviewTab === "moves")}><Timeline variant="panel" activeBoard={activeBoard} boardFocusEnabled={boardFocusEnabled} onActiveBoardChange={changeBoardFocus} /></div>
+      <div className={`utility-pane moves-pane ${primaryTab === "review" && reviewTab === "moves" ? "active" : "inactive"}`} aria-hidden={!(primaryTab === "review" && reviewTab === "moves")}><Timeline variant="panel" activeBoard={activeBoard} boardFocusEnabled={boardFocusEnabled} onActiveBoardChange={changeBoardFocus} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} /></div>
       {primaryTab === "review" && reviewTab === "info" && <div className="utility-pane info-pane">{infoContent}</div>}
 
       {primaryTab === "games" && <div className="utility-pane games-pane">
@@ -162,7 +174,7 @@ export function SidePanel({ onSelectGame, loadingGame, partnerContent, infoConte
       </div>}
 
       {primaryTab === "library" && <div className="utility-pane library-pane">
-        <header className="library-header"><BookOpen size={17} /><div><strong>Guest learning library</strong><span>{qualifyingGames}/3 games toward partner-board instructions</span></div></header>
+        <header className="library-header"><BookOpen size={17} /><div><strong>Guest learning library</strong><span>{qualifyingGames}/3 games toward second-board instructions</span></div></header>
         <div className="unlock-progress"><span style={{ width: `${Math.min(3, qualifyingGames) / 3 * 100}%` }} /><strong>{qualifyingGames}/3 games</strong></div>
         <p className="library-boundary">Only medium- or high-confidence mistakes and blunders with a legal suggested move count. Saved here means stored in this browser.</p>
         <div className="library-list">

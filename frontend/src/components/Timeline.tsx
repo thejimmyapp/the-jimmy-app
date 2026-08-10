@@ -2,7 +2,6 @@ import { Pause, Play, SkipBack, SkipForward, StepBack, StepForward } from "lucid
 import { useCallback, useEffect, useState } from "react";
 import { sendRoomEvent } from "../socket";
 import { useCoachStore } from "../store";
-import { sourceBoardForDisplay } from "../guestBoardPresentation";
 import type { BoardId } from "../types";
 
 interface Props {
@@ -10,14 +9,17 @@ interface Props {
   activeBoard?: BoardId;
   boardFocusEnabled?: boolean;
   onActiveBoardChange?: (board: BoardId) => void;
+  stagedSourceBoard?: BoardId;
+  dockSourceBoard?: BoardId;
+  stagedBoardName?: string;
+  dockBoardName?: string;
 }
 
-export function Timeline({ variant = "full", activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange }: Props) {
-  const { game, guestMatch, globalPly, seek, mode } = useCoachStore();
+export function Timeline({ variant = "full", activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board" }: Props) {
+  const { game, globalPly, seek, mode } = useCoachStore();
   const [playing, setPlaying] = useState(false);
   const max = Math.max(0, game?.timeline.length ? game.timeline.length - 1 : (game?.positions_a.length ?? 1) - 1);
-  const displayBoardASource = sourceBoardForDisplay(guestMatch, "A");
-  const displayBoardBSource = sourceBoardForDisplay(guestMatch, "B");
+  const focusedBoardName = activeBoard === "A" ? stagedBoardName : dockBoardName;
   useEffect(() => {
     if (!playing || globalPly >= max) return;
     const timer = window.setTimeout(() => {
@@ -57,11 +59,11 @@ export function Timeline({ variant = "full", activeBoard = "A", boardFocusEnable
           <button onClick={() => move(globalPly + 1)} aria-label="Next"><StepForward size={17} /></button>
           <button onClick={() => move(max)} aria-label="End"><SkipForward size={17} /></button>
         </div>
-        <div className={`mode-badge ${mode}`}><span />{mode === "review" ? `GAME REVIEW · MOVE ${globalPly}${boardFocusEnabled ? ` · BOARD ${activeBoard} FOCUS` : ""}` : `EXPLORATION · MOVE ${globalPly}`}</div>
+        <div className={`mode-badge ${mode}`}><span />{mode === "review" ? `GAME REVIEW · MOVE ${globalPly}${boardFocusEnabled ? ` · ${focusedBoardName.toUpperCase()} FOCUS` : ""}` : `EXPLORATION · MOVE ${globalPly}`}</div>
       </div>
       <div className="timeline-tracks">
-        <div className={`track-label ${activeBoard === "A" && boardFocusEnabled ? "focus-active" : ""}`}>A</div><div className="move-track">{game?.timeline.filter((item) => item.board === displayBoardASource).map((item) => <button className={item.global_ply === globalPly ? "active" : ""} key={item.global_ply} onClick={() => move(item.global_ply)}>{item.move}</button>)}</div>
-        <div className={`track-label ${activeBoard === "B" && boardFocusEnabled ? "focus-active" : ""}`}>B</div><div className="move-track">{game?.timeline.filter((item) => item.board === displayBoardBSource).map((item) => <button className={item.global_ply === globalPly ? "active" : ""} key={item.global_ply} onClick={() => move(item.global_ply)}>{item.move}</button>)}</div>
+        <div className={`track-label ${activeBoard === "A" && boardFocusEnabled ? "focus-active" : ""}`}>{stagedBoardName}</div><div className="move-track">{game?.timeline.filter((item) => item.board === stagedSourceBoard).map((item) => <button className={item.global_ply === globalPly ? "active" : ""} key={item.global_ply} onClick={() => move(item.global_ply)}>{item.move}</button>)}</div>
+        <div className={`track-label ${activeBoard === "B" && boardFocusEnabled ? "focus-active" : ""}`}>{dockBoardName}</div><div className="move-track">{game?.timeline.filter((item) => item.board === dockSourceBoard).map((item) => <button className={item.global_ply === globalPly ? "active" : ""} key={item.global_ply} onClick={() => move(item.global_ply)}>{item.move}</button>)}</div>
       </div>
       <div className="timeline-position"><strong>{mode === "review" ? "GAME" : "VAR"}</strong><span>{globalPly}/{max}</span></div>
     </section>
