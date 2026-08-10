@@ -147,6 +147,16 @@
   .specimen-window{max-height:760px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#080d16}
   .specimen-window img{border:0;border-radius:0}
   .specimen-meta{font-size:11px;color:var(--txt3);margin-top:9px}
+  .leave-timer{position:fixed;top:14px;right:14px;z-index:9999;width:194px;padding:11px 12px 10px;border:1px solid #7a5a1e;border-top:2px solid #e8b93c;border-radius:7px;background:rgba(8,13,22,.94);box-shadow:0 10px 32px rgba(0,0,0,.42);font-family:var(--mono);pointer-events:none;backdrop-filter:blur(8px)}
+  .leave-timer[hidden]{display:none}
+  .leave-timer__kicker{display:block;margin-bottom:6px;color:#e8b93c;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+  .leave-timer__clocks{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .leave-timer__clock{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:3px;padding:5px 6px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+  .leave-timer__clock strong{color:var(--txt);font-size:18px;font-variant-numeric:tabular-nums;line-height:1}
+  .leave-timer__clock span{color:var(--txt3);font-size:8px;text-transform:uppercase}
+  .leave-timer__rate{display:block;margin-top:6px;color:var(--txt3);font-size:8px;letter-spacing:.03em}
+  .leave-timer.is-accelerated{border-color:var(--red);border-top-color:var(--red)}
+  .leave-timer.is-accelerated .leave-timer__kicker{color:var(--red)}
   @media (max-width:680px){
     body{padding:24px 16px 56px}
     .grid{grid-template-columns:minmax(0,1fr);gap:18px}
@@ -156,10 +166,19 @@
     .source-matrix-head{display:block}
     .source-matrix-count{display:block;margin-top:7px}
     .source-matrix{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .leave-timer{top:8px;right:8px;width:180px}
   }
 </style>
 </head>
 <body>
+<aside class="leave-timer" id="guest-leave-timer" role="timer" aria-label="Guest preview leave timer" hidden>
+  <span class="leave-timer__kicker">Guest peek · leave timer</span>
+  <span class="leave-timer__clocks" aria-hidden="true">
+    <span class="leave-timer__clock"><strong id="leave-timer-seconds">84.5</strong><span>sec</span></span>
+    <span class="leave-timer__clock"><strong id="leave-timer-milliseconds">500</strong><span>ms</span></span>
+  </span>
+  <span class="leave-timer__rate" id="leave-timer-rate">seconds ×1 · milliseconds ×3 · click −25 · wheel −15</span>
+</aside>
 <h1>thejimmyapp — UI building blocks</h1>
 <p class="sub">The chess.com patterns we borrow, redrawn in our own skin (dark navy + cyan, per the wireframe). Skeleton imitated, assets not copied. Each block notes its chess.com analog, its zone (RAIL / STAGE / DOCK), and its lock behavior in the capability map.</p>
 
@@ -491,5 +510,111 @@
 </section>
 
 </div>
+<script>
+(() => {
+  "use strict";
+
+  const GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v1";
+  const GUEST_PROGRESS_VERSION = 1;
+  const START_MILLISECONDS = 84_500;
+  const CLICK_DEDUCTION_MILLISECONDS = 25_000;
+  const WHEEL_DEDUCTION_MILLISECONDS = 15_000;
+  const BASE_COUNTDOWN_RATE = 1;
+  const ACCELERATED_COUNTDOWN_RATE = 4.5;
+  const DISPLAY_MILLISECONDS_RATE = 3;
+  // R35 owner-review assumption: 300 ms without another wheel event ends one scroll gesture.
+  const WHEEL_GESTURE_IDLE_MILLISECONDS = 300;
+
+  const timer = document.getElementById("guest-leave-timer");
+  const seconds = document.getElementById("leave-timer-seconds");
+  const milliseconds = document.getElementById("leave-timer-milliseconds");
+  const rate = document.getElementById("leave-timer-rate");
+  if (!timer || !seconds || !milliseconds || !rate) return;
+
+  const visitorIsGuest = () => {
+    try {
+      const raw = window.localStorage.getItem(GUEST_PROGRESS_KEY);
+      if (!raw) return true;
+      const progress = JSON.parse(raw);
+      return progress?.version !== GUEST_PROGRESS_VERSION || progress.firstGameOpened !== true;
+    } catch {
+      return true;
+    }
+  };
+
+  if (!visitorIsGuest()) return;
+
+  let remainingMilliseconds = START_MILLISECONDS;
+  let displayMilliseconds = START_MILLISECONDS % 1000;
+  let countdownRate = BASE_COUNTDOWN_RATE;
+  let previousFrame = performance.now();
+  let wheelGestureActive = false;
+  let wheelGestureTimeout = 0;
+  let redirected = false;
+
+  const render = () => {
+    seconds.textContent = (remainingMilliseconds / 1000).toFixed(1);
+    milliseconds.textContent = String(Math.floor(displayMilliseconds)).padStart(3, "0");
+    timer.dataset.remainingSeconds = (remainingMilliseconds / 1000).toFixed(3);
+    timer.dataset.displayMilliseconds = String(Math.floor(displayMilliseconds));
+    timer.dataset.countdownRate = String(countdownRate);
+  };
+
+  const leave = () => {
+    if (redirected) return;
+    redirected = true;
+    remainingMilliseconds = 0;
+    render();
+    window.location.replace("/");
+  };
+
+  const deduct = (amount) => {
+    remainingMilliseconds = Math.max(0, remainingMilliseconds - amount);
+    render();
+    if (remainingMilliseconds === 0) leave();
+  };
+
+  const tick = (now) => {
+    if (redirected) return;
+    const elapsed = Math.max(0, now - previousFrame);
+    previousFrame = now;
+    remainingMilliseconds = Math.max(0, remainingMilliseconds - elapsed * countdownRate);
+    displayMilliseconds = (displayMilliseconds - elapsed * DISPLAY_MILLISECONDS_RATE) % 1000;
+    if (displayMilliseconds < 0) displayMilliseconds += 1000;
+    render();
+    if (remainingMilliseconds === 0) {
+      leave();
+      return;
+    }
+    requestAnimationFrame(tick);
+  };
+
+  document.addEventListener("click", (event) => {
+    if (redirected) return;
+    countdownRate = ACCELERATED_COUNTDOWN_RATE;
+    timer.classList.add("is-accelerated");
+    rate.textContent = "seconds ×4.5 · milliseconds ×3 · click −25 · wheel −15";
+    deduct(CLICK_DEDUCTION_MILLISECONDS);
+    if (redirected) event.preventDefault();
+  }, true);
+
+  document.addEventListener("wheel", () => {
+    window.clearTimeout(wheelGestureTimeout);
+    if (!wheelGestureActive) {
+      wheelGestureActive = true;
+      deduct(WHEEL_DEDUCTION_MILLISECONDS);
+      displayMilliseconds = remainingMilliseconds % 1000;
+      render();
+    }
+    wheelGestureTimeout = window.setTimeout(() => {
+      wheelGestureActive = false;
+    }, WHEEL_GESTURE_IDLE_MILLISECONDS);
+  }, { passive: true, capture: true });
+
+  timer.hidden = false;
+  render();
+  requestAnimationFrame(tick);
+})();
+</script>
 </body>
 </html>
