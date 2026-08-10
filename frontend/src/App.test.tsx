@@ -161,6 +161,17 @@ describe("URL-first exact review", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: /Guest Spawn/ }));
   });
 
+  it("keeps the building-blocks rail link unlocked and opens it in a new tab", () => {
+    const { container } = renderApp();
+    const link = container.querySelector<HTMLAnchorElement>(".rail-blocks-link");
+    expect(link?.getAttribute("href")).toBe("/blocks");
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noreferrer");
+    expect(link?.textContent).toBe("🎨");
+    expect(link?.hasAttribute("aria-disabled")).toBe(false);
+    expect(link?.classList.contains("capability-locked")).toBe(false);
+  });
+
   it("restores a standalone exact review from the browser URL on reload", async () => {
     history.replaceState(null, "", "/?game=42");
     renderApp();
