@@ -177,13 +177,17 @@ def test_guest_session_reports_real_arrival_counts_and_rotates_identity(tmp_path
     assert first.json() == {
         "guest_number": 1,
         "total_guests": 1,
-        "completions_to_date": 0,
+        "completions_to_date": None,
+        "saved_moment_count": 0,
+        "analysis_unlocked": False,
     }
     assert repeated.json() == first.json()
     assert rotated.json() == {
         "guest_number": 2,
         "total_guests": 2,
-        "completions_to_date": 0,
+        "completions_to_date": None,
+        "saved_moment_count": 0,
+        "analysis_unlocked": False,
     }
     assert service.guest_identity_count() == 2
 

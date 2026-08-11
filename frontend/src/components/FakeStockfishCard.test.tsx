@@ -27,7 +27,7 @@ describe("FakeStockfishGate", () => {
   it("looks real, refuses on press, records 13-second pulses, then traps the toggle", async () => {
     const fetcher = vi.mocked(fetch);
     const view = render(
-      <FakeStockfishGate isGuest savedMomentCount={3} guestNumber={13}>
+      <FakeStockfishGate isGuest analysisUnlocked={false} savedMomentCount={3} guestNumber={13}>
         <div>Real analysis path</div>
       </FakeStockfishGate>,
     );
@@ -60,7 +60,7 @@ describe("FakeStockfishGate", () => {
     expect(screen.getByText("Accumulated quest-clock debt: 26 seconds.")).toBeTruthy();
 
     view.rerender(
-      <FakeStockfishGate isGuest savedMomentCount={4} guestNumber={13}>
+      <FakeStockfishGate isGuest analysisUnlocked={false} savedMomentCount={4} guestNumber={13}>
         <div>Real analysis path</div>
       </FakeStockfishGate>,
     );
@@ -69,9 +69,9 @@ describe("FakeStockfishGate", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("renders only the real analysis path at ten moments or for a non-guest", () => {
+  it("renders only the real analysis path when the server unlocks it or for a non-guest", () => {
     const view = render(
-      <FakeStockfishGate isGuest savedMomentCount={10} guestNumber={13}>
+      <FakeStockfishGate isGuest analysisUnlocked savedMomentCount={10} guestNumber={13}>
         <div>Real analysis path</div>
       </FakeStockfishGate>,
     );
@@ -79,11 +79,22 @@ describe("FakeStockfishGate", () => {
     expect(screen.queryByText(FAKE_STOCKFISH_HEADER)).toBeNull();
 
     view.rerender(
-      <FakeStockfishGate isGuest={false} savedMomentCount={0} guestNumber={13}>
+      <FakeStockfishGate isGuest={false} analysisUnlocked={false} savedMomentCount={0} guestNumber={13}>
         <div>Real analysis path</div>
       </FakeStockfishGate>,
     );
     expect(screen.getByText("Real analysis path")).toBeTruthy();
     expect(screen.queryByText(FAKE_STOCKFISH_HEADER)).toBeNull();
+  });
+
+  it("keeps fake Stockfish when a client count claims ten but the server decision is locked", () => {
+    render(
+      <FakeStockfishGate isGuest analysisUnlocked={false} savedMomentCount={10} guestNumber={13}>
+        <div>Real analysis path</div>
+      </FakeStockfishGate>,
+    );
+
+    expect(screen.getByText(FAKE_STOCKFISH_HEADER)).toBeTruthy();
+    expect(screen.queryByText("Real analysis path")).toBeNull();
   });
 });

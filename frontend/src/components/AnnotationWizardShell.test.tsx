@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AnnotationWizardShell } from "./AnnotationWizardShell";
 
 const moves = [
@@ -133,5 +133,29 @@ describe("AnnotationWizardShell", () => {
     expect(screen.getByRole("heading", { name: "Instead, play ___", hidden: true })).toBeTruthy();
     expect((container.querySelector(".wizard-step--answer") as HTMLElement).hasAttribute("inert")).toBe(true);
     expect(screen.getByText("[COPY-PLACEHOLDER] Select a glyph to see this prompt.", { selector: "p" })).toBeTruthy();
+  });
+
+  it("submits only a complete live board-played moment with the locked Because opener", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AnnotationWizardShell
+        move_options={moves}
+        render_alternative_board={(onMovePlayed) => <button type="button" onClick={() => onMovePlayed("Q@h5")}>Play Q@h5 on board</button>}
+        onSave={onSave}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Save moment" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "17A Nxf7" }));
+    fireEvent.keyDown(screen.getByRole("group", { name: "Required move glyph" }), { key: "1" });
+    expect(screen.queryByRole("button", { name: "Save moment" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Play Q@h5 on board" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save moment" }));
+
+    expect(onSave).toHaveBeenCalledWith({
+      moveToken: "17A",
+      glyph: "!",
+      alternativeMove: "Q@h5",
+      writtenAnswer: "Because",
+    });
   });
 });

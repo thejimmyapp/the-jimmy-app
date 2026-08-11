@@ -1016,6 +1016,18 @@ class Database:
             ).fetchall()
         return [_moment_row(row) for row in rows]
 
+    def private_moment_count(self, author_guest_number: int) -> int:
+        with closing(self.connect()) as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM private_moments
+                WHERE author_guest_number = ?
+                """,
+                (author_guest_number,),
+            ).fetchone()
+        return int(row["total"]) if row else 0
+
     def list_public_moments(self) -> list[dict[str, object]]:
         with closing(self.connect()) as conn:
             rows = conn.execute(

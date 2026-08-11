@@ -68,6 +68,7 @@ coach_jobs = CoachJobs(settings, games, qwen_runtime)
 leak_map_jobs = LeakMapJobs(settings, games)
 chesscom_matchups = ChessComMatchupService(settings)
 GUEST_IDENTITY_COOKIE = "jimmy_guest_identity"
+ENGINE_UNLOCK_MOMENT_COUNT = 10
 app = FastAPI(title=settings.app_name, version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -89,11 +90,17 @@ def _set_guest_identity_cookie(response: Response, identity_token: str) -> None:
     )
 
 
-async def _guest_session_payload(guest_number: int) -> dict[str, int]:
+async def _guest_session_payload(guest_number: int) -> dict[str, object]:
+    total_guests, saved_moment_count = await asyncio.gather(
+        asyncio.to_thread(games.guest_identity_count),
+        asyncio.to_thread(games.saved_moment_count, guest_number),
+    )
     return {
         "guest_number": guest_number,
-        "total_guests": await asyncio.to_thread(games.guest_identity_count),
-        "completions_to_date": 0,
+        "total_guests": total_guests,
+        "completions_to_date": None,
+        "saved_moment_count": saved_moment_count,
+        "analysis_unlocked": saved_moment_count >= ENGINE_UNLOCK_MOMENT_COUNT,
     }
 
 
@@ -235,7 +242,7 @@ async def chesscom_match_replay(game_id: int) -> dict[str, object]:
 
 
 @app.post("/api/guests")
-async def guest_session(request: Request, response: Response) -> dict[str, int]:
+async def guest_session(request: Request, response: Response) -> dict[str, object]:
     guest_number = await _guest_number_from_request(request)
     if guest_number is None:
         guest_number, identity_token = await asyncio.to_thread(games.create_guest_identity)
@@ -244,7 +251,7 @@ async def guest_session(request: Request, response: Response) -> dict[str, int]:
 
 
 @app.post("/api/guests/reset")
-async def reset_guest_session(response: Response) -> dict[str, int]:
+async def reset_guest_session(response: Response) -> dict[str, object]:
     guest_number, identity_token = await asyncio.to_thread(games.create_guest_identity)
     _set_guest_identity_cookie(response, identity_token)
     return await _guest_session_payload(guest_number)

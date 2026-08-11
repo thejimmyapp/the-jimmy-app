@@ -214,3 +214,35 @@ def test_delete_removes_only_the_authors_private_copy(tmp_path, monkeypatch) -> 
     assert deleted.json() == {"deleted": True}
     assert service.list_private_moments(1) == []
     assert len(service.list_public_moments()) == 1
+
+
+def test_server_engine_gate_flips_at_exactly_ten_private_moments(tmp_path, monkeypatch) -> None:
+    _service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        for index in range(9):
+            assert _create(client, game_id, written_answer=f"moment {index + 1}").status_code == 201
+        below = client.post("/api/guests")
+        tenth = _create(client, game_id, written_answer="moment 10")
+        exact = client.post("/api/guests")
+
+    assert below.json()["saved_moment_count"] == 9
+    assert below.json()["analysis_unlocked"] is False
+    assert tenth.status_code == 201
+    assert exact.json()["saved_moment_count"] == 10
+    assert exact.json()["analysis_unlocked"] is True
+
+
+def test_client_claim_cannot_override_server_engine_gate(tmp_path, monkeypatch) -> None:
+    _service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        for index in range(3):
+            assert _create(client, game_id, written_answer=f"moment {index + 1}").status_code == 201
+        claimed = client.post(
+            "/api/guests",
+            json={"saved_moment_count": 10, "analysis_unlocked": True},
+        )
+
+    assert claimed.json()["saved_moment_count"] == 3
+    assert claimed.json()["analysis_unlocked"] is False

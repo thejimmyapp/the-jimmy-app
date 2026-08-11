@@ -32,11 +32,12 @@ describe("guest quest lifecycle", () => {
       ...emptyGuestProgress(),
       savedMoments: [moment("one"), moment("two"), moment("three")],
     }, 1_000);
-    const completed = completeGuestQuestIfReady(running);
+    const completed = completeGuestQuestIfReady(running, 3);
     expect(completed.questCompleted).toBe(true);
     expect(completed.questDeadline).toBeNull();
     expect(completed.capabilities.dock_quest).toBe("unlocked");
-    expect(completeGuestQuestIfReady({ ...completed, savedMoments: [] }).questCompleted).toBe(true);
+    expect(completeGuestQuestIfReady({ ...completed, savedMoments: [] }, 0).questCompleted).toBe(true);
+    expect(completeGuestQuestIfReady({ ...running, savedMoments: [] }, 2).questCompleted).toBe(false);
   });
 
   it("formats the live shared-room warning", () => {

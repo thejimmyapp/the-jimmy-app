@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { MomentGlyph } from "../guestProgress";
 import { GlyphPicker } from "./GlyphPicker";
 
@@ -9,7 +9,12 @@ export interface WizardMoveOption {
 
 export interface AnnotationWizardShellProps {
   move_options: WizardMoveOption[];
-  alternative_move_options: string[];
+  alternative_move_options?: string[];
+  render_alternative_board?: (onMovePlayed: (notation: string) => void) => ReactNode;
+  onSave?: (moment: { moveToken: string; glyph: MomentGlyph; alternativeMove: string; writtenAnswer: string }) => Promise<void>;
+  onCancel?: () => void;
+  saving?: boolean;
+  saveError?: string | null;
 }
 
 const STEP_FOUR_PROMPTS: Record<MomentGlyph, string> = {
@@ -21,7 +26,7 @@ const STEP_FOUR_PROMPTS: Record<MomentGlyph, string> = {
   "?!": "What's the safer option?",
 };
 
-export function AnnotationWizardShell({ move_options, alternative_move_options }: AnnotationWizardShellProps) {
+export function AnnotationWizardShell({ move_options, alternative_move_options = [], render_alternative_board, onSave, onCancel, saving = false, saveError = null }: AnnotationWizardShellProps) {
   const [selectedMove, setSelectedMove] = useState<WizardMoveOption | null>(null);
   const [glyph, setGlyph] = useState<MomentGlyph | null>(null);
   const [alternativeMove, setAlternativeMove] = useState<string | null>(null);
@@ -42,6 +47,11 @@ export function AnnotationWizardShell({ move_options, alternative_move_options }
   };
 
   const currentStep = alternativeMove ? 4 : glyph ? 3 : selectedMove ? 2 : 1;
+  const save = async () => {
+    if (!onSave || !selectedMove || !glyph || !alternativeMove || saving) return;
+    const writtenAnswer = answer.trim() ? `Because ${answer.trim()}` : "Because";
+    await onSave({ moveToken: selectedMove.token, glyph, alternativeMove, writtenAnswer });
+  };
 
   return (
     <article className="annotation-wizard" aria-label="Learning moment wizard steps 1 through 4">
@@ -96,7 +106,8 @@ export function AnnotationWizardShell({ move_options, alternative_move_options }
         <h3 id="wizard-step-3-title">Instead, play {alternativeMove ?? "___"}</h3>
         <p>Interesting move for sure! Next you're required to give one relevant alternative move. Relax don't overthink it you're halfway done.</p>
         <div className="wizard-step__board-moves" role="group" aria-label="Play one alternative move on the board">
-          {alternative_move_options.map((move) => (
+          {render_alternative_board?.(setAlternativeMove)}
+          {!render_alternative_board && alternative_move_options.map((move) => (
             <button
               type="button"
               className={alternativeMove === move ? "is-selected" : undefined}
@@ -129,6 +140,15 @@ export function AnnotationWizardShell({ move_options, alternative_move_options }
             onChange={(event) => setAnswer(event.target.value)}
           />
         </label>
+        {onSave && (
+          <div className="wizard-step__actions">
+            {onCancel && <button type="button" onClick={onCancel} disabled={saving}>Cancel</button>}
+            <button type="button" className="primary" onClick={() => void save()} disabled={!selectedMove || !glyph || !alternativeMove || saving}>
+              {saving ? "Saving…" : "Save moment"}
+            </button>
+          </div>
+        )}
+        {saveError && <p className="wizard-step__error" role="alert">{saveError}</p>}
       </section>
     </article>
   );

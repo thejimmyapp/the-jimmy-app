@@ -114,8 +114,8 @@ describe("URL-first exact review", () => {
     localStorage.clear();
     history.replaceState(null, "", "/");
     useCoachStore.setState({ username: "", game: null, guestMatch: null, games: [], roomId: null });
-    apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: 0 });
-    apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: 0 });
+    apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
+    apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
     apiMock.games.mockResolvedValue({ games: [] });
     apiMock.guestMatchups.mockResolvedValue({
       matches: Array.from({ length: 5 }, (_, index) => ({
@@ -175,7 +175,7 @@ describe("URL-first exact review", () => {
   it("renders real guest counters and opens the keyboard-reachable countdown panel", async () => {
     renderApp();
     expect(await screen.findByRole("heading", { name: "Salutations, SirGuest#13!" })).toBeTruthy();
-    expect(screen.getByText("0 of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.")).toBeTruthy();
+    expect(screen.getByText("— of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.")).toBeTruthy();
     const libraryButton = screen.getByRole("button", { name: "Open flashcard library" });
     libraryButton.focus();
     fireEvent.click(libraryButton);
