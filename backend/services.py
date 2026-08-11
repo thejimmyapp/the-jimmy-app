@@ -60,6 +60,8 @@ class GameService:
         alternative_move: str,
         written_answer: str,
         author_guest_number: int,
+        engine_identity: str | None = None,
+        engine_depth: int | None = None,
     ) -> tuple[dict[str, object], dict[str, object]]:
         _validate_moment_annotation(
             game_id=game_id,
@@ -69,6 +71,7 @@ class GameService:
             written_answer=written_answer,
             author_guest_number=author_guest_number,
         )
+        _validate_moment_provenance(engine_identity, engine_depth)
         global_ply = self._moment_global_ply(game_id, move_token)
         snapshot = self.snapshot(game_id, global_ply)
         if snapshot is None or snapshot.get("global_ply") != global_ply:
@@ -81,6 +84,8 @@ class GameService:
                 "glyph": glyph,
                 "alternative_move": alternative_move,
                 "written_answer": written_answer,
+                "engine_identity": engine_identity,
+                "engine_depth": engine_depth,
                 "author_guest_number": author_guest_number,
                 **coupled_state,
             }
@@ -393,6 +398,22 @@ def _capture_coupled_state(snapshot: dict[str, object]) -> dict[str, str]:
                 raise MomentPersistenceError(f"coupled replay frame is missing {board_key}.{field}")
             captured[f"{prefix}_{field}"] = value
     return captured
+
+
+def _validate_moment_provenance(engine_identity: str | None, engine_depth: int | None) -> None:
+    if (engine_identity is None) != (engine_depth is None):
+        raise MomentPersistenceError("engine identity and depth must be supplied together")
+    if engine_identity is None:
+        return
+    if not isinstance(engine_identity, str) or not engine_identity.strip():
+        raise MomentPersistenceError("engine identity is invalid")
+    if (
+        isinstance(engine_depth, bool)
+        or not isinstance(engine_depth, int)
+        or engine_depth < 4
+        or engine_depth > 24
+    ):
+        raise MomentPersistenceError("engine depth is invalid")
 
 
 def _flatten_guest_replay(replay_source: dict[str, Any]) -> tuple[dict[str, Any], int, int]:

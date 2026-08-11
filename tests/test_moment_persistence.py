@@ -116,6 +116,30 @@ def test_saved_moment_round_trips_authoritative_pockets_and_all_four_clocks(tmp_
     assert private_moment["author"] == "guest_1"
     assert private_moment["created_at"]
     assert private_moment["written_answer"] == BASE_MOMENT["written_answer"]
+    assert private_moment["engine_identity"] is None
+    assert private_moment["engine_depth"] is None
+    assert public_moment["engine_identity"] is None
+    assert public_moment["engine_depth"] is None
+
+
+def test_engine_provenance_round_trips_into_both_frozen_copies(tmp_path, monkeypatch) -> None:
+    _service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        created = _create(
+            client,
+            game_id,
+            engine_identity="Fairy-Stockfish 14",
+            engine_depth=10,
+        )
+        mine = client.get("/api/moments/mine").json()["moments"]
+        public = client.get("/api/moments/public").json()["moments"]
+
+    assert created.status_code == 201
+    assert mine[0]["engine_identity"] == "Fairy-Stockfish 14"
+    assert mine[0]["engine_depth"] == 10
+    assert public[0]["engine_identity"] == "Fairy-Stockfish 14"
+    assert public[0]["engine_depth"] == 10
 
 
 def test_moment_refuses_each_incomplete_wizard_step_without_writing(tmp_path, monkeypatch) -> None:
@@ -130,6 +154,15 @@ def test_moment_refuses_each_incomplete_wizard_step_without_writing(tmp_path, mo
             refused = _create(client, game_id, written_answer=invalid_answer)
             assert refused.status_code == 422
             assert refused.json()["detail"]["code"] == "moment_refused"
+        refused_with_provenance = _create(
+            client,
+            game_id,
+            move_token="99A",
+            engine_identity="Fairy-Stockfish 14",
+            engine_depth=10,
+        )
+        assert refused_with_provenance.status_code == 422
+        assert refused_with_provenance.json()["detail"]["code"] == "moment_refused"
 
     assert service.list_private_moments(1) == []
     assert service.list_public_moments() == []
@@ -213,9 +246,14 @@ def test_malformed_payload_is_refused_without_partial_storage_or_visibility_sche
     assert service.list_public_moments() == []
     with service.db.connect() as conn:
         for table in ("private_moments", "public_moments"):
-            columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+            table_info = conn.execute(f"PRAGMA table_info({table})").fetchall()
+            columns = {row["name"] for row in table_info}
             foreign_keys = conn.execute(f"PRAGMA foreign_key_list({table})").fetchall()
             assert "visibility" not in columns
+            assert {row["name"]: row["notnull"] for row in table_info if row["name"] in {"engine_identity", "engine_depth"}} == {
+                "engine_identity": 0,
+                "engine_depth": 0,
+            }
             assert foreign_keys == []
 
 

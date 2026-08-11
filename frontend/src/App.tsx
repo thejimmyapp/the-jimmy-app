@@ -14,7 +14,7 @@ import { AnalysisAcknowledgement } from "./components/AnalysisAcknowledgement";
 import { AnnotationWizardShell } from "./components/AnnotationWizardShell";
 import { FakeStockfishGate } from "./components/FakeStockfishCard";
 import { LegalLinks } from "./components/LegalLinks";
-import { LiveEvalCard } from "./components/LiveEvalCard";
+import { LiveEvalCard, type EngineLineMomentCandidate } from "./components/LiveEvalCard";
 import { GuestMatchupList } from "./components/GuestMatchupList";
 import { GuestFlashcardPanel } from "./components/GuestFlashcardPanel";
 import { OnboardingMap } from "./components/OnboardingMap";
@@ -104,6 +104,7 @@ export default function App() {
   const [wordVertigoActive, setWordVertigoActive] = useState(false);
   const [boardsSwapped, setBoardsSwapped] = useState(false);
   const [momentCapture, setMomentCapture] = useState<MomentCapture | null>(null);
+  const [momentEngineCandidate, setMomentEngineCandidate] = useState<{ notation: string; engineIdentity: string; depth: number } | null>(null);
   const [momentSavePending, setMomentSavePending] = useState(false);
   const [momentPersistenceError, setMomentPersistenceError] = useState<string | null>(null);
   const [questNow, setQuestNow] = useState(Date.now);
@@ -296,6 +297,7 @@ export default function App() {
     setActiveReviewBoard("A");
     setBoardsSwapped(false);
     setMomentCapture(null);
+    setMomentEngineCandidate(null);
     setMomentPersistenceError(null);
   }, [store.game?.game.id, store.guestMatch?.highest_rated.seat]);
 
@@ -329,6 +331,7 @@ export default function App() {
     setView("review");
     setReviewGameId(null);
     setMomentCapture(null);
+    setMomentEngineCandidate(null);
     setMomentPersistenceError(null);
     setGuestLibraryOpen(false);
     const browserUrl = new URL(location.href);
@@ -386,8 +389,50 @@ export default function App() {
     const capture = captureMomentContext(current.guestMatch, current.game, current.globalPly);
     if (capture) {
       setMomentPersistenceError(null);
+      setMomentEngineCandidate(null);
       setMomentCapture(capture);
     }
+  }, []);
+
+  const openEngineLineMoment = useCallback(async (candidate: EngineLineMomentCandidate) => {
+    const current = useCoachStore.getState();
+    if (current.mode !== "review" || !current.game || !current.guestMatch) {
+      throw new Error("A guest replay frame is required.");
+    }
+    if (current.globalPly !== candidate.globalPly) {
+      throw new Error("The replay moved before the engine line could be applied.");
+    }
+    const capture = captureMomentContext(current.guestMatch, current.game, current.globalPly);
+    if (!capture || capture.boardId !== candidate.board) {
+      throw new Error("The engine line does not match the selected moment board.");
+    }
+    const sourceFrame = current.game.timeline[capture.ply - 1];
+    if (!sourceFrame || sourceFrame.global_ply !== capture.ply - 1) {
+      throw new Error("The exact coupled source frame is unavailable.");
+    }
+    const result = await api.explorationSanMove({
+      board_a_fen: sourceFrame.board_a.variant_fen,
+      board_b_fen: sourceFrame.board_b.variant_fen,
+      board: candidate.board,
+      san: candidate.firstMove,
+    });
+    const notation = result.notation?.trim();
+    if (!result.legal || !notation || !result.board_a || !result.board_b) {
+      throw new Error(result.reason ?? "The exploration service refused the engine move.");
+    }
+    const latest = useCoachStore.getState();
+    const latestCapture = captureMomentContext(latest.guestMatch, latest.game, latest.globalPly);
+    if (
+      latest.game !== current.game
+      || latest.globalPly !== candidate.globalPly
+      || latestCapture?.moveToken !== capture.moveToken
+      || latestCapture?.boardId !== capture.boardId
+    ) {
+      throw new Error("The replay moved before the engine line could be applied.");
+    }
+    setMomentPersistenceError(null);
+    setMomentEngineCandidate({ notation, engineIdentity: candidate.engineIdentity, depth: candidate.depth });
+    setMomentCapture(capture);
   }, []);
 
   useEffect(() => {
@@ -461,6 +506,8 @@ export default function App() {
         glyph,
         alternative_move: alternativeMove,
         written_answer: writtenAnswer,
+        engine_identity: momentEngineCandidate?.notation === alternativeMove ? momentEngineCandidate.engineIdentity : null,
+        engine_depth: momentEngineCandidate?.notation === alternativeMove ? momentEngineCandidate.depth : null,
       });
       const privateMomentId = created.private_moment.id;
       if (!Number.isSafeInteger(privateMomentId) || privateMomentId <= 0) throw new Error("Saved moment response did not contain a valid private moment id.");
@@ -471,6 +518,7 @@ export default function App() {
         capabilities: { ...current.capabilities, dock_library: "unlocked" },
       }));
       setMomentCapture(null);
+      setMomentEngineCandidate(null);
       try {
         await refreshGuestSession();
       } catch (error) {
@@ -560,6 +608,7 @@ export default function App() {
     setView("review");
     setReviewGameId(null);
     setMomentCapture(null);
+    setMomentEngineCandidate(null);
     setMomentPersistenceError(null);
     const browserUrl = new URL(location.href);
     browserUrl.searchParams.delete("game");
@@ -637,7 +686,7 @@ export default function App() {
           {store.game ? <div className="boards-grid"><BoardPanel boardId={stagedSourceBoard} position={stagedPosition} orientation={stagedOrientation} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "A"} title={stagedBoardName} showTitle={false} onCaptureMoment={store.guestMatch ? openMomentEditor : undefined} captureMomentDisabled={!captureMomentContext(store.guestMatch, store.game, store.globalPly)} playerTop={stagedPlayerTop} playerBottom={stagedPlayerBottom} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}
         </div>
       </section> : <StatsDashboard username={store.username} />}
-      dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" activeBoard={activeReviewBoard} boardFocusEnabled={Boolean(store.guestMatch)} onActiveBoardChange={setActiveReviewBoard} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} onSwapBoards={store.guestMatch ? () => setBoardsSwapped((current) => !current) : undefined} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} savedMoments={guestProgress.savedMoments} savedMomentCount={momentCount} questCompleted={guestProgress.questCompleted} questProgress={questProgress} roomQuestRemainingSeconds={roomQuestRemaining} momentPlayers={momentPlayers} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} onOpenSavedMoment={openSavedMoment} onRemoveSavedMoment={removeSavedMoment} infoContent={reviewInfo} analysisContent={<FakeStockfishGate isGuest={Boolean(store.guestMatch)} analysisUnlocked={guestSession.analysis_unlocked} savedMomentCount={momentCount} guestNumber={guestSession.guest_number}><LiveEvalCard gameLoaded={Boolean(store.game)} storedGameId={store.game && !store.guestMatch ? Number(store.game.game.id) : null} guestMatchId={store.guestMatch?.game_ids.A ?? null} globalPly={store.globalPly} board={stagedSourceBoard} boardName={stagedBoardName} position={stagedPosition} /></FakeStockfishGate>} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button disabled={guestCoachLocked} className={`coach-button ${guestCoachLocked ? "capability-locked" : ""}`} title={guestCoachLocked ? "Team Coach unlocks in a future guest capability" : "Run the coupled Bughouse coaching pipeline"} onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach{guestCoachLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>}</> : undefined} boardContent={store.game ? <BoardPanel boardId={dockSourceBoard} position={dockPosition} orientation={dockOrientation} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "B"} title={dockBoardName} playerTop={dockBoardAvailable ? dockPlayerTop : "Diagonal Opponent Unknown"} playerBottom={dockBoardAvailable ? dockPlayerBottom : "Partner Unknown"} unavailable={!dockBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : undefined} />}
+      dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" activeBoard={activeReviewBoard} boardFocusEnabled={Boolean(store.guestMatch)} onActiveBoardChange={setActiveReviewBoard} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} onSwapBoards={store.guestMatch ? () => setBoardsSwapped((current) => !current) : undefined} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} savedMoments={guestProgress.savedMoments} savedMomentCount={momentCount} questCompleted={guestProgress.questCompleted} questProgress={questProgress} roomQuestRemainingSeconds={roomQuestRemaining} momentPlayers={momentPlayers} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} onOpenSavedMoment={openSavedMoment} onRemoveSavedMoment={removeSavedMoment} infoContent={reviewInfo} analysisContent={<FakeStockfishGate isGuest={Boolean(store.guestMatch)} analysisUnlocked={guestSession.analysis_unlocked} savedMomentCount={momentCount} guestNumber={guestSession.guest_number}><LiveEvalCard gameLoaded={Boolean(store.game)} storedGameId={store.game && !store.guestMatch ? Number(store.game.game.id) : null} guestMatchId={store.guestMatch?.game_ids.A ?? null} globalPly={store.globalPly} board={stagedSourceBoard} boardName={stagedBoardName} position={stagedPosition} onSendLineToMoment={store.guestMatch ? openEngineLineMoment : undefined} /></FakeStockfishGate>} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button disabled={guestCoachLocked} className={`coach-button ${guestCoachLocked ? "capability-locked" : ""}`} title={guestCoachLocked ? "Team Coach unlocks in a future guest capability" : "Run the coupled Bughouse coaching pipeline"} onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach{guestCoachLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>}</> : undefined} boardContent={store.game ? <BoardPanel boardId={dockSourceBoard} position={dockPosition} orientation={dockOrientation} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "B"} title={dockBoardName} playerTop={dockBoardAvailable ? dockPlayerTop : "Diagonal Opponent Unknown"} playerBottom={dockBoardAvailable ? dockPlayerBottom : "Partner Unknown"} unavailable={!dockBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : undefined} />}
     />
       {guestLibraryOpen && document.getElementById("app-stage-panel") && createPortal(<GuestFlashcardPanel guestNumber={guestSession.guest_number} remainingSeconds={questRemaining} questCompleted={guestProgress.questCompleted} onClose={() => setGuestLibraryOpen(false)} />, document.getElementById("app-stage-panel")!)}
     {store.game && <TeamCoach open={coachOpen} onClose={() => setCoachOpen(false)} boardA={sourceBoardA} boardB={sourceBoardB} />}
@@ -645,6 +694,7 @@ export default function App() {
         <div className="moment-editor-backdrop">
           <AnnotationWizardShell
             move_options={[{ token: momentCapture.moveToken, move: momentCapture.move }]}
+            initial_alternative_move={momentEngineCandidate?.notation}
             render_alternative_board={(onMovePlayed) => (
               <BoardPanel
                 boardId={momentCapture.boardId}
@@ -673,7 +723,7 @@ export default function App() {
               />
             )}
             onSave={saveLearningMoment}
-            onCancel={() => { if (!momentSavePending) setMomentCapture(null); }}
+            onCancel={() => { if (!momentSavePending) { setMomentCapture(null); setMomentEngineCandidate(null); } }}
             saving={momentSavePending}
             saveError={momentPersistenceError}
           />

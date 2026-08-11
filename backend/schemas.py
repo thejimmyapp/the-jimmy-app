@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ChessComConnectRequest(BaseModel):
@@ -49,6 +49,8 @@ class MomentCreateRequest(BaseModel):
     glyph: Literal["!", "?", "!!", "??", "!?", "?!"]
     alternative_move: str = Field(min_length=1, max_length=64)
     written_answer: str = Field(min_length=1, max_length=5000)
+    engine_identity: str | None = Field(default=None, min_length=1, max_length=200)
+    engine_depth: int | None = Field(default=None, ge=4, le=24, strict=True)
 
     @field_validator("alternative_move")
     @classmethod
@@ -64,6 +66,19 @@ class MomentCreateRequest(BaseModel):
         if not cleaned or cleaned == "Because":
             raise ValueError("written answer is required")
         return value
+
+    @field_validator("engine_identity")
+    @classmethod
+    def require_engine_identity(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("engine identity cannot be blank")
+        return value
+
+    @model_validator(mode="after")
+    def require_complete_engine_provenance(self) -> "MomentCreateRequest":
+        if (self.engine_identity is None) != (self.engine_depth is None):
+            raise ValueError("engine identity and depth must be supplied together")
+        return self
 
 
 class CoachAnnotationInput(BaseModel):

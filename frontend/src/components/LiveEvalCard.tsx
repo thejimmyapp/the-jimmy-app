@@ -2,10 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import { AnalysisClient, AnalysisProtocolError, type AnalysisPosition, type AnalysisState } from "../analysisClient";
 import type { BoardId, ReplayPosition } from "../types";
-import { EvalCard, type EvalCardStatus } from "./EvalCard";
+import { EvalCard, type EvalCardStatus, type EvalPrincipalLine } from "./EvalCard";
 
 export const ANALYSIS_DEBOUNCE_MS = 400;
 export const ANALYSIS_DEPTH = 10;
+
+export interface EngineLineMomentCandidate {
+  firstMove: string;
+  engineIdentity: string;
+  depth: number;
+  board: BoardId;
+  globalPly: number;
+}
 
 interface Props {
   gameLoaded: boolean;
@@ -15,6 +23,7 @@ interface Props {
   board: BoardId;
   boardName: string;
   position: ReplayPosition | null;
+  onSendLineToMoment?: (candidate: EngineLineMomentCandidate) => Promise<void>;
 }
 
 type PreparationState =
@@ -62,16 +71,18 @@ const prepareFailureMessage = (error: unknown) => {
   return "Analysis preparation failed. Turn analysis off and on to retry.";
 };
 
-export function LiveEvalCard({ gameLoaded, storedGameId, guestMatchId, globalPly, board, boardName, position }: Props) {
+export function LiveEvalCard({ gameLoaded, storedGameId, guestMatchId, globalPly, board, boardName, position, onSendLineToMoment }: Props) {
   const gameKey = guestMatchId ? `guest:${guestMatchId}` : storedGameId ? `stored:${storedGameId}` : null;
   const [enableIntent, setEnableIntent] = useState({ gameKey, enabled: false });
   const [storedGuestGames, setStoredGuestGames] = useState<Record<number, number>>({});
   const [preparation, setPreparation] = useState<PreparationState>({ kind: "idle" });
   const [state, setState] = useState<AnalysisState>({ kind: "idle" });
+  const [lineAction, setLineAction] = useState<{ pendingRank: number | null; error: string | null }>({ pendingRank: null, error: null });
   const currentPositionRef = useRef<AnalysisPosition | null>(null);
   const clientRef = useRef<AnalysisClient | null>(null);
   const storeGenerationRef = useRef(0);
   const inFlightStoresRef = useRef(new Map<number, Promise<{ game_id: number }>>());
+  const lineActionGenerationRef = useRef(0);
   const enabled = enableIntent.gameKey === gameKey && enableIntent.enabled;
   const effectiveStoredGameId = storedGameId ?? (guestMatchId ? storedGuestGames[guestMatchId] ?? null : null);
   const analysisPosition = useMemo(() => effectiveStoredGameId && position
@@ -91,6 +102,11 @@ export function LiveEvalCard({ gameLoaded, storedGameId, guestMatchId, globalPly
     setEnableIntent({ gameKey, enabled: false });
     setPreparation({ kind: "idle" });
   }, [gameKey]);
+
+  useEffect(() => {
+    lineActionGenerationRef.current += 1;
+    setLineAction({ pendingRank: null, error: null });
+  }, [board, gameKey, globalPly]);
 
   useEffect(() => {
     if (!enabled || storedGameId || !guestMatchId || storedGuestGames[guestMatchId]) return;
@@ -175,6 +191,37 @@ export function LiveEvalCard({ gameLoaded, storedGameId, guestMatchId, globalPly
     if (!nextEnabled) setPreparation({ kind: "idle" });
   };
 
+  const sendLineToMoment = async (line: EvalPrincipalLine) => {
+    if (!onSendLineToMoment) return;
+    const firstMove = line.moves[0]?.trim();
+    const identity = engineIdentity(visibleState).trim();
+    const depth = completed?.depth;
+    if (
+      !firstMove
+      || firstMove.length < 2
+      || firstMove.length > 24
+      || !identity
+      || identity.length > 200
+      || depth == null
+      || !Number.isInteger(depth)
+      || depth < 4
+      || depth > 24
+    ) {
+      setLineAction({ pendingRank: null, error: "This engine line is malformed and cannot be sent to a moment." });
+      return;
+    }
+    const generation = ++lineActionGenerationRef.current;
+    setLineAction({ pendingRank: line.rank, error: null });
+    try {
+      await onSendLineToMoment({ firstMove, engineIdentity: identity, depth, board, globalPly });
+      if (lineActionGenerationRef.current === generation) setLineAction({ pendingRank: null, error: null });
+    } catch (error) {
+      if (lineActionGenerationRef.current !== generation) return;
+      const reason = error instanceof Error && error.message ? ` ${error.message}` : "";
+      setLineAction({ pendingRank: null, error: `This engine move could not be played in the selected frame.${reason}` });
+    }
+  };
+
   return (
     <div className="live-eval-card">
       <EvalCard
@@ -192,6 +239,9 @@ export function LiveEvalCard({ gameLoaded, storedGameId, guestMatchId, globalPly
         board_label={`${boardName} · Board ${board} · ply ${globalPly}`}
         toggle_disabled={Boolean(unavailableMessage)}
         onEnabledChange={changeEnabled}
+        onSendLineToMoment={onSendLineToMoment ? (line) => { void sendLineToMoment(line); } : undefined}
+        line_action_pending_rank={lineAction.pendingRank}
+        line_action_error={lineAction.error}
       />
     </div>
   );

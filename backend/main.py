@@ -310,6 +310,8 @@ async def create_moment(payload: MomentCreateRequest, request: Request) -> dict[
             payload.alternative_move,
             payload.written_answer,
             guest_number,
+            payload.engine_identity,
+            payload.engine_depth,
         )
     except DailyMomentCapReached as exc:
         raise HTTPException(

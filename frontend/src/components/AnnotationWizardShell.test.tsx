@@ -166,4 +166,22 @@ describe("AnnotationWizardShell", () => {
       writtenAnswer: "Because Timing",
     });
   });
+
+  it("reveals a validated engine candidate only when step 3 becomes reachable", () => {
+    render(
+      <AnnotationWizardShell
+        move_options={moves}
+        initial_alternative_move="Q@h5"
+        render_alternative_board={(onMovePlayed) => <button type="button" onClick={() => onMovePlayed("N@g5")}>Play N@g5 on board</button>}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Instead, play ___", hidden: true })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "17A Nxf7" }));
+    expect(screen.getByRole("heading", { name: "Instead, play ___", hidden: true })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("group", { name: "Required move glyph" }), { key: "1" });
+    expect(screen.getByRole("heading", { name: "Instead, play Q@h5" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Play N@g5 on board" }));
+    expect(screen.getByRole("heading", { name: "Instead, play N@g5" })).toBeTruthy();
+  });
 });

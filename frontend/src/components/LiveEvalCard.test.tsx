@@ -82,6 +82,22 @@ describe("LiveEvalCard", () => {
     expect(screen.queryByText("1.37")).toBeNull();
   });
 
+  it("keeps the wizard callback closed and shows a card error when a line move is refused", async () => {
+    const fetcher = vi.mocked(fetch);
+    fetcher.mockResolvedValueOnce(submission("job-a")).mockResolvedValueOnce(completed("A", 137));
+    const onSendLineToMoment = vi.fn().mockRejectedValue(new Error("The exploration service refused it."));
+    render(<LiveEvalCard gameLoaded storedGameId={42} guestMatchId={null} globalPly={14} board="A" boardName="First Board" position={position} onSendLineToMoment={onSendLineToMoment} />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Enable" }));
+    await act(async () => { vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS); await flush(); });
+    fireEvent.click(screen.getByRole("button", { name: "Send to moment" }));
+    await act(flush);
+
+    expect(onSendLineToMoment).toHaveBeenCalledOnce();
+    expect(screen.getByRole("alert").textContent).toContain("could not be played in the selected frame");
+    expect(screen.queryByLabelText("Learning moment wizard steps 1 through 4")).toBeNull();
+  });
+
   it("retargets a swap and never shows the old board result", async () => {
     let resolveOldJob: ((response: Response) => void) | undefined;
     const oldJob = new Promise<Response>((resolve) => { resolveOldJob = resolve; });

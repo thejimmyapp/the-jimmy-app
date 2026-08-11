@@ -25,6 +25,8 @@ _MOMENT_FIELDS = (
     "glyph",
     "alternative_move",
     "written_answer",
+    "engine_identity",
+    "engine_depth",
     "author_guest_number",
     "board_a_white_pocket",
     "board_a_black_pocket",
@@ -335,6 +337,22 @@ class Database:
                     conn,
                     "opening_move_analysis",
                     {"analysis_version": "TEXT NOT NULL DEFAULT 'legacy'"},
+                )
+                _ensure_columns(
+                    conn,
+                    "private_moments",
+                    {
+                        "engine_identity": "TEXT",
+                        "engine_depth": "INTEGER",
+                    },
+                )
+                _ensure_columns(
+                    conn,
+                    "public_moments",
+                    {
+                        "engine_identity": "TEXT",
+                        "engine_depth": "INTEGER",
+                    },
                 )
                 conn.execute("PRAGMA journal_mode = WAL")
                 conn.executescript(

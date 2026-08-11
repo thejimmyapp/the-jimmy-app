@@ -26,6 +26,9 @@ export interface EvalCardProps {
   body_override?: ReactNode;
   body_after?: ReactNode;
   onEnabledChange?: (enabled: boolean) => void;
+  onSendLineToMoment?: (line: EvalPrincipalLine) => void;
+  line_action_pending_rank?: number | null;
+  line_action_error?: string | null;
 }
 
 const displayPocket = (pocket: string) => pocket.trim() || "—";
@@ -92,8 +95,19 @@ export function EvalCard(props: EvalCardProps) {
             <div className="eval-card__line" key={`${line.rank}-${line.moves.join("-")}`}>
               <span className="eval-card__rank">#{line.rank}</span>
               <code>{line.moves.map(displayMove).join(" ")}</code>
+              {props.onSendLineToMoment && (
+                <button
+                  className="eval-card__send-line"
+                  type="button"
+                  disabled={props.line_action_pending_rank != null}
+                  onClick={() => props.onSendLineToMoment?.(line)}
+                >
+                  {props.line_action_pending_rank === line.rank ? "Sending…" : "Send to moment"}
+                </button>
+              )}
             </div>
           )) : <p className="eval-card__state">No principal line returned.</p>}
+          {props.line_action_error && <p className="eval-card__failure" role="alert">{props.line_action_error}</p>}
           {additionalLineCount > 0 && (
             <button
               className="eval-card__expand"

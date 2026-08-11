@@ -1383,9 +1383,12 @@ body { background: #050910; }
 .eval-card__failure { margin:0;padding:8px 10px;border:1px solid #e0656a80;border-radius:5px;background:#e0656a14;color:#f0a1a5;font-size:11px; }
 .eval-card__state { margin:0;color:#a7b8cc;font-size:11px;line-height:1.5; }
 .eval-card__lines { display:flex;flex-direction:column;gap:7px; }
-.eval-card__line { display:grid;grid-template-columns:28px minmax(0,1fr);gap:7px;align-items:start;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel); }
+.eval-card__line { display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:7px;align-items:start;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel); }
 .eval-card__rank { color:var(--cyan);font:10px Consolas,monospace; }
 .eval-card__line code { overflow-wrap:anywhere;color:#edf5ff;font:11px/1.55 Consolas,monospace; }
+.eval-card__send-line { min-height:28px;padding:0 8px;border:1px solid #26808d;border-radius:3px;background:#155b67;color:#e1fdff;font:800 9px Consolas,monospace;cursor:pointer; }
+.eval-card__send-line:disabled { opacity:.5;cursor:wait; }
+.eval-card__send-line:focus-visible { outline:2px solid var(--cyan);outline-offset:2px; }
 .eval-card__expand { align-self:flex-start;border:0;background:transparent;color:var(--cyan);font:10px Consolas,monospace;cursor:pointer;text-decoration:underline;text-underline-offset:3px; }
 .eval-card__expand:focus-visible,.eval-card__toggle input:focus-visible { outline:2px solid var(--cyan);outline-offset:3px; }
 .eval-card__pockets { display:grid;grid-template-columns:auto 1fr 1fr;gap:7px;align-items:center;padding-top:10px;border-top:1px solid var(--line); }
