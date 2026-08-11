@@ -29,6 +29,7 @@ const renderPanel = (overrides: Partial<Parameters<typeof SidePanel>[0]> = {}) =
     onSelectGame: vi.fn(),
     loadingGame: false,
     boardContent: <div>Compact second board</div>,
+    analysisContent: <div>Live engine card</div>,
     infoContent: <div>Review information</div>,
     savedLessons: [saved],
     qualifyingGames: 1,
@@ -70,6 +71,14 @@ describe("review utility panel", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Games" }));
     fireEvent.click(screen.getByRole("tab", { name: "Collaborate" }));
     expect((screen.getByPlaceholderText("Message your partner") as HTMLTextAreaElement).value).toBe("keep this draft");
+  });
+
+  it("keeps the Analysis tab active regardless of onboarding capabilities", () => {
+    renderPanel({ capabilities: initialCapabilityMap() });
+    const analysis = screen.getByRole("tab", { name: "Analysis" }) as HTMLButtonElement;
+    expect(analysis.disabled).toBe(false);
+    fireEvent.click(analysis);
+    expect(screen.getByText("Live engine card")).toBeTruthy();
   });
 
   it("exposes a native swap button and keeps focus attached to the same named board", async () => {

@@ -7,7 +7,7 @@ import { useCoachStore } from "../store";
 import type { BoardId, GameSummary } from "../types";
 import { Timeline } from "./Timeline";
 
-type PrimaryTab = "review" | "games" | "library" | "collaborate" | "quest";
+type PrimaryTab = "review" | "analysis" | "games" | "library" | "collaborate" | "quest";
 type ReviewTab = "info" | "moves" | "board";
 type CollaborateTab = "chat" | "notes";
 
@@ -15,6 +15,7 @@ interface Props {
   onSelectGame: (game: GameSummary) => void;
   loadingGame: boolean;
   boardContent?: ReactNode;
+  analysisContent?: ReactNode;
   infoContent: ReactNode;
   savedLessons: SavedLesson[];
   savedMoments?: SavedMoment[];
@@ -43,7 +44,7 @@ interface Props {
   onSwapBoards?: () => void;
 }
 
-const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
+const primaryCapability: Partial<Record<PrimaryTab, CapabilityKey>> = {
   review: "dock_review",
   games: "dock_games",
   library: "dock_library",
@@ -51,7 +52,7 @@ const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
   quest: "dock_quest",
 };
 
-export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, questCompleted = false, questProgress = Math.min(QUEST_TARGET_MOMENTS, savedMomentCount), roomQuestRemainingSeconds = null, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
+export function SidePanel({ onSelectGame, loadingGame, boardContent, analysisContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, questCompleted = false, questProgress = Math.min(QUEST_TARGET_MOMENTS, savedMomentCount), roomQuestRemainingSeconds = null, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
   const [reviewTab, setReviewTab] = useState<ReviewTab | null>(null);
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
@@ -147,11 +148,12 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
   };
 
   return (
-    <aside className={`side-panel utility-panel ${isCapabilityLocked(capabilities, primaryCapability[primaryTab]) ? "capability-locked" : ""}`} aria-label="Review utility panel" data-saved-moment-count={savedMomentCount}>
+    <aside className={`side-panel utility-panel ${primaryCapability[primaryTab] && isCapabilityLocked(capabilities, primaryCapability[primaryTab]) ? "capability-locked" : ""}`} aria-label="Review utility panel" data-saved-moment-count={savedMomentCount}>
       <div className="utility-titlebar"><span>REVIEW WORKSPACE</span><div className="utility-titlebar-actions">{onSwapBoards && <button type="button" className="board-swap-button" aria-label="Swap staged board" title="Swap staged board" onClick={swapBoards}><span aria-hidden="true">↹⇄</span></button>}{dockActions}<button type="button" onClick={onMap}><Home size={13} /> Map</button></div></div>
       <div className="utility-primary-tabs" role="tablist" aria-label="Review tools">
-        {(["review", "games", "library", "collaborate", "quest"] as PrimaryTab[]).map((tab) => {
-          const locked = isCapabilityLocked(capabilities, primaryCapability[tab]);
+        {(["review", "analysis", "games", "library", "collaborate", "quest"] as PrimaryTab[]).map((tab) => {
+          const capability = primaryCapability[tab];
+          const locked = Boolean(capability && isCapabilityLocked(capabilities, capability));
           const label = tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</>
             : tab === "library" ? <>Library{savedMomentCount > 0 && <span className="library-count">{savedMomentCount}</span>}</>
               : tab === "quest" ? (questCompleted ? "Complete" : "Quest")
@@ -173,6 +175,8 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
 
       <div className={`utility-pane moves-pane ${primaryTab === "review" && reviewTab === "moves" ? "active" : "inactive"}`} aria-hidden={!(primaryTab === "review" && reviewTab === "moves")}><Timeline variant="panel" activeBoard={activeBoard} boardFocusEnabled={boardFocusEnabled} onActiveBoardChange={changeBoardFocus} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} /></div>
       {primaryTab === "review" && reviewTab === "info" && <div className="utility-pane info-pane">{infoContent}</div>}
+
+      {primaryTab === "analysis" && <div className="utility-pane analysis-pane">{analysisContent}</div>}
 
       {primaryTab === "games" && <div className="utility-pane games-pane">
         <div className="game-filters">
