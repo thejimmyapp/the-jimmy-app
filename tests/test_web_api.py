@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from threading import Event
 from uuid import uuid4
 
-from fastapi import status
+from fastapi import FastAPI, status
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
@@ -13,6 +13,61 @@ from starlette.websockets import WebSocketDisconnect
 import backend.main as main_module
 from backend.main import app, get_session, settings
 from backend.models import SharedNote
+
+
+@pytest.mark.parametrize("full_path", ["api", "api/unknown"])
+def test_frontend_response_decision_refuses_api_paths(full_path: str) -> None:
+    assert main_module.decide_frontend_response(full_path, candidate_is_file=False) == "api_404"
+
+
+@pytest.mark.parametrize(
+    "full_path",
+    ["", "mission", "privacy", f"puzzle/{'a' * 40}"],
+)
+def test_frontend_response_decision_preserves_spa_fallback(full_path: str) -> None:
+    assert main_module.decide_frontend_response(full_path, candidate_is_file=False) == "index"
+
+
+def test_frontend_response_decision_serves_real_relative_file(tmp_path) -> None:
+    relative_path = "assets/app.js"
+    candidate = tmp_path / relative_path
+    candidate.parent.mkdir()
+    candidate.write_text("console.log('ok')", encoding="utf-8")
+
+    assert main_module.decide_frontend_response(
+        relative_path,
+        candidate_is_file=candidate.is_file(),
+    ) == "file"
+
+
+def test_frontend_routes_return_json_for_unknown_api_and_html_for_spa(tmp_path) -> None:
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    index_body = "<!doctype html><title>temporary frontend</title>"
+    (dist / "index.html").write_text(index_body, encoding="utf-8")
+    test_app = FastAPI()
+    main_module.register_frontend_routes(test_app, dist)
+
+    with TestClient(test_app) as client:
+        missing_api = client.get("/api/does-not-exist")
+        root = client.get("/")
+        mission = client.get("/mission")
+
+    assert missing_api.status_code == 404
+    assert missing_api.headers["content-type"].startswith("application/json")
+    assert missing_api.json() == {
+        "detail": {
+            "code": "not_found",
+            "message": "API route /api/does-not-exist was not found.",
+        }
+    }
+    assert index_body not in missing_api.text
+    assert root.status_code == 200
+    assert root.headers["content-type"].startswith("text/html")
+    assert root.text == index_body
+    assert mission.status_code == 200
+    assert mission.headers["content-type"].startswith("text/html")
+    assert mission.text == index_body
 
 
 def receive_event_type(socket, expected_type: str) -> dict:

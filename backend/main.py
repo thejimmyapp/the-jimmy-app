@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 import logging
 import re
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
@@ -824,10 +825,34 @@ async def room_socket(
 
 
 frontend_dist = Path(__file__).resolve().parents[1] / "frontend" / "dist"
-if frontend_dist.exists():
-    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+FrontendResponseDecision = Literal["api_404", "index", "file"]
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def serve_frontend(full_path: str) -> FileResponse:
-        candidate = frontend_dist / full_path
-        return FileResponse(candidate if candidate.is_file() else frontend_dist / "index.html")
+
+def decide_frontend_response(full_path: str, *, candidate_is_file: bool) -> FrontendResponseDecision:
+    if full_path == "api" or full_path.startswith("api/"):
+        return "api_404"
+    return "file" if candidate_is_file else "index"
+
+
+def register_frontend_routes(frontend_app: FastAPI, dist: Path) -> None:
+    frontend_app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+
+    @frontend_app.get("/{full_path:path}", include_in_schema=False, response_model=None)
+    def serve_frontend(full_path: str) -> FileResponse | JSONResponse:
+        candidate = dist / full_path
+        decision = decide_frontend_response(full_path, candidate_is_file=candidate.is_file())
+        if decision == "api_404":
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={
+                    "detail": {
+                        "code": "not_found",
+                        "message": f"API route /{full_path} was not found.",
+                    }
+                },
+            )
+        return FileResponse(candidate if decision == "file" else dist / "index.html")
+
+
+if frontend_dist.exists():
+    register_frontend_routes(app, frontend_dist)
