@@ -46,6 +46,20 @@ describe("EvalCard", () => {
     expect(onEnabledChange).toHaveBeenCalledWith(false);
   });
 
+  it("offers the send-to-moment control on every visible engine line", () => {
+    const onSendLineToMoment = vi.fn();
+    render(<EvalCard {...baseProps} onSendLineToMoment={onSendLineToMoment} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Send to moment" }));
+    expect(onSendLineToMoment).toHaveBeenLastCalledWith(baseProps.principal_lines?.[0]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 more line" }));
+    const controls = screen.getAllByRole("button", { name: "Send to moment" });
+    expect(controls).toHaveLength(2);
+    fireEvent.click(controls[1]);
+    expect(onSendLineToMoment).toHaveBeenLastCalledWith(baseProps.principal_lines?.[1]);
+  });
+
   it("identifies the analysed board and can disable the toggle", () => {
     render(<EvalCard {...baseProps} board_label="First Board · Board A · ply 14" toggle_disabled />);
     expect(screen.getByText("Analysed: First Board · Board A · ply 14")).toBeTruthy();

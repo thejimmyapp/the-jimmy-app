@@ -37,6 +37,8 @@ export interface MomentRecord {
   glyph: MomentGlyph;
   alternative_move: string;
   written_answer: string;
+  engine_identity: string | null;
+  engine_depth: number | null;
   author_guest_number: number;
   board_a_white_pocket: string;
   board_a_black_pocket: string;
@@ -55,6 +57,8 @@ export interface CreateMomentRequest {
   glyph: MomentGlyph;
   alternative_move: string;
   written_answer: string;
+  engine_identity: string | null;
+  engine_depth: number | null;
 }
 
 export const api = {

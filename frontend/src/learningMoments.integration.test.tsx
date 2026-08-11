@@ -19,6 +19,7 @@ const apiMock = vi.hoisted(() => ({
   createMoment: vi.fn(),
   deleteMoment: vi.fn(),
   explorationMove: vi.fn(),
+  explorationSanMove: vi.fn(),
 }));
 
 vi.mock("./api", async (importOriginal) => {
@@ -137,11 +138,17 @@ describe("guest learning moment library", () => {
       const frame = current.game?.timeline[Math.max(0, current.globalPly - 1)];
       return { legal: true, notation: "e3", board_a: frame?.board_a, board_b: frame?.board_b };
     });
+    apiMock.explorationSanMove.mockImplementation(async () => {
+      const current = useCoachStore.getState();
+      const frame = current.game?.timeline[Math.max(0, current.globalPly - 1)];
+      return { legal: true, notation: "e3", board_a: frame?.board_a, board_b: frame?.board_b };
+    });
   });
 
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -169,6 +176,8 @@ describe("guest learning moment library", () => {
       glyph: "!!",
       alternative_move: "e3",
       written_answer: "Because Timing",
+      engine_identity: null,
+      engine_depth: null,
     });
     expect(apiMock.createMoment.mock.calls[0][0].move_token).toMatch(/^[1-9]\d*[AaBb]$/);
     fireEvent.keyDown(window, { key: "ArrowRight" });
@@ -209,6 +218,101 @@ describe("guest learning moment library", () => {
     expect(container.querySelector(".side-panel")?.getAttribute("data-saved-moment-count")).toBe("2");
     expect(screen.getAllByRole("button", { name: "Open" })).toHaveLength(2);
   }, 10_000);
+
+  it("sends a playable engine line with provenance, clears it on divergence, and refuses an unplayable line", async () => {
+    serverMomentCount = 10;
+    let requestedAnalysis: { board: "A" | "B"; global_ply: number } | null = null;
+    vi.stubGlobal("fetch", vi.fn(async (input, init) => {
+      if (String(input) === "/api/analysis") {
+        requestedAnalysis = JSON.parse(String(init?.body)) as { board: "A" | "B"; global_ply: number };
+        return new Response(JSON.stringify({ job_id: "engine-moment", status: "queued", engine: "Fairy-Stockfish" }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const analysis = requestedAnalysis;
+      if (!analysis) throw new Error("Analysis was polled before it was submitted.");
+      return new Response(JSON.stringify({
+        status: "completed",
+        engine: "Fairy-Stockfish",
+        board: analysis.board,
+        global_ply: analysis.global_ply,
+        depth: 10,
+        cached: false,
+        result: {
+          fen: "8/8/8/8/8/8/8/8[] w - - 0 1",
+          bestmove: "e2e4",
+          score_cp: 42,
+          mate_in: null,
+          pv: ["e2e4", "e7e5"],
+          depth: 10,
+          variant_supported: true,
+          engine_name: "Fairy-Stockfish 14",
+        },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole("button", { name: /Click me\?/ }));
+    fireEvent.keyDown(await screen.findByRole("listbox", { name: "Guest matchups" }), { key: "Enter" });
+    expect(await screen.findAllByLabelText(/Board chessboard/)).toHaveLength(2);
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    const selectedFrame = useCoachStore.getState().game?.timeline[1];
+    if (!selectedFrame) throw new Error("Test replay did not expose the first coupled move frame.");
+    if (selectedFrame.board === "A") fireEvent.click(screen.getByRole("button", { name: "Swap staged board" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Analysis" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Enable" }));
+    const sendControl = await screen.findByRole("button", { name: "Send to moment" });
+
+    fireEvent.click(sendControl);
+    let wizard = await screen.findByLabelText("Learning moment wizard steps 1 through 4");
+    fireEvent.click(within(within(wizard).getByLabelText("Moves at this position")).getAllByRole("button")[0]);
+    fireEvent.keyDown(within(wizard).getByRole("group", { name: "Required move glyph" }), { key: "1" });
+    expect(within(wizard).getByRole("heading", { name: "Instead, play e3" })).toBeTruthy();
+    fireEvent.change(within(wizard).getByRole("textbox", { name: "Written answer after Because" }), { target: { value: "the engine line keeps the initiative" } });
+    fireEvent.click(within(wizard).getByRole("button", { name: "Save moment" }));
+    await waitFor(() => expect(screen.queryByLabelText("Learning moment wizard steps 1 through 4")).toBeNull());
+    expect(apiMock.explorationSanMove).toHaveBeenLastCalledWith(expect.objectContaining({ board: selectedFrame.board, san: "e2e4" }));
+    expect(apiMock.createMoment.mock.calls.at(-1)?.[0]).toMatchObject({
+      alternative_move: "e3",
+      engine_identity: "Fairy-Stockfish 14",
+      engine_depth: 10,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send to moment" }));
+    wizard = await screen.findByLabelText("Learning moment wizard steps 1 through 4");
+    fireEvent.click(within(within(wizard).getByLabelText("Moves at this position")).getAllByRole("button")[0]);
+    fireEvent.keyDown(within(wizard).getByRole("group", { name: "Required move glyph" }), { key: "2" });
+    expect(within(wizard).getByRole("heading", { name: "Instead, play e3" })).toBeTruthy();
+    apiMock.explorationMove.mockImplementation(async (request) => {
+      if (request.dry_run) return { legal: true, legal_destinations: ["e3"] };
+      const current = useCoachStore.getState();
+      const frame = current.game?.timeline[Math.max(0, current.globalPly - 1)];
+      return { legal: true, notation: "Nf3", board_a: frame?.board_a, board_b: frame?.board_b };
+    });
+    const board = within(wizard).getByLabelText(/alternative chessboard/);
+    const squares = within(board).getAllByRole("button");
+    const sideToMove = board.closest(".board-panel")?.querySelector(".board-heading > span:last-child")?.textContent ?? "";
+    const piecePattern = sideToMove.startsWith("Black") ? / [kqrbnp]$/ : / [KQRBNP]$/;
+    fireEvent.click(squares.find((button) => piecePattern.test(button.getAttribute("aria-label") ?? ""))!);
+    fireEvent.click(squares.find((button) => /^[a-h][1-8]$/.test(button.getAttribute("aria-label") ?? ""))!);
+    await within(wizard).findByRole("heading", { name: "Instead, play Nf3" });
+    fireEvent.change(within(wizard).getByRole("textbox", { name: "Written answer after Because" }), { target: { value: "a different board move was chosen" } });
+    fireEvent.click(within(wizard).getByRole("button", { name: "Save moment" }));
+    await waitFor(() => expect(screen.queryByLabelText("Learning moment wizard steps 1 through 4")).toBeNull());
+    expect(apiMock.createMoment.mock.calls.at(-1)?.[0]).toMatchObject({
+      alternative_move: "Nf3",
+      engine_identity: null,
+      engine_depth: null,
+    });
+
+    apiMock.explorationSanMove.mockResolvedValueOnce({ legal: false, reason: "This notation is not legal in the current Bughouse position." });
+    fireEvent.click(screen.getByRole("button", { name: "Send to moment" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("could not be played in the selected frame");
+    expect(screen.queryByLabelText("Learning moment wizard steps 1 through 4")).toBeNull();
+    expect(apiMock.createMoment).toHaveBeenCalledTimes(2);
+  });
 
   it("leaves the live count unchanged and surfaces a daily-cap refusal", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });

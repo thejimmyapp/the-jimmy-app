@@ -10,6 +10,7 @@ export interface WizardMoveOption {
 export interface AnnotationWizardShellProps {
   move_options: WizardMoveOption[];
   alternative_move_options?: string[];
+  initial_alternative_move?: string;
   render_alternative_board?: (onMovePlayed: (notation: string) => void) => ReactNode;
   onSave?: (moment: { moveToken: string; glyph: MomentGlyph; alternativeMove: string; writtenAnswer: string }) => Promise<void>;
   onCancel?: () => void;
@@ -26,7 +27,7 @@ const STEP_FOUR_PROMPTS: Record<MomentGlyph, string> = {
   "?!": "What's the safer option?",
 };
 
-export function AnnotationWizardShell({ move_options, alternative_move_options = [], render_alternative_board, onSave, onCancel, saving = false, saveError = null }: AnnotationWizardShellProps) {
+export function AnnotationWizardShell({ move_options, alternative_move_options = [], initial_alternative_move, render_alternative_board, onSave, onCancel, saving = false, saveError = null }: AnnotationWizardShellProps) {
   const [selectedMove, setSelectedMove] = useState<WizardMoveOption | null>(null);
   const [glyph, setGlyph] = useState<MomentGlyph | null>(null);
   const [alternativeMove, setAlternativeMove] = useState<string | null>(null);
@@ -44,6 +45,11 @@ export function AnnotationWizardShell({ move_options, alternative_move_options =
     setGlyph(null);
     setAlternativeMove(null);
     setAnswer("");
+  };
+
+  const chooseGlyph = (nextGlyph: MomentGlyph) => {
+    setGlyph(nextGlyph);
+    setAlternativeMove((current) => current ?? initial_alternative_move ?? null);
   };
 
   const currentStep = alternativeMove ? 4 : glyph ? 3 : selectedMove ? 2 : 1;
@@ -93,7 +99,7 @@ export function AnnotationWizardShell({ move_options, alternative_move_options =
       >
         <span className="wizard-step__number">step 2 of 4 · required</span>
         <h3 id="wizard-step-2-title">This move is {glyph ?? "___"}</h3>
-        <GlyphPicker value={glyph} onChange={setGlyph} disabled={!selectedMove} label="Required move glyph" />
+        <GlyphPicker value={glyph} onChange={chooseGlyph} disabled={!selectedMove} label="Required move glyph" />
       </section>
 
       <section
