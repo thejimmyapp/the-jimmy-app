@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AnnotationWizardShell } from "./AnnotationWizardShell";
 
 const moves = [
@@ -115,7 +115,7 @@ describe("AnnotationWizardShell", () => {
     expect(screen.getByRole("heading", { name: "Instead, play Bxf7+" })).toBeTruthy();
     expect(screen.getByText("[COPY-PLACEHOLDER] What risk did they accept?")).toBeTruthy();
     const answer = screen.getByRole("textbox", { name: "Written answer after Because" }) as HTMLTextAreaElement;
-    expect(answer.hasAttribute("minlength")).toBe(false);
+    expect(answer.getAttribute("minlength")).toBe("1");
     fireEvent.change(answer, { target: { value: "the drop leaves the king exposed" } });
     expect(answer.value).toBe("the drop leaves the king exposed");
     expect(answer.parentElement?.querySelector("span")?.textContent).toBe("Because");
@@ -133,5 +133,37 @@ describe("AnnotationWizardShell", () => {
     expect(screen.getByRole("heading", { name: "Instead, play ___", hidden: true })).toBeTruthy();
     expect((container.querySelector(".wizard-step--answer") as HTMLElement).hasAttribute("inert")).toBe(true);
     expect(screen.getByText("[COPY-PLACEHOLDER] Select a glyph to see this prompt.", { selector: "p" })).toBeTruthy();
+  });
+
+  it("refuses an empty answer and submits one real word with the locked Because opener", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AnnotationWizardShell
+        move_options={moves}
+        render_alternative_board={(onMovePlayed) => <button type="button" onClick={() => onMovePlayed("Q@h5")}>Play Q@h5 on board</button>}
+        onSave={onSave}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Save moment" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "17A Nxf7" }));
+    fireEvent.keyDown(screen.getByRole("group", { name: "Required move glyph" }), { key: "1" });
+    expect(screen.queryByRole("button", { name: "Save moment" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Play Q@h5 on board" }));
+    const saveButton = screen.getByRole("button", { name: "Save moment" }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+    fireEvent.change(screen.getByRole("textbox", { name: "Written answer after Because" }), { target: { value: "   " } });
+    expect(saveButton.disabled).toBe(true);
+    fireEvent.click(saveButton);
+    expect(onSave).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Written answer after Because" }), { target: { value: "Timing" } });
+    expect(saveButton.disabled).toBe(false);
+    fireEvent.click(saveButton);
+
+    expect(onSave).toHaveBeenCalledWith({
+      moveToken: "17A",
+      glyph: "!",
+      alternativeMove: "Q@h5",
+      writtenAnswer: "Because Timing",
+    });
   });
 });

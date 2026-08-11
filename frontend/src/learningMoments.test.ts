@@ -52,20 +52,22 @@ const game: GamePayload = {
 };
 
 describe("learning moment capture", () => {
-  it("captures the staged board plus the producing move and seat", () => {
-    expect(captureMomentContext(match, game, 0, "A")).toBeNull();
-    const capture = captureMomentContext(match, game, 2, "B");
-    expect(capture).toEqual({ matchIds: { A: 101, B: 102 }, ply: 2, boardId: "B", move: "N@h6", seat: "A-black" });
-    expect(savedMomentFromCapture(capture!, "!?", "  keeps the diagonal closed  ", "2026-08-10T00:00:00.000Z")).toEqual({
+  it("captures the producing board and derives the case-sensitive move token", () => {
+    expect(captureMomentContext(match, game, 0)).toBeNull();
+    const capture = captureMomentContext(match, game, 2);
+    expect(capture).toEqual({ matchIds: { A: 101, B: 102 }, ply: 2, boardId: "A", move: "N@h6", seat: "A-black", moveToken: "1a" });
+    expect(savedMomentFromCapture(capture!, "!?", "Q@h5", "  Because it keeps the diagonal closed  ", 71, "2026-08-10T00:00:00.000Z")).toEqual({
       ...capture,
+      serverId: 71,
       glyph: "!?",
-      note: "keeps the diagonal closed",
+      alternativeMove: "Q@h5",
+      note: "Because it keeps the diagonal closed",
       savedAt: "2026-08-10T00:00:00.000Z",
     });
   });
 
   it("resolves saved match ids and renders all four player names", () => {
-    const saved = savedMomentFromCapture(captureMomentContext(match, game, 1, "A")!, "!", "timing");
+    const saved = savedMomentFromCapture(captureMomentContext(match, game, 1)!, "!", "N@f6", "Because timing", 72);
     expect(matchForSavedMoment([match], saved)).toBe(match);
     expect(playerNamesForMoment(match)).toBe("Alpha · Beta · Gamma · Delta");
   });

@@ -18,10 +18,8 @@ export const formatQuestCountdown = (seconds: number) => {
   return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, "0")}`;
 };
 
-export const questMomentProgress = (progress: Pick<GuestProgress, "savedMoments">) => Math.min(QUEST_TARGET_MOMENTS, progress.savedMoments.length);
-
-export const completeGuestQuestIfReady = (progress: GuestProgress): GuestProgress => {
-  if (progress.questCompleted || questMomentProgress(progress) < QUEST_TARGET_MOMENTS) return progress;
+export const completeGuestQuestIfReady = (progress: GuestProgress, savedMomentCount: number): GuestProgress => {
+  if (progress.questCompleted || Math.min(QUEST_TARGET_MOMENTS, savedMomentCount) < QUEST_TARGET_MOMENTS) return progress;
   return {
     ...progress,
     questDeadline: null,

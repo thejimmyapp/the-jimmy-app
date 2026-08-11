@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { ApiError } from "./api";
 import { reconstructGuestMatch } from "./bughouseDecoder";
 import replayFixtures from "./fixtures/guest-match-replays.json";
 import { emptyGuestProgress, loadGuestProgress, storeGuestProgress } from "./guestProgress";
@@ -14,6 +15,10 @@ const apiMock = vi.hoisted(() => ({
   resetGuestSession: vi.fn(),
   guestMatchups: vi.fn(),
   chessComMatchReplay: vi.fn(),
+  storeChessComGuestMatch: vi.fn(),
+  createMoment: vi.fn(),
+  deleteMoment: vi.fn(),
+  explorationMove: vi.fn(),
 }));
 
 vi.mock("./api", async (importOriginal) => {
@@ -68,21 +73,42 @@ const replayFor = (match: NormalizedMatch) => ({
   },
 });
 
-const saveMoment = (glyph: string, note: string, useButton = false) => {
+const glyphKey = { "!": "1", "?": "2", "!!": "3", "??": "4", "!?": "5", "?!": "6" } as const;
+
+const saveMoment = async (glyph: keyof typeof glyphKey, note: string, useButton = false) => {
   if (useButton) fireEvent.click(screen.getByRole("button", { name: "Save current learning moment" }));
   else fireEvent.keyDown(window, { key: "m" });
-  fireEvent.click(screen.getByRole("radio", { name: glyph }));
-  fireEvent.change(screen.getByPlaceholderText("what it does / why it stood out"), { target: { value: note } });
-  fireEvent.click(screen.getByRole("button", { name: "Save moment" }));
+  const wizard = screen.getByLabelText("Learning moment wizard steps 1 through 4");
+  const moves = within(wizard).getByLabelText("Moves at this position");
+  fireEvent.click(within(moves).getAllByRole("button")[0]);
+  fireEvent.keyDown(within(wizard).getByRole("group", { name: "Required move glyph" }), { key: glyphKey[glyph] });
+  const board = within(wizard).getByLabelText(/alternative chessboard/);
+  const squares = within(board).getAllByRole("button");
+  const sideToMove = board.closest(".board-panel")?.querySelector(".board-heading > span:last-child")?.textContent ?? "";
+  const piecePattern = sideToMove.startsWith("Black") ? / [kqrbnp]$/ : / [KQRBNP]$/;
+  const source = squares.find((button) => piecePattern.test(button.getAttribute("aria-label") ?? ""));
+  const target = squares.find((button) => /^[a-h][1-8]$/.test(button.getAttribute("aria-label") ?? ""));
+  if (!source || !target) throw new Error("Test replay did not expose a side-to-move piece and empty target square.");
+  fireEvent.click(source);
+  fireEvent.click(target);
+  await within(wizard).findByRole("heading", { name: "Instead, play e3" });
+  fireEvent.change(within(wizard).getByRole("textbox", { name: "Written answer after Because" }), { target: { value: note } });
+  fireEvent.click(within(wizard).getByRole("button", { name: "Save moment" }));
+  await waitFor(() => expect(screen.queryByLabelText("Learning moment wizard steps 1 through 4")).toBeNull());
 };
 
 describe("guest learning moment library", () => {
+  let serverMomentCount = 0;
+  let nextMomentId = 1;
+
   beforeEach(() => {
     localStorage.clear();
     history.replaceState(null, "", "/");
     useCoachStore.setState({ game: null, guestMatch: null, roomId: null, globalPly: 0, mode: "review" });
-    apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: 0 });
-    apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: 0 });
+    serverMomentCount = 0;
+    nextMomentId = 1;
+    apiMock.guestSession.mockImplementation(async () => ({ guest_number: 13, total_guests: 13, completions_to_date: null, saved_moment_count: serverMomentCount, analysis_unlocked: serverMomentCount >= 10 }));
+    apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
     apiMock.guestMatchups.mockResolvedValue({
       matches: [firstMatch, secondMatch],
       examined: 2,
@@ -94,6 +120,23 @@ describe("guest learning moment library", () => {
       cached: false,
     });
     apiMock.chessComMatchReplay.mockImplementation(async (gameId: number) => replayFor(gameId === secondMatch.game_ids.A ? secondMatch : firstMatch));
+    apiMock.storeChessComGuestMatch.mockResolvedValue({ game_id: 901 });
+    apiMock.createMoment.mockImplementation(async (request) => {
+      const id = nextMomentId++;
+      serverMomentCount += 1;
+      const moment = { id, ...request };
+      return { private_moment: moment, public_moment: { ...moment, id: id + 10_000 } };
+    });
+    apiMock.deleteMoment.mockImplementation(async () => {
+      serverMomentCount -= 1;
+      return { deleted: true };
+    });
+    apiMock.explorationMove.mockImplementation(async (request) => {
+      if (request.dry_run) return { legal: true, legal_destinations: ["e3"] };
+      const current = useCoachStore.getState();
+      const frame = current.game?.timeline[Math.max(0, current.globalPly - 1)];
+      return { legal: true, notation: "e3", board_a: frame?.board_a, board_b: frame?.board_b };
+    });
   });
 
   afterEach(() => {
@@ -117,9 +160,19 @@ describe("guest learning moment library", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close flashcard library" }));
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    saveMoment("!!", "The first game starts to squeeze the king.");
+    await saveMoment("!!", "Timing");
+    expect(container.querySelector(".side-panel")?.getAttribute("data-saved-moment-count")).toBe("1");
+    expect(apiMock.storeChessComGuestMatch).toHaveBeenCalledWith(firstMatch.game_ids.A);
+    expect(apiMock.storeChessComGuestMatch.mock.invocationCallOrder[0]).toBeLessThan(apiMock.createMoment.mock.invocationCallOrder[0]);
+    expect(apiMock.createMoment.mock.calls[0][0]).toMatchObject({
+      game_id: 901,
+      glyph: "!!",
+      alternative_move: "e3",
+      written_answer: "Because Timing",
+    });
+    expect(apiMock.createMoment.mock.calls[0][0].move_token).toMatch(/^[1-9]\d*[AaBb]$/);
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    saveMoment("?!", "The transfer changes what the other board can allow.");
+    await saveMoment("?!", "The transfer changes what the other board can allow.");
     expect(loadGuestProgress().savedMoments).toHaveLength(2);
     expect(loadGuestProgress().capabilities.dock_library).toBe("unlocked");
     expect(loadGuestProgress().savedMoments[0]).toMatchObject({ matchIds: firstMatch.game_ids, ply: 1, glyph: "!!" });
@@ -131,7 +184,7 @@ describe("guest learning moment library", () => {
     fireEvent.keyDown(list, { key: "Enter" });
     await waitFor(() => expect(useCoachStore.getState().guestMatch?.game_ids).toEqual(secondMatch.game_ids));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    saveMoment("!", "A second game shows the same timing from another angle.", true);
+    await saveMoment("!", "A second game shows the same timing from another angle.", true);
     expect(loadGuestProgress().questCompleted).toBe(true);
     expect(loadGuestProgress().questDeadline).toBeNull();
     expect(loadGuestProgress().capabilities.dock_quest).toBe("unlocked");
@@ -152,9 +205,36 @@ describe("guest learning moment library", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: /Library/ }));
     fireEvent.click(screen.getByRole("button", { name: "Delete saved moment at ply 2" }));
-    expect(loadGuestProgress().savedMoments).toHaveLength(2);
+    await waitFor(() => expect(loadGuestProgress().savedMoments).toHaveLength(2));
     expect(container.querySelector(".side-panel")?.getAttribute("data-saved-moment-count")).toBe("2");
     expect(screen.getAllByRole("button", { name: "Open" })).toHaveLength(2);
+  }, 10_000);
+
+  it("leaves the live count unchanged and surfaces a daily-cap refusal", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const { container } = render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole("button", { name: /Click me\?/ }));
+    fireEvent.keyDown(await screen.findByRole("listbox", { name: "Guest matchups" }), { key: "Enter" });
+    expect(await screen.findAllByLabelText(/Board chessboard/)).toHaveLength(2);
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    apiMock.createMoment.mockRejectedValueOnce(new ApiError(429, "daily moment cap reached", { code: "daily_moment_cap_reached" }));
+
+    if (screen.queryByLabelText("Learning moment wizard steps 1 through 4")) throw new Error("Wizard unexpectedly open before save.");
+    fireEvent.keyDown(window, { key: "m" });
+    const wizard = screen.getByLabelText("Learning moment wizard steps 1 through 4");
+    fireEvent.click(within(within(wizard).getByLabelText("Moves at this position")).getAllByRole("button")[0]);
+    fireEvent.keyDown(within(wizard).getByRole("group", { name: "Required move glyph" }), { key: "1" });
+    const board = within(wizard).getByLabelText(/alternative chessboard/);
+    const squares = within(board).getAllByRole("button");
+    fireEvent.click(squares.find((button) => / [KQRBNP]$/.test(button.getAttribute("aria-label") ?? ""))!);
+    fireEvent.click(squares.find((button) => /^[a-h][1-8]$/.test(button.getAttribute("aria-label") ?? ""))!);
+    await within(wizard).findByRole("heading", { name: "Instead, play e3" });
+    fireEvent.change(within(wizard).getByRole("textbox", { name: "Written answer after Because" }), { target: { value: "the timing fails" } });
+    fireEvent.click(within(wizard).getByRole("button", { name: "Save moment" }));
+
+    expect((await within(wizard).findByRole("alert")).textContent).toContain("daily_moment_cap_reached");
+    expect(container.querySelector(".side-panel")?.getAttribute("data-saved-moment-count")).toBe("0");
+    expect(loadGuestProgress().savedMoments).toHaveLength(0);
   });
 
   it("clears an insufficient guest session and returns to entry when the persisted deadline expires", async () => {
@@ -193,7 +273,7 @@ describe("guest learning moment library", () => {
     expect(restarted.savedMoments).toHaveLength(0);
     expect(restarted.questDeadline).toBeGreaterThan(Date.now());
     expect(screen.getByRole("heading", { name: "Salutations, SirGuest#14!" })).toBeTruthy();
-    expect(screen.getByText("0 of 14 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#15. Mwahaha! Kittens and cookies! Mwahaha, yessss.")).toBeTruthy();
+    expect(screen.getByText("— of 14 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#15. Mwahaha! Kittens and cookies! Mwahaha, yessss.")).toBeTruthy();
   });
 
   it("completes the quest after three moments saved from one guest game", async () => {
@@ -206,7 +286,7 @@ describe("guest learning moment library", () => {
 
     for (const [glyph, note] of [["!!", "First moment."], ["!?", "Second moment."], ["!", "Third moment."]] as const) {
       fireEvent.keyDown(window, { key: "ArrowRight" });
-      saveMoment(glyph, note);
+      await saveMoment(glyph, note);
     }
 
     const completed = loadGuestProgress();

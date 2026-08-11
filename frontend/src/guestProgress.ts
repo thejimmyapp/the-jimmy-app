@@ -67,12 +67,14 @@ export const momentGlyphs = ["!!", "!", "!?", "?!", "?", "??"] as const;
 export type MomentGlyph = (typeof momentGlyphs)[number];
 
 export interface SavedMoment {
+  serverId?: number;
   matchIds: Record<BoardId, number>;
   ply: number;
   boardId: BoardId;
   move: string;
   seat: MatchSeat;
   glyph: MomentGlyph;
+  alternativeMove?: string;
   note: string;
   savedAt: string;
 }
@@ -126,7 +128,9 @@ const isSavedLesson = (value: unknown): value is SavedLesson => {
 const isSavedMoment = (value: unknown): value is SavedMoment => {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<SavedMoment>;
-  return Boolean(item.matchIds)
+  return (item.serverId === undefined || (Number.isSafeInteger(item.serverId) && Number(item.serverId) > 0))
+    && (item.alternativeMove === undefined || (typeof item.alternativeMove === "string" && item.alternativeMove.trim().length > 0))
+    && Boolean(item.matchIds)
     && Number.isSafeInteger(item.matchIds?.A)
     && Number.isSafeInteger(item.matchIds?.B)
     && Number.isInteger(item.ply)

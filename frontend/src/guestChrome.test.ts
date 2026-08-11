@@ -9,22 +9,22 @@ describe("owner-approved guest chrome copy", () => {
     expect(SUB_CARD_COPY).toBe("The timer has started. You shouldn't still be clicking. Are you clicking? Stop clicking.");
   });
 
-  it("substitutes the three counter values without rendering spec brackets", () => {
-    const identity = { guest_number: 13, total_guests: 13, completions_to_date: 0 };
+  it("renders the unknown completion numerator honestly without rendering spec brackets", () => {
+    const identity = { guest_number: 13, total_guests: 13, completions_to_date: null, saved_moment_count: 3, analysis_unlocked: false };
     const headline = landingHeadline(identity);
     const subcopy = landingSubcopy(identity);
     const rendered = `${headline} ${subcopy}`;
     expect(headline).toBe("Salutations, SirGuest#13!");
-    expect(subcopy).toBe("0 of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.");
-    expect(rendered).toBe("Salutations, SirGuest#13! 0 of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.");
+    expect(subcopy).toBe("— of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.");
+    expect(rendered).toBe("Salutations, SirGuest#13! — of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.");
     expect(rendered).not.toContain("[");
     expect(rendered).not.toContain("]");
   });
 
-  it("renders zero for every unavailable landing value", () => {
-    const identity = { guest_number: 0, total_guests: 0, completions_to_date: 0 };
+  it("keeps unknown completion distinct from real zero values", () => {
+    const identity = { guest_number: 0, total_guests: 0, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false };
     const rendered = `${landingHeadline(identity)} ${landingSubcopy(identity)}`;
-    expect(rendered).toContain("SirGuest#0! 0 of 0 visitors");
+    expect(rendered).toContain("SirGuest#0! — of 0 visitors");
     expect(rendered).toContain("new name, SirGuest#0.");
     expect(rendered).not.toContain("[");
     expect(rendered).not.toContain("]");

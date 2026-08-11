@@ -153,7 +153,7 @@ export function OnboardingMap({ guest_number, total_guests, completions_to_date,
     <section ref={surfaceRef} className={`onboarding-map-shell locked-shell-onboarding ${active ? "word-vertigo-active" : ""}`} aria-label="Choose how to enter The Jimmy App" onKeyDown={handleKeyDown}>
       <div className="onboarding-entry-copy" inert={active || undefined} aria-hidden={active || undefined}>
         <span>THE JIMMY APP</span>
-        <h1>{landingHeadline({ guest_number, total_guests, completions_to_date })}</h1>
+        <h1>{landingHeadline({ guest_number })}</h1>
         <p>{landingSubcopy({ guest_number, total_guests, completions_to_date })}</p>
       </div>
       <div className="onboarding-entry-nodes">

@@ -17,6 +17,7 @@ interface FakeStockfishCardProps {
 
 interface FakeStockfishGateProps extends FakeStockfishCardProps {
   isGuest: boolean;
+  analysisUnlocked: boolean;
   children: ReactNode;
 }
 
@@ -98,7 +99,7 @@ export function FakeStockfishCard({ guestNumber, savedMomentCount }: FakeStockfi
   );
 }
 
-export function FakeStockfishGate({ isGuest, savedMomentCount, guestNumber, children }: FakeStockfishGateProps) {
-  if (!isGuest || savedMomentCount >= 10) return <>{children}</>;
+export function FakeStockfishGate({ isGuest, analysisUnlocked, savedMomentCount, guestNumber, children }: FakeStockfishGateProps) {
+  if (!isGuest || analysisUnlocked) return <>{children}</>;
   return <FakeStockfishCard guestNumber={guestNumber} savedMomentCount={savedMomentCount} />;
 }

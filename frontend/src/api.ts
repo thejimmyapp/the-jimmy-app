@@ -1,5 +1,6 @@
 import type { BoardId, CoachJob, CoachPreparedPayload, CoachPrepareRequest, ExplorationMoveResult, GamePayload, GameSummary, GuestMatchReplaySource, GuestMatchupList, LeakMapJob, NormalizedMatch, PlayerStats, PuzzleMove, PuzzlePayload, PuzzleResponse, QwenStatus, RoomPayload } from "./types";
 import type { GuestSessionIdentity } from "./guestChrome";
+import type { MomentGlyph } from "./guestProgress";
 
 type ApiErrorDetail = { code?: string; message?: string; external_game_id?: string };
 
@@ -28,6 +29,34 @@ const json = async <T>(responsePromise: Promise<Response>): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
+export interface MomentRecord {
+  id: number;
+  save_order: number;
+  game_id: number;
+  move_token: string;
+  glyph: MomentGlyph;
+  alternative_move: string;
+  written_answer: string;
+  author_guest_number: number;
+  board_a_white_pocket: string;
+  board_a_black_pocket: string;
+  board_b_white_pocket: string;
+  board_b_black_pocket: string;
+  board_a_white_clock: string;
+  board_a_black_clock: string;
+  board_b_white_clock: string;
+  board_b_black_clock: string;
+  created_at: string;
+}
+
+export interface CreateMomentRequest {
+  game_id: number;
+  move_token: string;
+  glyph: MomentGlyph;
+  alternative_move: string;
+  written_answer: string;
+}
+
 export const api = {
   guestSession: () => json<GuestSessionIdentity>(fetch("/api/guests", { method: "POST" })),
   resetGuestSession: () => json<GuestSessionIdentity>(fetch("/api/guests/reset", { method: "POST" })),
@@ -35,6 +64,15 @@ export const api = {
   chessComMatchReplay: (gameId: number) => json<GuestMatchReplaySource>(fetch(`/api/chesscom/matches/${gameId}/replay`)),
   storeChessComGuestMatch: (gameId: number) =>
     json<{ game_id: number }>(fetch(`/api/chesscom/matches/${gameId}/store`, { method: "POST" })),
+  createMoment: (request: CreateMomentRequest) =>
+    json<{ private_moment: MomentRecord; public_moment: MomentRecord }>(fetch("/api/moments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    })),
+  listMyMoments: () => json<{ moments: MomentRecord[] }>(fetch("/api/moments/mine")),
+  deleteMoment: (momentId: number) =>
+    json<{ deleted: true }>(fetch(`/api/moments/${momentId}`, { method: "DELETE" })),
   guestMatchups: ({ refresh = false, excludeGameIds = [] }: { refresh?: boolean; excludeGameIds?: number[] } = {}) => {
     const params = new URLSearchParams();
     if (refresh) params.set("refresh", "true");
