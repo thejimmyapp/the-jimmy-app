@@ -196,7 +196,16 @@ def parse_tcn(tcn: str, raw: dict[str, Any] | None = None) -> ParsedGame:
             source="tcn",
         )
 
-    board = _initial_tcn_board(raw or {})
+    try:
+        board = _initial_tcn_board(raw or {})
+    except (TypeError, ValueError) as exc:
+        return ParsedGame(
+            headers=headers,
+            moves=[],
+            result=_result_from_raw(raw or {}),
+            parse_warnings=[f"Initial setup could not be initialized: {exc}"],
+            source="tcn",
+        )
     moves: list[MoveRecord] = []
     inferred_pockets = 0
     for item in decoded:
@@ -276,6 +285,10 @@ def parse_partner_game_data(raw_json: str | None) -> ParsedGame | None:
     partner_raw["tcn"] = tcn
     if raw.get("bughousePartnerMoveTimestamps"):
         partner_raw["moveTimestamps"] = raw.get("bughousePartnerMoveTimestamps")
+    if "bughousePartnerInitialFen" in raw:
+        partner_raw["initialFen"] = raw["bughousePartnerInitialFen"]
+    elif "bughouse_partner_initial_fen" in raw:
+        partner_raw["initialFen"] = raw["bughouse_partner_initial_fen"]
     return parse_tcn(tcn, partner_raw)
 
 
@@ -473,15 +486,28 @@ def _parse_time_control(value: str | None) -> tuple[float | None, float]:
 
 
 def _initial_tcn_board(raw: dict[str, Any]) -> Any:
+    setup_found = False
+    initial: object = None
+    for key in ("initial_setup", "initialSetup", "initialFen"):
+        if key in raw:
+            setup_found = True
+            initial = raw[key]
+            break
+
+    if not setup_found:
+        return chess.variant.CrazyhouseBoard() if chess is not None else None
+    if not isinstance(initial, str) or not initial.strip():
+        raise ValueError("initial setup must be a non-empty string")
+
+    setup = initial.strip()
+    if setup.lower() in {"startpos", "standard"}:
+        return chess.variant.CrazyhouseBoard() if chess is not None else None
     if chess is None:
-        return None
-    initial = raw.get("initial_setup") or raw.get("initialSetup")
-    if isinstance(initial, str) and initial and initial.lower() not in {"startpos", "standard"}:
-        try:
-            return chess.variant.CrazyhouseBoard(initial)
-        except ValueError:
-            pass
-    return chess.variant.CrazyhouseBoard()
+        raise ValueError("python-chess is unavailable for a non-standard initial setup")
+    try:
+        return chess.variant.CrazyhouseBoard(setup)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("non-standard initial setup is invalid") from exc
 
 
 def _detect_result(headers: dict[str, str], move_text: str) -> str:

@@ -7,13 +7,19 @@ from pathlib import Path
 from typing import Any
 from collections import OrderedDict, defaultdict
 
+import chess.variant
+
 from backend.config import Settings
 from backend.job_control import BoundedJobRegistry
 from thejimmyapp.board_renderer import build_bughouse_pair_positions, build_global_replay_frames, build_replay_positions
 from thejimmyapp.db import Database
 from thejimmyapp.engine import EngineConfig, FairyStockfishEngine
-from thejimmyapp.game_completion import is_completed_stored_game
+from thejimmyapp.game_completion import is_completed_chesscom_game, is_completed_stored_game
 from thejimmyapp.pgn_parser import parse_game_data, parse_partner_game_data
+
+
+class GuestReplayIngestError(ValueError):
+    pass
 
 
 class GameService:
@@ -27,6 +33,65 @@ class GameService:
     def is_completed_game(self, game_id: int) -> bool:
         game = self.db.get_game(game_id)
         return bool(game and is_completed_stored_game(game))
+
+    def create_guest_identity(self) -> tuple[int, str]:
+        return self.db.create_guest_identity()
+
+    def guest_number_for_token(self, token: str) -> int | None:
+        return self.db.guest_number_for_token(token)
+
+    def ingest_guest_replay(self, replay_source: dict[str, Any], guest_number: int) -> int:
+        if isinstance(guest_number, bool) or not isinstance(guest_number, int) or guest_number <= 0:
+            raise GuestReplayIngestError("guest number must be a positive integer")
+
+        archive_game, ply_count_a, ply_count_b = _flatten_guest_replay(replay_source)
+        raw_json = json.dumps(archive_game, ensure_ascii=False)
+        try:
+            parsed = parse_game_data("", raw_json)
+            partner = parse_partner_game_data(raw_json)
+            if partner is None:
+                raise GuestReplayIngestError("partner board could not be parsed")
+            warnings = [*parsed.parse_warnings, *partner.parse_warnings]
+            if any(
+                warning.startswith(
+                    ("Could not validate decoded move", "Initial setup could not be initialized")
+                )
+                for warning in warnings
+            ):
+                raise GuestReplayIngestError("the replay payload could not be reconstructed safely")
+            if len(parsed.moves) != ply_count_a or len(partner.moves) != ply_count_b:
+                raise GuestReplayIngestError("decoded move count does not match the replay payload")
+            if any(not move.uci for move in [*parsed.moves, *partner.moves]):
+                raise GuestReplayIngestError("a decoded move is missing its coordinate form")
+            timeline = build_global_replay_frames(parsed.moves, partner.moves)
+        except GuestReplayIngestError:
+            raise
+        except Exception as exc:
+            raise GuestReplayIngestError("the replay payload could not be parsed") from exc
+
+        if len(timeline) != ply_count_a + ply_count_b + 1:
+            raise GuestReplayIngestError("the coupled replay timeline is incomplete")
+        for frame in (timeline[0], timeline[-1]):
+            if not frame.board_a.variant_fen or not frame.board_b.variant_fen:
+                raise GuestReplayIngestError("the replay payload did not produce both board positions")
+        initial_positions = (
+            ("A", archive_game["initialFen"], timeline[0].board_a.variant_fen),
+            ("B", archive_game["bughousePartnerInitialFen"], timeline[0].board_b.variant_fen),
+        )
+        for label, initial_fen, timeline_fen in initial_positions:
+            if _guest_initial_variant_fen(initial_fen) != timeline_fen:
+                raise GuestReplayIngestError(
+                    f"boards.{label}.initialFen cannot be preserved by the coupled replay timeline"
+                )
+        if not is_completed_chesscom_game(archive_game):
+            raise GuestReplayIngestError("the replay payload does not contain a terminal result")
+
+        username = f"guest_{guest_number}"
+        self.db.upsert_game(username, archive_game)
+        stored = self.db.get_game_by_username_url(username, str(archive_game["url"]))
+        if stored is None:
+            raise RuntimeError("guest replay was not stored")
+        return int(stored["id"])
 
     def resolve_stored_game(self, urls: tuple[str, ...], username: str | None = None) -> dict[str, object] | None:
         completed = [game for game in self.db.find_games_by_urls(urls) if is_completed_stored_game(game)]
@@ -165,6 +230,161 @@ class GameService:
                 "analyzed_games": coverage.get("analyzed_at_depth", 0),
             },
         }
+
+
+def _flatten_guest_replay(replay_source: dict[str, Any]) -> tuple[dict[str, Any], int, int]:
+    if not isinstance(replay_source, dict):
+        raise GuestReplayIngestError("replay source must be an object")
+    match = _required_dict(replay_source, "match", "replay source")
+    boards = _required_dict(replay_source, "boards", "replay source")
+    board_a = _validated_guest_board(_required_dict(boards, "A", "boards"), "A")
+    board_b = _validated_guest_board(_required_dict(boards, "B", "boards"), "B")
+
+    game_ids = _required_dict(match, "game_ids", "match")
+    ply_counts = _required_dict(match, "ply_counts", "match")
+    if _required_positive_int(game_ids, "A", "match.game_ids") != board_a["id"]:
+        raise GuestReplayIngestError("match.game_ids.A does not match boards.A.id")
+    if _required_positive_int(game_ids, "B", "match.game_ids") != board_b["id"]:
+        raise GuestReplayIngestError("match.game_ids.B does not match boards.B.id")
+    if _required_positive_int(ply_counts, "A", "match.ply_counts") != board_a["ply_count"]:
+        raise GuestReplayIngestError("match.ply_counts.A does not match boards.A.plyCount")
+    if _required_positive_int(ply_counts, "B", "match.ply_counts") != board_b["ply_count"]:
+        raise GuestReplayIngestError("match.ply_counts.B does not match boards.B.plyCount")
+    if board_a["partner_uuid"] != board_b["uuid"] or board_b["partner_uuid"] != board_a["uuid"]:
+        raise GuestReplayIngestError("board partner identifiers do not agree")
+
+    seats = _required_dict(match, "seats", "match")
+    seat_players = {
+        seat: _validated_guest_seat(_required_dict(seats, seat, "match.seats"), seat)
+        for seat in ("A-white", "A-black", "B-white", "B-black")
+    }
+    end_time = _required_positive_int(match, "end_time", "match")
+    decisive_board = _required_string(match, "decisive_board", "match")
+    if decisive_board not in {"A", "B"}:
+        raise GuestReplayIngestError("match.decisive_board must be A or B")
+    loser_seat = _required_string(match, "loser_seat", "match")
+    if loser_seat not in seat_players or not loser_seat.startswith(f"{decisive_board}-"):
+        raise GuestReplayIngestError("match.loser_seat does not agree with match.decisive_board")
+    action = _required_string(match, "action", "match")
+    loss_results = {
+        "checkmated": "checkmated",
+        "resigned": "resigned",
+        "flagged": "timeout",
+        "abandoned": "abandoned",
+    }
+    if action not in loss_results:
+        raise GuestReplayIngestError("match.action is not a supported terminal action")
+
+    decisive_loser_color = loser_seat.split("-", 1)[1]
+    losing_a_color = (
+        decisive_loser_color
+        if decisive_board == "A"
+        else "black" if decisive_loser_color == "white" else "white"
+    )
+    a_loss_result = loss_results[action] if decisive_board == "A" else "lose"
+    white_result = a_loss_result if losing_a_color == "white" else "win"
+    black_result = a_loss_result if losing_a_color == "black" else "win"
+
+    return (
+        {
+            "url": f"https://www.chess.com/game/live/{board_a['id']}",
+            "uuid": board_a["uuid"],
+            "rules": "bughouse",
+            "end_time": end_time,
+            "tcn": board_a["move_list"],
+            "moveTimestamps": board_a["move_timestamps"],
+            "bughousePartnerTcnMoves": board_b["move_list"],
+            "bughousePartnerMoveTimestamps": board_b["move_timestamps"],
+            "initialFen": board_a["initial_fen"],
+            "bughousePartnerInitialFen": board_b["initial_fen"],
+            "bughousePlayer1Name": seat_players["A-white"]["name"],
+            "bughousePlayer2Name": seat_players["A-black"]["name"],
+            "bughousePartnerPlayer1Name": seat_players["B-white"]["name"],
+            "bughousePartnerPlayer2Name": seat_players["B-black"]["name"],
+            "white": {
+                "username": seat_players["A-white"]["name"],
+                "rating": seat_players["A-white"]["rating"],
+                "result": white_result,
+            },
+            "black": {
+                "username": seat_players["A-black"]["name"],
+                "rating": seat_players["A-black"]["rating"],
+                "result": black_result,
+            },
+        },
+        int(board_a["ply_count"]),
+        int(board_b["ply_count"]),
+    )
+
+
+def _validated_guest_board(board: dict[str, Any], label: str) -> dict[str, Any]:
+    board_id = _required_positive_int(board, "id", f"boards.{label}")
+    uuid = _required_string(board, "uuid", f"boards.{label}")
+    partner_uuid = _required_string(board, "partnerGameId", f"boards.{label}")
+    move_list = _required_string(board, "moveList", f"boards.{label}")
+    move_timestamps = _required_string(board, "moveTimestamps", f"boards.{label}")
+    ply_count = _required_positive_int(board, "plyCount", f"boards.{label}")
+    initial_fen = _required_string(board, "initialFen", f"boards.{label}")
+    if len(move_list) != ply_count * 2:
+        raise GuestReplayIngestError(f"boards.{label}.moveList length does not match plyCount")
+    timestamps = move_timestamps.split(",")
+    if len(timestamps) not in {ply_count, ply_count + 1} or any(not value.isdigit() for value in timestamps):
+        raise GuestReplayIngestError(f"boards.{label}.moveTimestamps has an unexpected shape")
+    return {
+        "id": board_id,
+        "uuid": uuid,
+        "partner_uuid": partner_uuid,
+        "move_list": move_list,
+        "move_timestamps": move_timestamps,
+        "ply_count": ply_count,
+        "initial_fen": initial_fen,
+    }
+
+
+def _validated_guest_seat(player: dict[str, Any], seat: str) -> dict[str, Any]:
+    return {
+        "name": _required_string(player, "name", f"match.seats.{seat}"),
+        "rating": _required_int(player, "rating", f"match.seats.{seat}"),
+    }
+
+
+def _guest_initial_variant_fen(value: object) -> str:
+    if not isinstance(value, str):
+        raise GuestReplayIngestError("initialFen must be a string")
+    if value.strip().lower() in {"startpos", "standard"}:
+        return chess.variant.CrazyhouseBoard().fen()
+    try:
+        return chess.variant.CrazyhouseBoard(value.strip()).fen()
+    except (TypeError, ValueError) as exc:
+        raise GuestReplayIngestError("initialFen is invalid") from exc
+
+
+def _required_dict(container: dict[str, Any], key: str, path: str) -> dict[str, Any]:
+    value = container.get(key)
+    if not isinstance(value, dict):
+        raise GuestReplayIngestError(f"{path}.{key} must be an object")
+    return value
+
+
+def _required_string(container: dict[str, Any], key: str, path: str) -> str:
+    value = container.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise GuestReplayIngestError(f"{path}.{key} must be a non-empty string")
+    return value
+
+
+def _required_int(container: dict[str, Any], key: str, path: str) -> int:
+    value = container.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise GuestReplayIngestError(f"{path}.{key} must be an integer")
+    return value
+
+
+def _required_positive_int(container: dict[str, Any], key: str, path: str) -> int:
+    value = _required_int(container, key, path)
+    if value <= 0:
+        raise GuestReplayIngestError(f"{path}.{key} must be positive")
+    return value
 
 
 class AnalysisJobs:

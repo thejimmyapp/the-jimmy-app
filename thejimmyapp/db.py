@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime
@@ -59,6 +60,12 @@ class Database:
                     ON games(url);
                 CREATE INDEX IF NOT EXISTS idx_games_username_result
                     ON games(username, result);
+
+                CREATE TABLE IF NOT EXISTS guest_identities (
+                    guest_number INTEGER PRIMARY KEY AUTOINCREMENT,
+                    token TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL
+                );
 
                 CREATE TABLE IF NOT EXISTS import_runs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -824,6 +831,28 @@ class Database:
             cursor = conn.execute(sql, [record[column] for column in columns])
             conn.commit()
             return cursor.rowcount > 0
+
+    def create_guest_identity(self) -> tuple[int, str]:
+        token = secrets.token_urlsafe(32)
+        with closing(self.connect()) as conn:
+            cursor = conn.execute(
+                "INSERT INTO guest_identities (token, created_at) VALUES (?, ?)",
+                (token, _utc_now()),
+            )
+            conn.commit()
+        if cursor.lastrowid is None:
+            raise RuntimeError("guest identity allocation failed")
+        return int(cursor.lastrowid), token
+
+    def guest_number_for_token(self, token: str) -> int | None:
+        if not token:
+            return None
+        with closing(self.connect()) as conn:
+            row = conn.execute(
+                "SELECT guest_number FROM guest_identities WHERE token = ?",
+                (token,),
+            ).fetchone()
+        return int(row["guest_number"]) if row else None
 
     def record_import(
         self,
