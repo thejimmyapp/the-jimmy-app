@@ -1,4 +1,5 @@
 import type { BoardId, MatchSeat, ReviewLesson } from "./types";
+import { isMoveAddress } from "./extractionInput";
 
 const LEGACY_GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v1";
 const PRE_QUEST_GUEST_PROGRESS_KEY = "thejimmyapp.guestProgress.v2";
@@ -68,6 +69,7 @@ export type MomentGlyph = (typeof momentGlyphs)[number];
 
 export interface SavedMoment {
   serverId?: number;
+  moveToken?: string;
   matchIds: Record<BoardId, number>;
   ply: number;
   boardId: BoardId;
@@ -129,6 +131,7 @@ const isSavedMoment = (value: unknown): value is SavedMoment => {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<SavedMoment>;
   return (item.serverId === undefined || (Number.isSafeInteger(item.serverId) && Number(item.serverId) > 0))
+    && (item.moveToken === undefined || (typeof item.moveToken === "string" && isMoveAddress(item.moveToken)))
     && (item.alternativeMove === undefined || (typeof item.alternativeMove === "string" && item.alternativeMove.trim().length > 0))
     && Boolean(item.matchIds)
     && Number.isSafeInteger(item.matchIds?.A)

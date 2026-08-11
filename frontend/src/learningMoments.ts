@@ -1,4 +1,5 @@
 import type { MomentGlyph, SavedMoment } from "./guestProgress";
+import { isMoveAddress } from "./extractionInput";
 import type { BoardId, GamePayload, MatchSeat, NormalizedMatch } from "./types";
 
 export type MomentCapture = Pick<SavedMoment, "matchIds" | "ply" | "boardId" | "move" | "seat"> & { moveToken: string };
@@ -7,6 +8,29 @@ export const momentToken = (board: BoardId, localPly: number) => {
   if (!Number.isInteger(localPly) || localPly <= 0) return null;
   const boardToken = localPly % 2 === 1 ? board : board.toLowerCase();
   return `${Math.ceil(localPly / 2)}${boardToken}`;
+};
+
+export type MomentAddressResolution =
+  | { ok: true; globalPly: number }
+  | { ok: false; reason: "malformed" | "zero_frames" | "multiple_frames" };
+
+export const resolveMomentAddress = (game: GamePayload, moveAddress: string): MomentAddressResolution => {
+  if (!isMoveAddress(moveAddress)) return { ok: false, reason: "malformed" };
+  const matches = game.timeline.filter((frame) => (
+    frame.global_ply > 0
+    && frame.local_ply > 0
+    && momentToken(frame.board, frame.local_ply) === moveAddress
+  ));
+  if (matches.length === 0) return { ok: false, reason: "zero_frames" };
+  if (matches.length !== 1) return { ok: false, reason: "multiple_frames" };
+  return { ok: true, globalPly: matches[0].global_ply };
+};
+
+export const momentPermalinkPath = (bridgeGameId: number, moveAddress: string) => {
+  if (!Number.isSafeInteger(bridgeGameId) || bridgeGameId <= 0 || !isMoveAddress(moveAddress)) {
+    throw new Error("A stored bridge game id and canonical moment address are required.");
+  }
+  return `/?game=${bridgeGameId}&moment=${encodeURIComponent(moveAddress)}`;
 };
 
 export const captureMomentContext = (
