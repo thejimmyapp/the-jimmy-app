@@ -84,13 +84,10 @@ By default, the ZIP does not include:
 - local reports
 - Fairy-Stockfish executable
 
-To include Fairy-Stockfish in the ZIP:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build_portable_zip.ps1 -IncludeEngine
-```
-
-Only include the engine if you are allowed to redistribute that binary.
+The ZIP never includes the Fairy-Stockfish executable. That binary is GPL-3.0 and
+redistributing it would carry corresponding-source obligations we do not meet.
+Recipients install their own engine at `engines/fairy-stockfish.exe` per the
+Fairy-Stockfish section above.
 
 ## Troubleshooting
 
