@@ -37,6 +37,7 @@ _MAX_MATCHES_PER_SEED_PLAYER = 2
 _MIN_REPRESENTED_SEED_PLAYERS = 3
 _GUEST_MATCH_TARGET = 5
 _GUEST_FRESHNESS_WINDOWS_HOURS = (1, 3, 12, 48)
+_GUEST_ASSEMBLY_BUDGET_SECONDS = 20.0
 
 
 class MatchProxyDisabledError(RuntimeError):
@@ -257,6 +258,11 @@ class ChessComMatchupService:
             for candidate in candidates:
                 if examined >= self.settings.chesscom_guest_max_matches_examined:
                     break
+                if sum(
+                    item.seed_username.lower() == candidate.seed_username.lower()
+                    for item in qualified
+                ) >= _MAX_MATCHES_PER_SEED_PLAYER:
+                    continue
                 if candidate.numeric_id in processed_public_ids:
                     continue
                 if now - candidate.end_time > window_hours * 3600:
@@ -306,15 +312,17 @@ class ChessComMatchupService:
 
         selected: list[_QualifiedGuestMatch] | None = None
         selection_window_hours = _GUEST_FRESHNESS_WINDOWS_HOURS[0]
+        assembly_budget_exhausted = False
 
-        for username in usernames:
-            await collect_candidates(username)
-            await process_window(selection_window_hours)
-            selected = select_matches()
-            if selected:
-                break
+        async def assemble() -> None:
+            nonlocal seed_source, selected, selection_window_hours
+            for username in usernames:
+                await collect_candidates(username)
+                await process_window(selection_window_hours)
+                selected = select_matches()
+                if selected:
+                    return
 
-        if selected is None:
             leaderboard_usernames = await self._leaderboard_seed_usernames()
             known = {username.lower() for username in usernames}
             fallback_usernames = [username for username in leaderboard_usernames if username.lower() not in known]
@@ -325,15 +333,14 @@ class ChessComMatchupService:
                 await process_window(selection_window_hours)
                 selected = select_matches()
                 if selected:
-                    break
+                    return
 
-        logger.info(
-            "Guest matchup freshness window: hours=%d qualifying=%d selected=%d",
-            selection_window_hours,
-            len(qualified),
-            len(selected or []),
-        )
-        if selected is None:
+            logger.info(
+                "Guest matchup freshness window: hours=%d qualifying=%d selected=%d",
+                selection_window_hours,
+                len(qualified),
+                len(selected or []),
+            )
             for selection_window_hours in _GUEST_FRESHNESS_WINDOWS_HOURS[1:]:
                 await process_window(selection_window_hours)
                 selected = select_matches()
@@ -344,12 +351,38 @@ class ChessComMatchupService:
                     len(selected or []),
                 )
                 if selected:
-                    break
+                    return
 
-        if selected is None and currently_shown_ids:
-            selection_window_hours = _GUEST_FRESHNESS_WINDOWS_HOURS[-1]
-            await process_window(selection_window_hours, include_known_current=True)
-            selected = select_matches(include_current=True)
+            if currently_shown_ids:
+                selection_window_hours = _GUEST_FRESHNESS_WINDOWS_HOURS[-1]
+                await process_window(selection_window_hours, include_known_current=True)
+                selected = select_matches(include_current=True)
+
+        try:
+            async with asyncio.timeout(_GUEST_ASSEMBLY_BUDGET_SECONDS):
+                await assemble()
+        except TimeoutError:
+            assembly_budget_exhausted = True
+            logger.warning(
+                "Guest matchup assembly reached the %.1fs budget with %d validated matches",
+                _GUEST_ASSEMBLY_BUDGET_SECONDS,
+                len(qualified),
+            )
+
+        if selected is None and qualified:
+            partial_selection: list[_QualifiedGuestMatch] = []
+            per_player: dict[str, int] = {}
+            for item in qualified:
+                if item.was_currently_shown:
+                    continue
+                player_key = item.seed_username.lower()
+                if per_player.get(player_key, 0) >= _MAX_MATCHES_PER_SEED_PLAYER:
+                    continue
+                per_player[player_key] = per_player.get(player_key, 0) + 1
+                partial_selection.append(item)
+                if len(partial_selection) == _GUEST_MATCH_TARGET:
+                    break
+            selected = partial_selection or None
 
         excluded_total = sum(excluded.values())
         logger.info(
@@ -375,6 +408,8 @@ class ChessComMatchupService:
             "players_represented": players_represented,
             "seed_source": seed_source,
             "selection_window_hours": selection_window_hours,
+            "partial": len(selected) < _GUEST_MATCH_TARGET,
+            "assembly_budget_exhausted": assembly_budget_exhausted,
             "cached": False,
         }
 
