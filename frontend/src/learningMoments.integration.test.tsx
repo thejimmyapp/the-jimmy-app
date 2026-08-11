@@ -18,6 +18,7 @@ const apiMock = vi.hoisted(() => ({
   storeChessComGuestMatch: vi.fn(),
   createMoment: vi.fn(),
   deleteMoment: vi.fn(),
+  listMyMoments: vi.fn(),
   explorationMove: vi.fn(),
   explorationSanMove: vi.fn(),
 }));
@@ -135,6 +136,7 @@ describe("guest learning moment library", () => {
       serverMomentCount -= 1;
       return { deleted: true };
     });
+    apiMock.listMyMoments.mockResolvedValue({ moments: [] });
     apiMock.explorationMove.mockImplementation(async (request) => {
       if (request.dry_run) return { legal: true, legal_destinations: ["e3"] };
       const current = useCoachStore.getState();

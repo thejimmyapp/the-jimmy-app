@@ -1928,6 +1928,18 @@ button.onboarding-entry-node { cursor: pointer; }
 .guest-library-empty { min-height: 190px; display: grid; place-content: center; justify-items: center; gap: 8px; border: 1px dashed #304057; border-radius: 4px; color: #62758f; text-align: center; }
 .guest-library-empty strong { color: #aebed1; font-size: 13px; }
 .guest-library-empty span { font-size: 10px; }
+.guest-flashcard-deck { display: grid; gap: 12px; }
+.guest-flashcard { min-height: 190px; display: grid; align-items: stretch; border: 1px solid #3a5873; border-radius: 4px; background: #091522; box-shadow: inset 0 3px #2da0b2; }
+.guest-flashcard.is-flipped { border-color: #725b3d; box-shadow: inset 0 3px #d18b4d; }
+.guest-flashcard-face { display: grid; place-content: center; gap: 12px; padding: 28px; text-align: center; }
+.guest-flashcard-face strong { color: #edf6ff; font-size: 18px; }
+.guest-flashcard-face p { margin: 0; color: #b3c5d7; font-size: 13px; line-height: 1.5; }
+.guest-flashcard-face small { color: #8ca0b6; font-size: 10px; }
+.guest-flashcard-label { color: var(--cyan); font-size: 9px; font-weight: 900; letter-spacing: .14em; }
+.guest-flashcard-controls { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; }
+.guest-flashcard-controls span { color: #90a4ba; text-align: center; font-size: 10px; font-weight: 800; }
+.guest-flashcard-controls button { min-height: 34px; padding: 0 11px; border: 1px solid #35536c; border-radius: 3px; background: #102030; color: #c9d9e8; font-size: 10px; font-weight: 800; cursor: pointer; }
+.guest-flashcard-controls button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .guest-account-claim { display: grid; gap: 9px; padding: 14px 16px; border: 1px solid #31536a; border-radius: 4px; background: #0a1824; color: #b8cadc; font-size: 11px; }
 .guest-account-claim form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .guest-account-claim form > strong,.guest-account-claim form > label,.guest-account-claim form > span { grid-column: 1 / -1; }
