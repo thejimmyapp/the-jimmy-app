@@ -39,4 +39,15 @@ export default defineConfig({
       "/ws": { target: "ws://127.0.0.1:8000", ws: true },
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        app: new URL("./index.html", import.meta.url).pathname,
+        blocks: new URL("./src/blocks.tsx", import.meta.url).pathname,
+      },
+      output: {
+        entryFileNames: (chunk) => chunk.name === "blocks" ? "assets/blocks.js" : "assets/[name]-[hash].js",
+      },
+    },
+  },
 });
