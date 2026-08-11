@@ -176,7 +176,7 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, analysisCon
       <div className={`utility-pane moves-pane ${primaryTab === "review" && reviewTab === "moves" ? "active" : "inactive"}`} aria-hidden={!(primaryTab === "review" && reviewTab === "moves")}><Timeline variant="panel" activeBoard={activeBoard} boardFocusEnabled={boardFocusEnabled} onActiveBoardChange={changeBoardFocus} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} /></div>
       {primaryTab === "review" && reviewTab === "info" && <div className="utility-pane info-pane">{infoContent}</div>}
 
-      {primaryTab === "analysis" && <div className="utility-pane analysis-pane">{analysisContent}</div>}
+      <div className={`utility-pane analysis-pane ${primaryTab === "analysis" ? "active" : "inactive"}`} aria-hidden={primaryTab !== "analysis"}>{analysisContent}</div>
 
       {primaryTab === "games" && <div className="utility-pane games-pane">
         <div className="game-filters">

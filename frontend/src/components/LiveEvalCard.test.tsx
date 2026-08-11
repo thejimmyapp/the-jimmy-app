@@ -63,7 +63,7 @@ describe("LiveEvalCard", () => {
   it("defaults off and waits for a stable position before requesting analysis", async () => {
     const fetcher = vi.mocked(fetch);
     fetcher.mockResolvedValueOnce(submission("job-a")).mockResolvedValueOnce(completed("A", 137));
-    const view = render(<LiveEvalCard gameLoaded storedGameId={42} globalPly={14} board="A" boardName="First Board" position={position} />);
+    const view = render(<LiveEvalCard gameLoaded storedGameId={42} guestMatchId={null} globalPly={14} board="A" boardName="First Board" position={position} />);
 
     expect((screen.getByRole("checkbox", { name: "Enable" }) as HTMLInputElement).checked).toBe(false);
     await act(async () => { vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS * 2); await flush(); });
@@ -78,7 +78,7 @@ describe("LiveEvalCard", () => {
     expect(screen.getByText("1.37")).toBeTruthy();
     expect(screen.getByText("Analysed: First Board · Board A · ply 14")).toBeTruthy();
 
-    view.rerender(<LiveEvalCard gameLoaded storedGameId={42} globalPly={14} board="B" boardName="Second Board" position={position} />);
+    view.rerender(<LiveEvalCard gameLoaded storedGameId={42} guestMatchId={null} globalPly={14} board="B" boardName="Second Board" position={position} />);
     expect(screen.queryByText("1.37")).toBeNull();
   });
 
@@ -96,12 +96,12 @@ describe("LiveEvalCard", () => {
       return completed("B", 200);
     });
 
-    const view = render(<LiveEvalCard gameLoaded storedGameId={42} globalPly={14} board="A" boardName="First Board" position={position} />);
+    const view = render(<LiveEvalCard gameLoaded storedGameId={42} guestMatchId={null} globalPly={14} board="A" boardName="First Board" position={position} />);
     fireEvent.click(screen.getByRole("checkbox", { name: "Enable" }));
     await act(async () => { vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS); await flush(); });
     expect(fetcher).toHaveBeenCalledTimes(2);
 
-    view.rerender(<LiveEvalCard gameLoaded storedGameId={42} globalPly={14} board="B" boardName="Second Board" position={position} />);
+    view.rerender(<LiveEvalCard gameLoaded storedGameId={42} guestMatchId={null} globalPly={14} board="B" boardName="Second Board" position={position} />);
     await act(async () => { vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS); await flush(); });
     expect(fetcher).toHaveBeenCalledTimes(4);
     expect(screen.getByText("2.00")).toBeTruthy();
@@ -114,7 +114,7 @@ describe("LiveEvalCard", () => {
 
   it("explains an unstored replay without calling the engine", async () => {
     const fetcher = vi.mocked(fetch);
-    render(<LiveEvalCard gameLoaded storedGameId={null} globalPly={14} board="A" boardName="My Board" position={position} />);
+    render(<LiveEvalCard gameLoaded storedGameId={null} guestMatchId={null} globalPly={14} board="A" boardName="My Board" position={position} />);
 
     expect(screen.getByText("Analysis is unavailable because this replay has not been stored as a completed game.")).toBeTruthy();
     expect((screen.getByRole("checkbox", { name: "Enable" }) as HTMLInputElement).disabled).toBe(true);
@@ -128,12 +128,97 @@ describe("LiveEvalCard", () => {
       status: 429,
       headers: { "Content-Type": "application/json", "Retry-After": "12" },
     }));
-    render(<LiveEvalCard gameLoaded storedGameId={42} globalPly={14} board="A" boardName="First Board" position={position} />);
+    render(<LiveEvalCard gameLoaded storedGameId={42} guestMatchId={null} globalPly={14} board="A" boardName="First Board" position={position} />);
     fireEvent.click(screen.getByRole("checkbox", { name: "Enable" }));
     await act(async () => { vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS); await flush(); });
 
     expect(screen.getByText("The engine is at capacity. Try again in 12 seconds.")).toBeTruthy();
     await act(async () => { vi.advanceTimersByTime(60_000); await flush(); });
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores a guest match only after enable, shows preparation, then analyses with the cached internal id", async () => {
+    let resolveStore: ((response: Response) => void) | undefined;
+    const storeResponse = new Promise<Response>((resolve) => { resolveStore = resolve; });
+    let analysisCount = 0;
+    const fetcher = vi.mocked(fetch);
+    fetcher.mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/store")) return storeResponse;
+      if (url === "/api/analysis") {
+        const request = JSON.parse(String(init?.body)) as { game_id: number };
+        expect(request.game_id).toBe(73);
+        analysisCount += 1;
+        return submission(`job-${analysisCount}`);
+      }
+      return completed("A", 137);
+    });
+    render(<LiveEvalCard gameLoaded storedGameId={null} guestMatchId={180731271553} globalPly={14} board="A" boardName="My Board" position={position} />);
+
+    await act(async () => { vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS * 2); await flush(); });
+    expect(fetcher).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Enable" }));
+    await act(flush);
+    expect(screen.getByText("Preparing…")).toBeTruthy();
+    expect(screen.getByText("Preparing this guest game for analysis.")).toBeTruthy();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveStore?.(new Response(JSON.stringify({ game_id: 73 }), { status: 200, headers: { "Content-Type": "application/json" } }));
+      await flush();
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await act(async () => { vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS); await flush(); });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(screen.getByText("1.37")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Enable" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Enable" }));
+    await act(async () => { vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS); await flush(); });
+    expect(fetcher.mock.calls.filter(([input]) => String(input).endsWith("/store"))).toHaveLength(1);
+    expect(analysisCount).toBe(2);
+  });
+
+  it.each([
+    [409, "guest_identity_missing", "Analysis cannot be prepared because this guest has no identity cookie yet. Return to the guest landing page first."],
+    [422, "guest_replay_refused", "This game cannot be prepared for analysis because its replay failed validation."],
+    [500, "unexpected", "Analysis preparation failed. Turn analysis off and on to retry."],
+  ])("shows the distinct %i preparation failure without calling analysis", async (status, code, expectedMessage) => {
+    const fetcher = vi.mocked(fetch);
+    fetcher.mockResolvedValue(new Response(JSON.stringify({ detail: { code, message: "server detail" } }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    }));
+    render(<LiveEvalCard gameLoaded storedGameId={null} guestMatchId={180731271553} globalPly={14} board="A" boardName="My Board" position={position} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Enable" }));
+    await act(flush);
+
+    expect(screen.getByText("Preparation failed")).toBeTruthy();
+    expect(screen.getByText(expectedMessage)).toBeTruthy();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(fetcher.mock.calls[0][0])).toContain("/api/chesscom/matches/180731271553/store");
+  });
+
+  it("does not apply a late stored id to a newly selected guest game", async () => {
+    let resolveFirstStore: ((response: Response) => void) | undefined;
+    const firstStore = new Promise<Response>((resolve) => { resolveFirstStore = resolve; });
+    const fetcher = vi.mocked(fetch);
+    fetcher.mockImplementation(() => firstStore);
+    const view = render(<LiveEvalCard gameLoaded storedGameId={null} guestMatchId={101} globalPly={14} board="A" boardName="My Board" position={position} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Enable" }));
+    await act(flush);
+    expect(screen.getByText("Preparing…")).toBeTruthy();
+
+    view.rerender(<LiveEvalCard gameLoaded storedGameId={null} guestMatchId={202} globalPly={14} board="A" boardName="My Board" position={position} />);
+    expect((screen.getByRole("checkbox", { name: "Enable" }) as HTMLInputElement).checked).toBe(false);
+    await act(async () => {
+      resolveFirstStore?.(new Response(JSON.stringify({ game_id: 73 }), { status: 200, headers: { "Content-Type": "application/json" } }));
+      await flush();
+      vi.advanceTimersByTime(ANALYSIS_DEBOUNCE_MS * 2);
+      await flush();
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Analysed: My Board · Board A · ply 14")).toBeNull();
   });
 });

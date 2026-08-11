@@ -1362,9 +1362,12 @@ body { background: #050910; }
 .utility-secondary-tabs .chat-unread { position: absolute; right: 3px; top: 3px; }
 .utility-pane { min-width: 0; min-height: 0; flex: 1; overflow: auto; }
 .analysis-pane { padding: 12px; }
+.analysis-pane.inactive { display:none; }
 .live-eval-card { min-height: 100%; }
 .eval-card { min-height:100%;display:flex;flex-direction:column;gap:12px;padding:15px;border:1px solid var(--line);border-top:2px solid var(--cyan);border-radius:7px;background:#0a111d;color:#edf5ff; }
 .eval-card--failed { border-top-color:var(--coral); }
+.eval-card--prepare-failed { border-top-color:var(--coral); }
+.eval-card--preparing { border-top-color:var(--orange); }
 .eval-card--unsupported-variant { border-top-color:#e8b93c; }
 .eval-card__header { display:flex;justify-content:space-between;align-items:flex-start;gap:14px; }
 .eval-card__kicker { display:block;color:var(--cyan);font:9px Consolas,monospace;letter-spacing:.13em; }

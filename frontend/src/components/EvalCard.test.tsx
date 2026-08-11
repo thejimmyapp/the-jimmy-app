@@ -54,7 +54,9 @@ describe("EvalCard", () => {
 
   it.each([
     ["idle", "Idle"],
+    ["preparing", "Preparing…"],
     ["analysing", "Analysing…"],
+    ["prepare-failed", "Preparation failed"],
     ["failed", "Analysis failed"],
     ["unsupported-variant", "Unsupported variant"],
   ] as const)("renders the %s state without a fabricated numeric result", (status, label) => {

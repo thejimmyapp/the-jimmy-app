@@ -33,6 +33,8 @@ export const api = {
   resetGuestSession: () => json<GuestSessionIdentity>(fetch("/api/guests/reset", { method: "POST" })),
   chessComMatch: (gameId: number) => json<NormalizedMatch>(fetch(`/api/chesscom/matches/${gameId}`)),
   chessComMatchReplay: (gameId: number) => json<GuestMatchReplaySource>(fetch(`/api/chesscom/matches/${gameId}/replay`)),
+  storeChessComGuestMatch: (gameId: number) =>
+    json<{ game_id: number }>(fetch(`/api/chesscom/matches/${gameId}/store`, { method: "POST" })),
   guestMatchups: ({ refresh = false, excludeGameIds = [] }: { refresh?: boolean; excludeGameIds?: number[] } = {}) => {
     const params = new URLSearchParams();
     if (refresh) params.set("refresh", "true");
