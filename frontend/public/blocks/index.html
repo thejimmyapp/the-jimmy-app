@@ -19,10 +19,10 @@
   h1{font-size:22px;letter-spacing:.02em;margin-bottom:4px}
   .identifier-note{color:var(--cyan);font:11px var(--mono);margin-bottom:8px}
   .sub{color:var(--txt2);font-size:13px;margin-bottom:36px;max-width:720px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:28px}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;align-items:start}
   section{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px}
   section h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--cyan)}
-  .canonical-block-group{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:28px}
+  .canonical-block-group{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;align-items:start}
   .block{background:var(--bg2);border:1px solid var(--line);border-radius:10px}
   .block>summary{padding:20px;color:var(--cyan);font-size:13px;font-weight:650;text-transform:uppercase;letter-spacing:.09em;cursor:pointer}
   .block[open]>summary{padding-bottom:0;margin-bottom:14px}
@@ -146,7 +146,9 @@
   .specimen-intro{font-size:12px;color:var(--txt2);max-width:920px}
   .design-backlog-note{font-size:11.5px;color:var(--cyan);border-left:3px solid var(--cyan-dim);padding-left:10px;max-width:980px}
   .license-boundary{font-size:11.5px;color:#d7b966;border-left:3px solid #7a5a1e;padding-left:10px;max-width:980px}
-  .specimen{grid-column:1/-1;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  .specimen-group{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;align-items:start}
+  .specimen{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  .live-component{grid-column:1/-1}
   .specimen-head{padding:14px;cursor:pointer}
   .specimen[open]>.specimen-head{margin-bottom:10px}
   .specimen-body{padding:0 14px 14px}
@@ -154,8 +156,9 @@
   .specimen-title{font-size:13px;color:var(--cyan);font-weight:650}
   .temporary{flex:0 0 auto;color:#e8b93c;border:1px solid #7a5a1e;border-radius:999px;padding:2px 8px;font:10px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.06em}
   .specimen-copy{font-size:12px;color:var(--txt2);margin-bottom:10px;max-width:980px}
-  .specimen img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:6px;background:#fff}
-  .specimen-window{max-height:760px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#080d16}
+  .specimen-image-link{display:flex;justify-content:center;max-width:100%;max-height:420px;overflow:hidden;background:#080d16;cursor:zoom-in}
+  .specimen img{display:block;width:auto;max-width:100%;height:auto;max-height:420px;object-fit:contain;object-position:top center;border:1px solid var(--line);border-radius:6px;background:#fff}
+  .specimen-window{max-height:420px;overflow:hidden;border:1px solid var(--line);border-radius:6px;background:#080d16}
   .specimen-window img{border:0;border-radius:0}
   .specimen-meta{font-size:11px;color:var(--txt3);margin-top:9px}
   .eval-fixture-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
@@ -198,10 +201,14 @@
   .leave-timer__rate{display:block;margin-top:6px;color:var(--txt3);font-size:8px;letter-spacing:.03em}
   .leave-timer.is-accelerated{border-color:var(--red);border-top-color:var(--red)}
   .leave-timer.is-accelerated .leave-timer__kicker{color:var(--red)}
+  @media (min-width:1600px){
+    .grid,.canonical-block-group,.specimen-group{grid-template-columns:repeat(3,minmax(0,1fr))}
+  }
+  @media (max-width:899px){
+    .grid,.canonical-block-group,.specimen-group{grid-template-columns:minmax(0,1fr);gap:18px}
+  }
   @media (max-width:680px){
     body{padding:24px 16px 56px}
-    .grid{grid-template-columns:minmax(0,1fr);gap:18px}
-    .canonical-block-group{grid-template-columns:minmax(0,1fr);gap:18px}
     section{padding:16px}
     .temporary{display:inline-block;margin-top:7px}
     .source-matrix-head{display:block}
@@ -226,33 +233,7 @@
 
 <div class="grid">
 
-<details class="specimen" data-block="25" open>
-  <summary class="specimen-head">
-    <span class="specimen-title">25 · Loaded two-board Bughouse viewer</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">One loaded match keeps both boards, four player identities and ratings, clocks, pockets, paired navigation, a position-address URL, variations, and a position comment in one utilitarian surface. Target lesson only: retain the coupled-board context around a learning moment. The viewer's piece graphics have unclear provenance and must never migrate into the app.</p>
-      <img src="./specimens/specimen-25-bmacho-loaded-match.jpg" width="1300" height="896" loading="lazy" alt="bmacho Bughouse Viewer with match 180616071971 loaded, both boards visible, four players and ratings, clocks, pockets, paired controls, position URL, variations, and comment">
-      <p class="specimen-meta">Source: <a href="https://bmacho.github.io/bughouse-viewer/view.html?game_id=180616071971">bmacho Bughouse Viewer — match 180616071971</a> · Captured 2026-08-09 · Temporary structure reference only · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="21" open>
-  <summary class="specimen-head">
-    <span class="specimen-title">21 · Full analysis dock</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">Tab triplet, engine header, ranked eval lines, game result header, move classifications, per-move time bars, jump controls, and New/Save/Review footer form one vertically ordered dock. Target: the engine-card group and Moves-tab upgrade, rebuilt in project tokens.</p>
-      <div class="specimen-window"><img src="./specimens/specimen-21-analysis-panel.jpg" width="1265" height="3239" loading="lazy" alt="Tall Chess.com analysis dock with tabs, engine lines, classified move list, time bars, navigation, and action footer"></div>
-      <p class="specimen-meta">Source: <a href="https://www.chess.com/analysis/game/live/172758001776/analysis">Chess.com game analysis</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="12">
+<details class="specimen live-component" data-block="12" open>
   <summary class="specimen-head">
     <span class="specimen-title">12 · Engine eval-line row</span>
   </summary>
@@ -261,32 +242,6 @@
       <div id="eval-card-fixtures"><p class="specimen-meta">Loading eval-card fixtures…</p></div>
       <noscript><p class="specimen-meta">JavaScript is required to render the live eval-card fixtures.</p></noscript>
       <p class="specimen-meta">Fixture data only · The former screenshot remains in the specimen archive but is no longer rendered for block 12.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="13">
-  <summary class="specimen-head">
-    <span class="specimen-title">13 · Flashcard / study card</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">Board, numbered moves, personal prose annotation, replay controls, and share affordance. Target: a saved moment card combining a moment address, position, and the user's own written insight.</p>
-      <img src="./specimens/specimen-13-flashcard.jpg" width="1560" height="854" loading="lazy" alt="Chess study embed with board, numbered moves, prose annotation, navigation controls, and share control">
-      <p class="specimen-meta">Source: <a href="https://www.chess.com/blog/RyanTime/dear-lord-someone-please-explain-this-to-me-a-two-star-puzzle-rated-3600">RyanTime — “Dear Lord, someone please explain this to me”</a> · Owner-supplied capture · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="14">
-  <summary class="specimen-head">
-    <span class="specimen-title">14 · Lichess analysis module</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">UI of interest: a narrow, self-contained analysis column with pocket rails, engine status and controls, a deep content well, and compact bottom navigation. The structural lesson is modular stacking beside a primary board, not Lichess's graphics or skin.</p>
-      <div class="specimen-window"><img src="./specimens/specimen-14-lichess-analysis.png" width="1440" height="1000" loading="lazy" alt="Public Lichess Crazyhouse analysis page showing a chessboard and the modular engine and pocket column at right"></div>
-      <p class="specimen-meta">Source: <a href="https://lichess.org/analysis/crazyhouse">lichess.org/analysis/crazyhouse</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
 
   </div>
 </details>
@@ -429,6 +384,40 @@
 </details>
 </div>
 
+<section class="specimen-section" aria-labelledby="temporary-specimens">
+  <h2 id="temporary-specimens">13–25 · Screenshot specimens — temporary references</h2>
+    <p class="specimen-intro">Captured third-party UI is retained here only as a build target. These pixels never migrate into app components. Registry: 1–11 canonical · 12–16 Bv2 · 17–21 curated · 22–24 Bv2 annotation · 25 Bv2 paired viewer · next specimen is 26.</p>
+    <p class="design-backlog-note"><strong>Design backlog:</strong> block 13 to be redesigned as lichess-study × chess.com hybrid card (owner redline era).</p>
+    <p class="license-boundary"><strong>License boundary:</strong> Lichess code references are AGPL-3.0 and exist only as clearly headed excerpts in <code>docs/specimens/</code>. No Lichess code is embedded on this page or elsewhere under <code>frontend/</code> or <code>backend/</code>; any future feature must be reimplemented from behavior, never pasted.</p>
+</section>
+
+<div class="specimen-group">
+<details class="specimen" data-block="13">
+  <summary class="specimen-head">
+    <span class="specimen-title">13 · Flashcard / study card</span>
+  </summary>
+  <div class="specimen-body">
+    <span class="temporary">Temporary reference</span>
+      <p class="specimen-copy">Board, numbered moves, personal prose annotation, replay controls, and share affordance. Target: a saved moment card combining a moment address, position, and the user's own written insight.</p>
+      <a class="specimen-image-link" href="./specimens/specimen-13-flashcard.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 13"><img src="./specimens/specimen-13-flashcard.jpg" width="1560" height="854" loading="lazy" alt="Chess study embed with board, numbered moves, prose annotation, navigation controls, and share control"></a>
+      <p class="specimen-meta">Source: <a href="https://www.chess.com/blog/RyanTime/dear-lord-someone-please-explain-this-to-me-a-two-star-puzzle-rated-3600">RyanTime — “Dear Lord, someone please explain this to me”</a> · Owner-supplied capture · Do not migrate this asset.</p>
+
+  </div>
+</details>
+
+<details class="specimen" data-block="14">
+  <summary class="specimen-head">
+    <span class="specimen-title">14 · Lichess analysis module</span>
+  </summary>
+  <div class="specimen-body">
+    <span class="temporary">Temporary reference</span>
+      <p class="specimen-copy">UI of interest: a narrow, self-contained analysis column with pocket rails, engine status and controls, a deep content well, and compact bottom navigation. The structural lesson is modular stacking beside a primary board, not Lichess's graphics or skin.</p>
+      <div class="specimen-window"><a class="specimen-image-link" href="./specimens/specimen-14-lichess-analysis.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 14"><img src="./specimens/specimen-14-lichess-analysis.png" width="1440" height="1000" loading="lazy" alt="Public Lichess Crazyhouse analysis page showing a chessboard and the modular engine and pocket column at right"></a></div>
+      <p class="specimen-meta">Source: <a href="https://lichess.org/analysis/crazyhouse">lichess.org/analysis/crazyhouse</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
+
+  </div>
+</details>
+
 <details class="specimen" data-block="15">
   <summary class="specimen-head">
     <span class="specimen-title">15 · Chess.com notification settings patterns</span>
@@ -436,7 +425,7 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">UI of interest: notification categories as collapsible rows, one expanded category, global and per-event toggles, and explicit delivery-channel checkboxes. The reference is for hierarchy and state density only; icons, palette, type, and controls must be redrawn.</p>
-      <div class="specimen-window"><img src="./specimens/specimen-15-chesscom-notification-settings.png" width="1099" height="1647" loading="lazy" alt="Chess.com notification settings with category accordions, toggles, and web, mobile, and email channel checkboxes"></div>
+      <div class="specimen-window"><a class="specimen-image-link" href="./specimens/specimen-15-chesscom-notification-settings.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 15"><img src="./specimens/specimen-15-chesscom-notification-settings.png" width="1099" height="1647" loading="lazy" alt="Chess.com notification settings with category accordions, toggles, and web, mobile, and email channel checkboxes"></a></div>
       <p class="specimen-meta">Source: <a href="https://support.chess.com/en/articles/8618508-how-do-i-manage-my-notifications">Chess.com Help Center — How do I manage my notifications?</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
 
   </div>
@@ -449,7 +438,7 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">UI of interest: a light, sentence-case page H1 with generous separation from body copy, followed by a similarly weighted but smaller H2. Target: a restrained content hierarchy for reference and settings pages, rebuilt with project tokens.</p>
-      <div class="specimen-window"><img src="./specimens/specimen-16-lichess-typography-h1-h2.png" width="1280" height="900" loading="lazy" alt="Lichess About page showing the About lichess.org H1 and Press Kit H2 hierarchy"></div>
+      <div class="specimen-window"><a class="specimen-image-link" href="./specimens/specimen-16-lichess-typography-h1-h2.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 16"><img src="./specimens/specimen-16-lichess-typography-h1-h2.png" width="1280" height="900" loading="lazy" alt="Lichess About page showing the About lichess.org H1 and Press Kit H2 hierarchy"></a></div>
       <p class="specimen-meta">Source: <a href="https://lichess.org/about">lichess.org/about</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
 
   </div>
@@ -462,7 +451,7 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">Row anatomy combines variant and time-control cues, stacked opponents and results, a Review action, move count, date, favorite heart, and selection checkbox beneath a filter tab strip. Target: refine canonical block 5 and its flashcard-adjacent bookmark state.</p>
-      <img src="./specimens/specimen-17-archive-favorites-rows.jpg" width="1300" height="523" loading="lazy" alt="Chess.com Favorites archive with four game rows, player pairs, results, review buttons, dates, hearts, and checkboxes">
+      <a class="specimen-image-link" href="./specimens/specimen-17-archive-favorites-rows.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 17"><img src="./specimens/specimen-17-archive-favorites-rows.jpg" width="1300" height="523" loading="lazy" alt="Chess.com Favorites archive with four game rows, player pairs, results, review buttons, dates, hearts, and checkboxes"></a>
       <p class="specimen-meta">Source: <a href="https://www.chess.com/member/fearingforfreddy/games?activeTab=favorites">Chess.com Favorites archive</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
 
   </div>
@@ -475,7 +464,7 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">Type icon and label, rating with delta, blurred premium columns, row chevrons, and a Show More disclosure demonstrate dense statistics with visible-but-locked depth. Target: the Statistics STAGE without copying icons, blur treatment, or skin.</p>
-      <img src="./specimens/specimen-18-stats-table.jpg" width="1300" height="478" loading="lazy" alt="Chess.com player stats table with ratings, deltas, blurred premium columns, row chevrons, and Show More control">
+      <a class="specimen-image-link" href="./specimens/specimen-18-stats-table.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 18"><img src="./specimens/specimen-18-stats-table.jpg" width="1300" height="478" loading="lazy" alt="Chess.com player stats table with ratings, deltas, blurred premium columns, row chevrons, and Show More control"></a>
       <p class="specimen-meta">Source: <a href="https://www.chess.com/member/fearingforfreddy/stats">Chess.com member stats</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
 
   </div>
@@ -488,7 +477,7 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">The inactive player bar recedes through a dark clock face and reduced contrast while identity and rating remain readable. Pair with block 20 to document turn-state fading for Board A/B player bars.</p>
-      <img src="./specimens/specimen-19-clock-top.jpg" width="1300" height="87" loading="lazy" alt="Chess.com analysis player bar with an inactive dark one-minute clock">
+      <a class="specimen-image-link" href="./specimens/specimen-19-clock-top.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 19"><img src="./specimens/specimen-19-clock-top.jpg" width="1300" height="87" loading="lazy" alt="Chess.com analysis player bar with an inactive dark one-minute clock"></a>
       <p class="specimen-meta">Source: <a href="https://www.chess.com/analysis/game/live/172758001776/analysis">Chess.com game analysis</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
 
   </div>
@@ -501,7 +490,20 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">The active player bar makes the clock the brightest object while preserving the same identity strip. Together blocks 19–20 isolate the fade/brighten-by-turn behavior rather than a one-off visual state.</p>
-      <img src="./specimens/specimen-20-clock-bottom-active.jpg" width="1300" height="92" loading="lazy" alt="Chess.com analysis player bar with an active bright one-minute clock">
+      <a class="specimen-image-link" href="./specimens/specimen-20-clock-bottom-active.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 20"><img src="./specimens/specimen-20-clock-bottom-active.jpg" width="1300" height="92" loading="lazy" alt="Chess.com analysis player bar with an active bright one-minute clock"></a>
+      <p class="specimen-meta">Source: <a href="https://www.chess.com/analysis/game/live/172758001776/analysis">Chess.com game analysis</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
+
+  </div>
+</details>
+
+<details class="specimen" data-block="21">
+  <summary class="specimen-head">
+    <span class="specimen-title">21 · Full analysis dock</span>
+  </summary>
+  <div class="specimen-body">
+    <span class="temporary">Temporary reference</span>
+      <p class="specimen-copy">Tab triplet, engine header, ranked eval lines, game result header, move classifications, per-move time bars, jump controls, and New/Save/Review footer form one vertically ordered dock. Target: the engine-card group and Moves-tab upgrade, rebuilt in project tokens.</p>
+      <div class="specimen-window"><a class="specimen-image-link" href="./specimens/specimen-21-analysis-panel.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 21"><img src="./specimens/specimen-21-analysis-panel.jpg" width="1265" height="3239" loading="lazy" alt="Tall Chess.com analysis dock with tabs, engine lines, classified move list, time bars, navigation, and action footer"></a></div>
       <p class="specimen-meta">Source: <a href="https://www.chess.com/analysis/game/live/172758001776/analysis">Chess.com game analysis</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
 
   </div>
@@ -514,7 +516,7 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">The selected position carries authored prose with visible attribution and edit/delete affordances. Target lesson only: a learning-moment note belongs to one position in one game, rather than to the game as an unanchored whole.</p>
-      <img src="./specimens/specimen-22-lichess-position-comments.png" width="800" height="326" loading="lazy" alt="Historical Lichess study capture showing two comments attached to the selected move, each with author attribution and editing controls">
+      <a class="specimen-image-link" href="./specimens/specimen-22-lichess-position-comments.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 22"><img src="./specimens/specimen-22-lichess-position-comments.png" width="800" height="326" loading="lazy" alt="Historical Lichess study capture showing two comments attached to the selected move, each with author attribution and editing controls"></a>
       <p class="specimen-meta">Source: <a href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA">Lichess — Study chess, the lichess way</a> · Official historical capture · Temporary structure reference only · Do not migrate this asset.</p>
 
   </div>
@@ -527,7 +529,7 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">Move glyphs are compact, named choices: <strong>!</strong>, <strong>?</strong>, <strong>!!</strong>, <strong>??</strong>, and <strong>!?</strong>, alongside position and observation annotations. Target lesson only: the chosen glyph is position context for a learning moment, not decorative text.</p>
-      <img src="./specimens/specimen-23-lichess-glyph-picker.png" width="800" height="373" loading="lazy" alt="Historical Lichess study annotation picker with named move glyphs including good move, mistake, brilliant move, blunder, and interesting move">
+      <a class="specimen-image-link" href="./specimens/specimen-23-lichess-glyph-picker.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 23"><img src="./specimens/specimen-23-lichess-glyph-picker.png" width="800" height="373" loading="lazy" alt="Historical Lichess study annotation picker with named move glyphs including good move, mistake, brilliant move, blunder, and interesting move"></a>
       <p class="specimen-meta">Source: <a href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA">Lichess — Study chess, the lichess way</a> · Official historical capture · Temporary structure reference only · Do not migrate this asset.</p>
 
   </div>
@@ -540,18 +542,25 @@
   <div class="specimen-body">
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">A tightly cropped historical study view shows alternate continuations presented as sibling choices beneath the move panel at the current path. Target lesson only: related lines branch from a position and remain navigable as alternatives.</p>
-      <img src="./specimens/specimen-24-lichess-position-variations.png" width="220" height="470" loading="lazy" alt="Cropped historical Lichess study move panel with two alternate continuation choices attached below the current variation">
+      <a class="specimen-image-link" href="./specimens/specimen-24-lichess-position-variations.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 24"><img src="./specimens/specimen-24-lichess-position-variations.png" width="220" height="470" loading="lazy" alt="Cropped historical Lichess study move panel with two alternate continuation choices attached below the current variation"></a>
       <p class="specimen-meta">Source: <a href="https://lichess.org/forum/lichess-feedback/showing-of-possible-options-gone-from-studies">Lichess forum — Showing of possible options gone from studies</a> · Historical community capture, cropped to the variation control · Temporary structure reference only · Do not migrate this asset.</p>
 
   </div>
 </details>
 
-<section class="specimen-section" aria-labelledby="temporary-specimens">
-  <h2 id="temporary-specimens">12–25 · Screenshot specimens — temporary reference (R24)</h2>
-    <p class="specimen-intro">Captured third-party UI is retained here only as a build target. These pixels never migrate into app components. Registry: 1–11 canonical · 12–16 Bv2 · 17–21 curated · 22–24 Bv2 annotation · 25 Bv2 paired viewer · next specimen is 26.</p>
-    <p class="design-backlog-note"><strong>Design backlog:</strong> block 13 to be redesigned as lichess-study × chess.com hybrid card (owner redline era).</p>
-    <p class="license-boundary"><strong>License boundary:</strong> Lichess code references are AGPL-3.0 and exist only as clearly headed excerpts in <code>docs/specimens/</code>. No Lichess code is embedded on this page or elsewhere under <code>frontend/</code> or <code>backend/</code>; any future feature must be reimplemented from behavior, never pasted.</p>
-</section>
+<details class="specimen" data-block="25">
+  <summary class="specimen-head">
+    <span class="specimen-title">25 · Loaded two-board Bughouse viewer</span>
+  </summary>
+  <div class="specimen-body">
+    <span class="temporary">Temporary reference</span>
+      <p class="specimen-copy">One loaded match keeps both boards, four player identities and ratings, clocks, pockets, paired navigation, a position-address URL, variations, and a position comment in one utilitarian surface. Target lesson only: retain the coupled-board context around a learning moment. The viewer's piece graphics have unclear provenance and must never migrate into the app.</p>
+      <a class="specimen-image-link" href="./specimens/specimen-25-bmacho-loaded-match.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 25"><img src="./specimens/specimen-25-bmacho-loaded-match.jpg" width="1300" height="896" loading="lazy" alt="bmacho Bughouse Viewer with match 180616071971 loaded, both boards visible, four players and ratings, clocks, pockets, paired controls, position URL, variations, and comment"></a>
+      <p class="specimen-meta">Source: <a href="https://bmacho.github.io/bughouse-viewer/view.html?game_id=180616071971">bmacho Bughouse Viewer — match 180616071971</a> · Captured 2026-08-09 · Temporary structure reference only · Do not migrate this asset.</p>
+
+  </div>
+</details>
+</div>
 
 </div>
 
