@@ -181,6 +181,137 @@ def test_one_word_written_answer_saves_and_increments_server_count(tmp_path, mon
     assert len(service.list_public_moments()) == 1
 
 
+def test_reaching_three_stamps_one_completion_and_fourth_preserves_ordinal(tmp_path, monkeypatch) -> None:
+    service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        for index in range(2):
+            assert _create(client, game_id, written_answer=f"moment {index + 1}").status_code == 201
+        below = client.post("/api/guests")
+        third = _create(client, game_id, written_answer="moment 3")
+        completed = client.post("/api/guests")
+        with service.db.connect() as conn:
+            first_completion = dict(
+                conn.execute(
+                    "SELECT * FROM guest_completions WHERE guest_number = 1"
+                ).fetchone()
+            )
+        fourth = _create(client, game_id, written_answer="moment 4")
+        after_fourth = client.post("/api/guests")
+        with service.db.connect() as conn:
+            completion_rows = [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT * FROM guest_completions ORDER BY completion_ordinal"
+                ).fetchall()
+            ]
+            sequence_sql = conn.execute(
+                """
+                SELECT sql
+                FROM sqlite_master
+                WHERE type = 'table' AND name = 'guest_completion_sequence'
+                """
+            ).fetchone()["sql"]
+            sequence_count = conn.execute(
+                "SELECT COUNT(*) AS total FROM guest_completion_sequence"
+            ).fetchone()["total"]
+            completion_foreign_keys = conn.execute(
+                "PRAGMA foreign_key_list(guest_completions)"
+            ).fetchall()
+
+    assert below.json()["completions_to_date"] == 0
+    assert below.json()["completed"] is False
+    assert below.json()["completion_ordinal"] is None
+    assert third.status_code == 201
+    assert completed.json()["completions_to_date"] == 1
+    assert completed.json()["completed"] is True
+    assert completed.json()["completion_ordinal"] == 1
+    assert first_completion["completed_at"]
+    assert first_completion["completion_ordinal"] == 1
+    assert fourth.status_code == 201
+    assert after_fourth.json()["completion_ordinal"] == 1
+    assert completion_rows == [first_completion]
+    assert "INTEGER PRIMARY KEY AUTOINCREMENT" in sequence_sql
+    assert sequence_count == 1
+    assert [(row["table"], row["from"], row["to"]) for row in completion_foreign_keys] == [
+        ("guest_identities", "guest_number", "guest_number")
+    ]
+
+
+def test_two_guests_receive_distinct_increasing_completion_ordinals(tmp_path, monkeypatch) -> None:
+    service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        for index in range(3):
+            assert _create(client, game_id, written_answer=f"guest 1 moment {index + 1}").status_code == 201
+        first_status = client.post("/api/guests")
+        reset = client.post("/api/guests/reset")
+        for index in range(3):
+            assert _create(client, game_id, written_answer=f"guest 2 moment {index + 1}").status_code == 201
+        second_status = client.post("/api/guests")
+        with service.db.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT guest_number, completion_ordinal
+                FROM guest_completions
+                ORDER BY completion_ordinal
+                """
+            ).fetchall()
+
+    assert first_status.json()["completions_to_date"] == 1
+    assert first_status.json()["completion_ordinal"] == 1
+    assert reset.json()["guest_number"] == 2
+    assert reset.json()["completed"] is False
+    assert reset.json()["completion_ordinal"] is None
+    assert second_status.json()["completions_to_date"] == 2
+    assert second_status.json()["completed"] is True
+    assert second_status.json()["completion_ordinal"] == 2
+    assert [(row["guest_number"], row["completion_ordinal"]) for row in rows] == [(1, 1), (2, 2)]
+
+
+def test_deleting_below_three_leaves_completion_permanent(tmp_path, monkeypatch) -> None:
+    service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        created = [
+            _create(client, game_id, written_answer=f"moment {index + 1}")
+            for index in range(3)
+        ]
+        before_delete = client.post("/api/guests")
+        deleted = client.delete(
+            f"/api/moments/{created[0].json()['private_moment']['id']}"
+        )
+        after_delete = client.post("/api/guests")
+
+    assert all(response.status_code == 201 for response in created)
+    assert before_delete.json()["completion_ordinal"] == 1
+    assert deleted.status_code == 200
+    assert after_delete.json()["saved_moment_count"] == 2
+    assert after_delete.json()["completions_to_date"] == 1
+    assert after_delete.json()["completed"] is True
+    assert after_delete.json()["completion_ordinal"] == 1
+    assert service.db.guest_completion_count() == 1
+
+
+def test_guest_completion_status_fails_closed_with_best_effort_count(tmp_path, monkeypatch) -> None:
+    service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        for index in range(3):
+            assert _create(client, game_id, written_answer=f"moment {index + 1}").status_code == 201
+
+        def fail_completion_status(_guest_number: int) -> dict[str, object]:
+            raise RuntimeError("completion status unavailable")
+
+        monkeypatch.setattr(service, "guest_completion_status", fail_completion_status)
+        session = client.post("/api/guests")
+
+    assert session.status_code == 200
+    assert session.json()["completions_to_date"] == 1
+    assert session.json()["completed"] is False
+    assert session.json()["completion_ordinal"] is None
+
+
 def test_editing_private_copy_leaves_public_copy_byte_identical(tmp_path, monkeypatch) -> None:
     service, client, game_id = _client_with_game(tmp_path, monkeypatch)
 

@@ -13,6 +13,7 @@ from thejimmyapp.versioning import ANALYSIS_VERSION
 
 
 DAILY_NOTE_CAP = 10
+QUEST_TARGET_MOMENTS = 3
 
 
 class DailyMomentCapReached(RuntimeError):
@@ -94,6 +95,16 @@ class Database:
                     guest_number INTEGER PRIMARY KEY AUTOINCREMENT,
                     token TEXT NOT NULL UNIQUE,
                     created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS guest_completion_sequence (
+                    value INTEGER PRIMARY KEY AUTOINCREMENT
+                );
+
+                CREATE TABLE IF NOT EXISTS guest_completions (
+                    guest_number INTEGER PRIMARY KEY REFERENCES guest_identities(guest_number),
+                    completed_at TEXT NOT NULL,
+                    completion_ordinal INTEGER NOT NULL UNIQUE CHECK(completion_ordinal > 0)
                 );
 
                 CREATE TABLE IF NOT EXISTS moment_save_sequence (
@@ -1005,6 +1016,55 @@ class Database:
                 )
                 if private_cursor.lastrowid is None or public_cursor.lastrowid is None:
                     raise RuntimeError("moment copies were not both stored")
+                private_moment_count = conn.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM private_moments
+                    WHERE author_guest_number = ?
+                    """,
+                    (moment["author_guest_number"],),
+                ).fetchone()
+                existing_completion = conn.execute(
+                    """
+                    SELECT completion_ordinal
+                    FROM guest_completions
+                    WHERE guest_number = ?
+                    """,
+                    (moment["author_guest_number"],),
+                ).fetchone()
+                if (
+                    private_moment_count
+                    and int(private_moment_count["total"]) >= QUEST_TARGET_MOMENTS
+                    and existing_completion is None
+                ):
+                    completion_sequence = conn.execute(
+                        "INSERT INTO guest_completion_sequence DEFAULT VALUES"
+                    )
+                    if completion_sequence.lastrowid is None:
+                        raise RuntimeError("completion ordering allocation failed")
+                    conn.execute(
+                        """
+                        INSERT OR IGNORE INTO guest_completions (
+                            guest_number, completed_at, completion_ordinal
+                        )
+                        VALUES (?, ?, ?)
+                        """,
+                        (
+                            moment["author_guest_number"],
+                            now,
+                            int(completion_sequence.lastrowid),
+                        ),
+                    )
+                    stored_completion = conn.execute(
+                        """
+                        SELECT completion_ordinal
+                        FROM guest_completions
+                        WHERE guest_number = ?
+                        """,
+                        (moment["author_guest_number"],),
+                    ).fetchone()
+                    if stored_completion is None:
+                        raise RuntimeError("guest completion was not stored")
                 private_row = conn.execute(
                     f"SELECT {_MOMENT_SELECT} FROM private_moments WHERE id = ?",
                     (private_cursor.lastrowid,),
@@ -1043,6 +1103,37 @@ class Database:
                 WHERE author_guest_number = ?
                 """,
                 (author_guest_number,),
+            ).fetchone()
+        return int(row["total"]) if row else 0
+
+    def guest_completion_status(self, guest_number: int) -> dict[str, object]:
+        with closing(self.connect()) as conn:
+            total_row = conn.execute(
+                "SELECT COUNT(*) AS total FROM guest_completions"
+            ).fetchone()
+            completion_row = conn.execute(
+                """
+                SELECT completion_ordinal
+                FROM guest_completions
+                WHERE guest_number = ?
+                """,
+                (guest_number,),
+            ).fetchone()
+        completion_ordinal = (
+            int(completion_row["completion_ordinal"])
+            if completion_row is not None
+            else None
+        )
+        return {
+            "completions_to_date": int(total_row["total"]) if total_row else 0,
+            "completed": completion_ordinal is not None,
+            "completion_ordinal": completion_ordinal,
+        }
+
+    def guest_completion_count(self) -> int:
+        with closing(self.connect()) as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS total FROM guest_completions"
             ).fetchone()
         return int(row["total"]) if row else 0
 
