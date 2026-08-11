@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { LogIn, UserRound, Volume2, VolumeX } from "lucide-react";
-import { CLICK_ME_COPY, landingHeadline, SIGN_IN_COPY, SIGN_IN_NOTICE, SUB_CARD_COPY, type GuestSessionIdentity } from "../guestChrome";
+import { CLICK_ME_COPY, landingHeadline, landingSubcopy, SIGN_IN_COPY, SIGN_IN_NOTICE, SUB_CARD_COPY, type GuestSessionIdentity } from "../guestChrome";
 import { formatWordVertigoCountdown, WORD_VERTIGO_BASE_CHARACTER_MS, WORD_VERTIGO_SECONDS, WORD_VERTIGO_SPEEDS, wordVertigoBlurb } from "../wordVertigo";
 
 interface Props extends GuestSessionIdentity {
@@ -154,6 +154,7 @@ export function OnboardingMap({ guest_number, total_guests, completions_to_date,
       <div className="onboarding-entry-copy" inert={active || undefined} aria-hidden={active || undefined}>
         <span>THE JIMMY APP</span>
         <h1>{landingHeadline({ guest_number, total_guests, completions_to_date })}</h1>
+        <p>{landingSubcopy({ guest_number, total_guests, completions_to_date })}</p>
       </div>
       <div className="onboarding-entry-nodes">
         <button ref={guestRef} type="button" className="onboarding-entry-node guest-entry-node" onClick={onGuestSpawn} inert={active || undefined} aria-hidden={active || undefined}>

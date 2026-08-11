@@ -174,7 +174,8 @@ describe("URL-first exact review", () => {
 
   it("renders real guest counters and opens the keyboard-reachable countdown panel", async () => {
     renderApp();
-    expect(await screen.findByRole("heading", { name: "Salutations, SirGuest#13! 0 of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Salutations, SirGuest#13!" })).toBeTruthy();
+    expect(screen.getByText("0 of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.")).toBeTruthy();
     const libraryButton = screen.getByRole("button", { name: "Open flashcard library" });
     libraryButton.focus();
     fireEvent.click(libraryButton);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLICK_ME_COPY, landingHeadline, SIGN_IN_COPY, SIGN_IN_NOTICE, SUB_CARD_COPY } from "./guestChrome";
+import { CLICK_ME_COPY, landingHeadline, landingSubcopy, SIGN_IN_COPY, SIGN_IN_NOTICE, SUB_CARD_COPY } from "./guestChrome";
 
 describe("owner-approved guest chrome copy", () => {
   it("keeps every final static string byte-identical", () => {
@@ -10,14 +10,20 @@ describe("owner-approved guest chrome copy", () => {
   });
 
   it("substitutes the three counter values without rendering spec brackets", () => {
-    const rendered = landingHeadline({ guest_number: 13, total_guests: 13, completions_to_date: 0 });
+    const identity = { guest_number: 13, total_guests: 13, completions_to_date: 0 };
+    const headline = landingHeadline(identity);
+    const subcopy = landingSubcopy(identity);
+    const rendered = `${headline} ${subcopy}`;
+    expect(headline).toBe("Salutations, SirGuest#13!");
+    expect(subcopy).toBe("0 of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.");
     expect(rendered).toBe("Salutations, SirGuest#13! 0 of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss.");
     expect(rendered).not.toContain("[");
     expect(rendered).not.toContain("]");
   });
 
   it("renders zero for every unavailable landing value", () => {
-    const rendered = landingHeadline({ guest_number: 0, total_guests: 0, completions_to_date: 0 });
+    const identity = { guest_number: 0, total_guests: 0, completions_to_date: 0 };
+    const rendered = `${landingHeadline(identity)} ${landingSubcopy(identity)}`;
     expect(rendered).toContain("SirGuest#0! 0 of 0 visitors");
     expect(rendered).toContain("new name, SirGuest#0.");
     expect(rendered).not.toContain("[");

@@ -192,7 +192,8 @@ describe("guest learning moment library", () => {
     expect(restarted.firstGameOpened).toBe(false);
     expect(restarted.savedMoments).toHaveLength(0);
     expect(restarted.questDeadline).toBeGreaterThan(Date.now());
-    expect(screen.getByRole("heading", { name: "Salutations, SirGuest#14! 0 of 14 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#15. Mwahaha! Kittens and cookies! Mwahaha, yessss." })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Salutations, SirGuest#14!" })).toBeTruthy();
+    expect(screen.getByText("0 of 14 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#15. Mwahaha! Kittens and cookies! Mwahaha, yessss.")).toBeTruthy();
   });
 
   it("completes the quest after three moments saved from one guest game", async () => {
