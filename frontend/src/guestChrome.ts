@@ -15,7 +15,10 @@ export const SIGN_IN_COPY = "Do not sign in. Instead, be amazed by an obscure lo
 export const SIGN_IN_NOTICE = "Account registration is currently unavailable. Coming soon.";
 export const SUB_CARD_COPY = "The timer has started. You shouldn't still be clicking. Are you clicking? Stop clicking.";
 
-export const landingHeadline = ({ guest_number, total_guests, completions_to_date }: GuestSessionIdentity) => {
+export const landingHeadline = ({ guest_number }: GuestSessionIdentity) =>
+  `Salutations, SirGuest#${guest_number}!`;
+
+export const landingSubcopy = ({ guest_number, total_guests, completions_to_date }: GuestSessionIdentity) => {
   const nextGuestNumber = guest_number > 0 ? guest_number + 1 : 0;
-  return `Salutations, SirGuest#${guest_number}! ${completions_to_date} of ${total_guests} visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#${nextGuestNumber}. Mwahaha! Kittens and cookies! Mwahaha, yessss.`;
+  return `${completions_to_date} of ${total_guests} visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#${nextGuestNumber}. Mwahaha! Kittens and cookies! Mwahaha, yessss.`;
 };
