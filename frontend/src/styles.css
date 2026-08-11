@@ -1395,6 +1395,18 @@ body { background: #050910; }
 .eval-card__pockets code { color:var(--cyan);font:11px Consolas,monospace; }
 .eval-card__context { margin:0;padding:9px 10px;border-left:3px solid #287385;background:#24d6e80f;color:#a7b8cc;font-size:10.5px;line-height:1.5; }
 .eval-card__footer { margin-top:auto;padding-top:9px;border-top:1px solid var(--line);color:#71839c;font:9px Consolas,monospace; }
+.fake-stockfish__refusal { display:grid;gap:14px;padding:14px;border:1px solid #6f3140;border-radius:6px;background:#2a1019;color:#ffdce1; }
+.fake-stockfish__refusal p { margin:0;font-size:13px;font-weight:750;line-height:1.55; }
+.fake-stockfish__pulse-slot { min-height:46px;display:grid;place-items:center; }
+.fake-stockfish__pulse { color:#ff465e;font:900 34px/1 Consolas,monospace;text-shadow:0 0 18px #ff465ecc;animation:fake-stockfish-debt-pulse 2s ease-out both; }
+.fake-stockfish__debt { display:grid;gap:3px;padding:9px 10px;border:1px solid #6f3140;border-radius:5px;background:#1b0d13;color:#ff9cab; }
+.fake-stockfish__debt strong { font:700 11px/1.4 Consolas,monospace; }
+.fake-stockfish__debt span { color:#b97e88;font-size:9px;line-height:1.4; }
+.fake-stockfish__loop { position:relative;width:154px;height:50px;overflow:hidden;border:1px solid #53647d;border-radius:5px;background:#090d15;isolation:isolate; }
+.fake-stockfish__loop-trail { position:absolute;inset:-14px -60px;background:repeating-linear-gradient(0deg,#ff4766 0 7px,#ffad3d 7px 14px,#ffe75a 14px 21px,#63e67d 21px 28px,#4bcfff 28px 35px,#a66bff 35px 42px);filter:saturate(1.4);animation:fake-stockfish-loop .32s linear infinite; }
+.fake-stockfish__loop strong { position:absolute;z-index:1;inset:7px;display:grid;place-items:center;padding:3px;background:#080d16e8;color:#fff;font:800 8px/1.25 Consolas,monospace;text-align:center;letter-spacing:.02em; }
+@keyframes fake-stockfish-debt-pulse { 0%{opacity:0;transform:scale(.35)} 35%{opacity:1;transform:scale(1.18)} 100%{opacity:.25;transform:scale(.92)} }
+@keyframes fake-stockfish-loop { from{transform:translateX(-28px) skewX(-12deg)} to{transform:translateX(28px) skewX(12deg)} }
 .moves-pane.inactive { position: absolute; inset: 112px 0 0; visibility: hidden; pointer-events: none; }
 .board-pane { padding: var(--grid-y) var(--grid-x); }
 .board-pane:not(.active) { position: absolute; inset: 112px 0 0; visibility: hidden; pointer-events: none; }
