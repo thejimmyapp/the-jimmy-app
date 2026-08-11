@@ -106,16 +106,34 @@ def _set_guest_identity_cookie(response: Response, identity_token: str) -> None:
 
 
 async def _guest_session_payload(guest_number: int) -> dict[str, object]:
-    total_guests, saved_moment_count = await asyncio.gather(
+    total_guests, saved_moment_count, completion_payload = await asyncio.gather(
         asyncio.to_thread(games.guest_identity_count),
         asyncio.to_thread(games.saved_moment_count, guest_number),
+        _guest_completion_payload(guest_number),
     )
     return {
         "guest_number": guest_number,
         "total_guests": total_guests,
-        "completions_to_date": None,
         "saved_moment_count": saved_moment_count,
         "analysis_unlocked": saved_moment_count >= ENGINE_UNLOCK_MOMENT_COUNT,
+        **completion_payload,
+    }
+
+
+async def _guest_completion_payload(guest_number: int) -> dict[str, object]:
+    try:
+        return await asyncio.to_thread(games.guest_completion_status, guest_number)
+    except Exception as exc:
+        logger.warning("Guest completion status failed closed: %s", exc)
+    try:
+        completions_to_date = await asyncio.to_thread(games.guest_completion_count)
+    except Exception as exc:
+        logger.warning("Guest completion count fallback failed: %s", exc)
+        completions_to_date = 0
+    return {
+        "completions_to_date": completions_to_date,
+        "completed": False,
+        "completion_ordinal": None,
     }
 
 
