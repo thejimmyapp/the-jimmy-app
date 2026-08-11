@@ -232,7 +232,7 @@
   .learning-moment__answer{padding:12px!important;border:1px solid var(--line)!important;border-radius:6px!important;background:var(--panel)!important}
   .learning-moment__answer p{margin-top:6px;color:var(--txt2);font-size:12px;line-height:1.65;overflow-wrap:anywhere}
   .glyph-picker{min-width:0;padding:13px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--txt)}
-  .glyph-picker:focus-visible,.glyph-picker select:focus-visible,.wizard-step button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+  .glyph-picker:focus-visible,.glyph-picker select:focus-visible,.wizard-step button:focus-visible,.wizard-step textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
   .glyph-picker[disabled]{opacity:.45}
   .glyph-picker legend{padding:0 5px;color:var(--cyan);font:10px var(--mono);letter-spacing:.1em;text-transform:uppercase}
   .glyph-picker__instruction{margin-bottom:8px;color:var(--txt2);font-size:11px}
@@ -264,7 +264,14 @@
   .wizard-step__selection{color:var(--cyan)!important;font:13px var(--mono)!important}
   .wizard-step__back{position:absolute;top:12px;right:12px;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg2);color:var(--txt2);font:9px var(--mono);cursor:pointer}
   .wizard-step--glyph .glyph-picker{margin-top:10px}
-  .wizard-step--future{min-height:76px}
+  .wizard-step__board-moves{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:11px}
+  .wizard-step__board-moves button{display:grid;gap:2px;padding:10px;border:1px solid var(--line);border-radius:5px;background:var(--bg2);color:var(--txt);text-align:left;cursor:pointer}
+  .wizard-step__board-moves button.is-selected{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan-dim);background:rgba(53,200,232,.08)}
+  .wizard-step__board-moves span{color:var(--txt3);font:8px var(--mono);letter-spacing:.08em}
+  .wizard-step__board-moves strong{color:var(--cyan);font:13px var(--mono)}
+  .wizard-step__answer-field{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start;margin-top:11px;padding:9px 10px;border:1px solid var(--line);border-radius:5px;background:var(--bg2)}
+  .wizard-step__answer-field>span{padding-top:7px;color:var(--cyan);font:600 12px var(--mono)}
+  .wizard-step__answer-field textarea{min-height:72px;resize:vertical;padding:7px 8px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--txt);font:12px/1.5 var(--sans)}
   .leave-timer{position:fixed;top:14px;right:14px;z-index:9999;width:194px;padding:11px 12px 10px;border:1px solid #7a5a1e;border-top:2px solid #e8b93c;border-radius:7px;background:rgba(8,13,22,.94);box-shadow:0 10px 32px rgba(0,0,0,.42);font-family:var(--mono);pointer-events:none;backdrop-filter:blur(8px)}
   .leave-timer[hidden]{display:none}
   .leave-timer__kicker{display:block;margin-bottom:6px;color:#e8b93c;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
@@ -355,7 +362,7 @@
     <span class="specimen-title">wizard shell (unnumbered, pending block assignment)</span>
   </summary>
   <div class="specimen-body">
-      <p class="specimen-copy">Fixture harness for locked annotation steps 1 and 2. Steps 3 and 4 are visible inert placeholders; there is no save, submit, or persistence path.</p>
+      <p class="specimen-copy">Fixture harness for locked annotation steps 1–4. The alternative is played through board-action fixtures and the written answer is the only free text; there is no save, submit, or persistence path.</p>
       <div id="wizard-shell-fixture"><p class="specimen-meta">Loading wizard-shell fixture…</p></div>
       <noscript><p class="specimen-meta">JavaScript is required to render the wizard-shell fixture.</p></noscript>
   </div>

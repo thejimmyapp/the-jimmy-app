@@ -192,7 +192,7 @@ function WizardShellFixture() {
     { token: "17A", move: "Nxf7" },
     { token: "17B", move: "Q@h4" },
     { token: "18A", move: "P@f7+" },
-  ]} />;
+  ]} alternative_move_options={["Q@h5", "N@g5", "Bxf7+"]} />;
 }
 
 const root = document.getElementById("eval-card-fixtures");

@@ -9,27 +9,45 @@ export interface WizardMoveOption {
 
 export interface AnnotationWizardShellProps {
   move_options: WizardMoveOption[];
+  alternative_move_options: string[];
 }
 
-export function AnnotationWizardShell({ move_options }: AnnotationWizardShellProps) {
+const STEP_FOUR_PROMPTS: Record<MomentGlyph, string> = {
+  "!": "Show a move you might have played instead — and why it's worse.",
+  "?": "What should they have played, and what did they miss?",
+  "!!": "What makes this one hard to find?",
+  "??": "What's the punishment?",
+  "!?": "What risk did they accept?",
+  "?!": "What's the safer option?",
+};
+
+export function AnnotationWizardShell({ move_options, alternative_move_options }: AnnotationWizardShellProps) {
   const [selectedMove, setSelectedMove] = useState<WizardMoveOption | null>(null);
   const [glyph, setGlyph] = useState<MomentGlyph | null>(null);
+  const [alternativeMove, setAlternativeMove] = useState<string | null>(null);
+  const [answer, setAnswer] = useState("");
 
   const chooseMove = (move: WizardMoveOption) => {
     setSelectedMove(move);
     setGlyph(null);
+    setAlternativeMove(null);
+    setAnswer("");
   };
 
   const changeMove = () => {
     setSelectedMove(null);
     setGlyph(null);
+    setAlternativeMove(null);
+    setAnswer("");
   };
 
+  const currentStep = alternativeMove ? 4 : glyph ? 3 : selectedMove ? 2 : 1;
+
   return (
-    <article className="annotation-wizard" aria-label="Learning moment wizard steps 1 and 2">
+    <article className="annotation-wizard" aria-label="Learning moment wizard steps 1 through 4">
       <header className="annotation-wizard__header">
         <span>LEARNING MOMENT WIZARD</span>
-        <strong>{glyph ? "2" : selectedMove ? "2" : "1"} of 4</strong>
+        <strong>{currentStep} of 4</strong>
       </header>
 
       <section className={`wizard-step wizard-step--move ${selectedMove ? "is-complete" : "is-active"}`} aria-labelledby="wizard-step-1-title">
@@ -59,6 +77,7 @@ export function AnnotationWizardShell({ move_options }: AnnotationWizardShellPro
         className={`wizard-step wizard-step--glyph ${selectedMove ? "is-active" : "is-locked"}`}
         aria-labelledby="wizard-step-2-title"
         aria-disabled={!selectedMove}
+        aria-hidden={!selectedMove}
         inert={!selectedMove || undefined}
       >
         <span className="wizard-step__number">step 2 of 4 · required</span>
@@ -66,16 +85,50 @@ export function AnnotationWizardShell({ move_options }: AnnotationWizardShellPro
         <GlyphPicker value={glyph} onChange={setGlyph} disabled={!selectedMove} label="Required move glyph" />
       </section>
 
-      <section className="wizard-step wizard-step--future is-locked" aria-disabled="true" inert>
-        <span className="wizard-step__number">step 3 of 4</span>
-        <h3>Alternative move</h3>
-        <p>Placeholder — not available in this shell.</p>
+      <section
+        className={`wizard-step wizard-step--alternative ${glyph ? (alternativeMove ? "is-complete" : "is-active") : "is-locked"}`}
+        aria-labelledby="wizard-step-3-title"
+        aria-disabled={!glyph}
+        aria-hidden={!glyph}
+        inert={!glyph || undefined}
+      >
+        <span className="wizard-step__number">step 3 of 4 · required</span>
+        <h3 id="wizard-step-3-title">Instead, play {alternativeMove ?? "___"}</h3>
+        <p>Interesting move for sure! Next you're required to give one relevant alternative move. Relax don't overthink it you're halfway done.</p>
+        <div className="wizard-step__board-moves" role="group" aria-label="Play one alternative move on the board">
+          {alternative_move_options.map((move) => (
+            <button
+              type="button"
+              className={alternativeMove === move ? "is-selected" : undefined}
+              aria-pressed={alternativeMove === move}
+              onClick={() => setAlternativeMove(move)}
+              key={move}
+            >
+              <span aria-hidden="true">BOARD</span>
+              <strong>{move}</strong>
+            </button>
+          ))}
+        </div>
       </section>
 
-      <section className="wizard-step wizard-step--future is-locked" aria-disabled="true" inert>
+      <section
+        className={`wizard-step wizard-step--answer ${alternativeMove ? "is-active" : "is-locked"}`}
+        aria-labelledby="wizard-step-4-title"
+        aria-disabled={!alternativeMove}
+        aria-hidden={!alternativeMove}
+        inert={!alternativeMove || undefined}
+      >
         <span className="wizard-step__number">step 4 of 4</span>
-        <h3>Written answer</h3>
-        <p>Placeholder — not available in this shell.</p>
+        <h3 id="wizard-step-4-title">Written answer</h3>
+        <p data-copy-placeholder="true">[COPY-PLACEHOLDER] {glyph ? STEP_FOUR_PROMPTS[glyph] : "Select a glyph to see this prompt."}</p>
+        <label className="wizard-step__answer-field">
+          <span>Because</span>
+          <textarea
+            aria-label="Written answer after Because"
+            value={answer}
+            onChange={(event) => setAnswer(event.target.value)}
+          />
+        </label>
       </section>
     </article>
   );
