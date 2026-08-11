@@ -21,6 +21,12 @@ describe("coach store", () => {
     expect(useCoachStore.getState().annotations[0].ply).toBe(3);
   });
 
+  it("orders room messages by their server receipt sequence", () => {
+    useCoachStore.getState().addMessage({ id: "second", author: "B", content: "second", timestamp: "2026-08-11T00:00:00Z", sequence: 2 });
+    useCoachStore.getState().addMessage({ id: "first", author: "A", content: "first", timestamp: "2026-08-11T00:00:01Z", sequence: 1 });
+    expect(useCoachStore.getState().messages.map((message) => message.content)).toEqual(["first", "second"]);
+  });
+
   it("undoes and redoes an exploration without changing the official ply", () => {
     const first = { ply: 0, label: "first", board: [], side_to_move: "White", variant_fen: "first", white_pocket: "-", black_pocket: "-", white_clock: "-", black_clock: "-", partner_index: null, from_square: null, to_square: null };
     const second = { ...first, label: "second", variant_fen: "second" };

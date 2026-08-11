@@ -593,7 +593,7 @@ def get_room(room_id: str, session: Session = Depends(get_session)) -> dict[str,
     room = session.get(ReviewRoom, room_id)
     if not room and not room_hub.has_room(room_id):
         raise HTTPException(status_code=404, detail="Room not found")
-    snapshot = room_hub.snapshots.get(room_id, {})
+    snapshot = room_hub.snapshot(room_id)
     fallback_game_id = snapshot.get("room", {}).get("game_id") if isinstance(snapshot.get("room"), dict) else None
     return {"id": room_id, "game_id": room.game_id if room else fallback_game_id, "snapshot": snapshot}
 
@@ -609,7 +609,11 @@ def join_room(room_id: str, request: RoomJoinRequest, session: Session = Depends
 def list_notes(room_id: str, session: Session = Depends(get_session)) -> list[dict[str, object]]:
     if not session.get(ReviewRoom, room_id) and room_hub.has_room(room_id):
         return []
-    rows = session.scalars(select(SharedNote).where(SharedNote.room_id == room_id).order_by(SharedNote.created_at)).all()
+    rows = session.scalars(
+        select(SharedNote)
+        .where(SharedNote.room_id == room_id)
+        .order_by(SharedNote.created_at, SharedNote.id)
+    ).all()
     return [
         {
             "id": row.id,
@@ -685,7 +689,7 @@ async def room_socket(
     clean_display_name = " ".join(display_name.split()) or "Guest"
     await room_hub.connect(room_id, client_id, websocket, clean_display_name)
     try:
-        await websocket.send_json({"type": "room.snapshot", "payload": room_hub.snapshots.get(room_id, {})})
+        await websocket.send_json({"type": "room.snapshot", "payload": room_hub.snapshot(room_id)})
         await room_hub.broadcast_presence(room_id, exclude_client_id=client_id)
         while True:
             raw = await websocket.receive_json()
@@ -694,6 +698,7 @@ async def room_socket(
                 await websocket.send_json({"type": "error", "payload": {"message": "Room ID mismatch"}})
                 continue
             payload = event.payload
+            event_payload = event.model_dump(mode="json")
             if event.type == "game.select":
                 selected_game_id = payload.get("game_id")
                 if isinstance(selected_game_id, int):
@@ -701,13 +706,21 @@ async def room_socket(
                     room_hub.set_room_game(room_id, selected_game_id)
             if event.type == "chat.message":
                 content = str(payload.get("content") or "").strip()[:5000]
+                event_payload = room_hub.sequence_chat_message(room_id, event_payload)
+                await room_hub.publish(room_id, event_payload)
                 if content:
-                    await asyncio.to_thread(_persist_room_chat_message, room_id, payload, content)
+                    await asyncio.to_thread(
+                        _persist_room_chat_message,
+                        room_id,
+                        event_payload["payload"],
+                        content,
+                    )
+                continue
             elif event.type == "note.create":
                 content = str(payload.get("content") or "").strip()[:5000]
                 if content:
                     await asyncio.to_thread(_persist_room_note, room_id, payload, content)
-            await room_hub.publish(room_id, event.model_dump(mode="json"))
+            await room_hub.publish(room_id, event_payload)
     except WebSocketDisconnect:
         await room_hub.disconnect(room_id, client_id)
         await room_hub.broadcast_presence(room_id)

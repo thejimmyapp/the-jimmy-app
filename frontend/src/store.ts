@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import type { Annotation, BoardId, ChatItem, ExplorationPair, GamePayload, GameSummary, NormalizedMatch, ReplayPosition, RoomParticipant } from "./types";
 
+export const compareChatMessages = (left: ChatItem, right: ChatItem) => {
+  const leftSequence = Number.isSafeInteger(left.sequence) ? Number(left.sequence) : Number.MAX_SAFE_INTEGER;
+  const rightSequence = Number.isSafeInteger(right.sequence) ? Number(right.sequence) : Number.MAX_SAFE_INTEGER;
+  return leftSequence - rightSequence || left.timestamp.localeCompare(right.timestamp) || left.id.localeCompare(right.id);
+};
+
 interface CoachState {
   username: string;
   games: GameSummary[];
@@ -118,7 +124,9 @@ export const useCoachStore = create<CoachState>((set) => ({
   toggleFollow: () => set((state) => ({ followPartner: !state.followPartner })),
   addAnnotation: (annotation) => set((state) => ({ annotations: [...state.annotations.filter((item) => item.id !== annotation.id), annotation] })),
   removeAnnotation: (id) => set((state) => ({ annotations: state.annotations.filter((item) => item.id !== id) })),
-  addMessage: (message) => set((state) => ({ messages: [...state.messages.filter((item) => item.id !== message.id), message] })),
+  addMessage: (message) => set((state) => ({
+    messages: [...state.messages.filter((item) => item.id !== message.id), message].sort(compareChatMessages),
+  })),
   setRoomQuestDeadline: (roomQuestDeadline) => set({ roomQuestDeadline }),
 }));
 

@@ -146,6 +146,7 @@ export interface ChatItem {
   board?: BoardId;
   ply?: number;
   timestamp: string;
+  sequence?: number;
 }
 
 export interface RoomParticipant {

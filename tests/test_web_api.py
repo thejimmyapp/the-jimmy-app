@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from threading import Event
 from uuid import uuid4
 
 from fastapi import status
@@ -9,7 +10,9 @@ import pytest
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.websockets import WebSocketDisconnect
 
+import backend.main as main_module
 from backend.main import app, get_session, settings
+from backend.models import SharedNote
 
 
 def receive_event_type(socket, expected_type: str) -> dict:
@@ -151,6 +154,99 @@ def test_room_websocket_relays_versioned_event() -> None:
             }
             socket.send_json(event)
             assert receive_event_type(socket, "timeline.seek")["payload"]["global_ply"] == 12
+
+
+def test_room_messages_keep_receipt_order_when_persistence_finishes_in_reverse(monkeypatch: pytest.MonkeyPatch) -> None:
+    first_started = Event()
+    release_first = Event()
+    first_completed = Event()
+    second_completed = Event()
+    persistence_order: list[str] = []
+
+    def persist_in_reverse(_: str, __: dict[str, object], content: str) -> None:
+        if content == "first":
+            first_started.set()
+            assert release_first.wait(2)
+            persistence_order.append(content)
+            first_completed.set()
+            return
+        persistence_order.append(content)
+        second_completed.set()
+
+    monkeypatch.setattr(main_module, "_persist_room_chat_message", persist_in_reverse)
+
+    with TestClient(app) as client:
+        room = client.post("/api/rooms", json={"game_id": None}).json()
+        senders = [
+            client.post(f"/api/rooms/{room['id']}/join", json={"display_name": name}).json()
+            for name in ("First", "Second", "Observer")
+        ]
+        with (
+            client.websocket_connect(f"/ws/rooms/{room['id']}?client_id={senders[0]['client_id']}&display_name=First") as first_socket,
+            client.websocket_connect(f"/ws/rooms/{room['id']}?client_id={senders[1]['client_id']}&display_name=Second") as second_socket,
+            client.websocket_connect(f"/ws/rooms/{room['id']}?client_id={senders[2]['client_id']}&display_name=Observer") as observer_socket,
+        ):
+            assert receive_event_type(first_socket, "room.snapshot")["type"] == "room.snapshot"
+            assert receive_event_type(second_socket, "room.snapshot")["type"] == "room.snapshot"
+            assert receive_event_type(observer_socket, "room.snapshot")["type"] == "room.snapshot"
+
+            def chat_event(sender: dict[str, object], content: str) -> dict[str, object]:
+                return {
+                    "version": 1,
+                    "event_id": str(uuid4()),
+                    "room_id": room["id"],
+                    "sender_id": sender["client_id"],
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "type": "chat.message",
+                    "payload": {"id": str(uuid4()), "author": sender["display_name"], "content": content, "timestamp": datetime.now(UTC).isoformat()},
+                }
+
+            first_socket.send_json(chat_event(senders[0], "first"))
+            assert first_started.wait(2)
+            second_socket.send_json(chat_event(senders[1], "second"))
+            assert second_completed.wait(2)
+
+            observed: list[dict[str, object]] = []
+            while not any(item["content"] == "second" for item in observed):
+                observed.append(receive_event_type(observer_socket, "chat.message")["payload"])
+            release_first.set()
+            assert first_completed.wait(2)
+            while len(observed) < 2:
+                observed.append(receive_event_type(observer_socket, "chat.message")["payload"])
+
+        late_joiner = client.post(f"/api/rooms/{room['id']}/join", json={"display_name": "Late"}).json()
+        with client.websocket_connect(
+            f"/ws/rooms/{room['id']}?client_id={late_joiner['client_id']}&display_name=Late"
+        ) as late_socket:
+            initial_messages = receive_event_type(late_socket, "room.snapshot")["payload"]["messages"]
+        snapshot_messages = client.get(f"/api/rooms/{room['id']}").json()["snapshot"]["messages"]
+
+    assert persistence_order == ["second", "first"]
+    assert [item["content"] for item in observed] == ["first", "second"]
+    assert [item["content"] for item in initial_messages] == ["first", "second"]
+    assert [item["content"] for item in snapshot_messages] == ["first", "second"]
+    assert [item["sequence"] for item in observed] == sorted(item["sequence"] for item in observed)
+
+
+def test_room_notes_use_id_as_a_stable_created_at_tie_breaker() -> None:
+    created_at = datetime.now(UTC)
+    id_prefix = str(uuid4())[:-1]
+    later_id = f"{id_prefix}2"
+    earlier_id = f"{id_prefix}1"
+    with TestClient(app) as client:
+        room = client.post("/api/rooms", json={"game_id": None}).json()
+        with main_module.SessionLocal() as session:
+            session.add_all(
+                [
+                    SharedNote(id=later_id, room_id=room["id"], author="Later UUID", content="second", created_at=created_at),
+                    SharedNote(id=earlier_id, room_id=room["id"], author="Earlier UUID", content="first", created_at=created_at),
+                ]
+            )
+            session.commit()
+
+        notes = client.get(f"/api/rooms/{room['id']}/notes").json()
+
+    assert [note["id"] for note in notes] == [earlier_id, later_id]
 
 
 def test_room_websocket_persists_quest_deadline_for_invitees() -> None:

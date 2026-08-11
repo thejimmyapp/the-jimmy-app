@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { useCoachStore } from "./store";
+import { compareChatMessages, useCoachStore } from "./store";
 import type { Annotation, ChatItem, ReplayPosition, RoomEventPayload, RoomParticipant, RoomSnapshot } from "./types";
 
 let socket: WebSocket | null = null;
@@ -65,7 +65,7 @@ export const applyRoomSnapshot = async (snapshot: RoomSnapshot, fallbackGameId?:
   applyQuestStatus(snapshot["quest.status"]);
   useCoachStore.getState().setParticipants(snapshot.presence ?? []);
   snapshot.annotations?.forEach((item) => useCoachStore.getState().addAnnotation(item));
-  snapshot.messages?.forEach((item) => useCoachStore.getState().addMessage(item));
+  snapshot.messages?.slice().sort(compareChatMessages).forEach((item) => useCoachStore.getState().addMessage(item));
 };
 
 export const connectRoomSocket = (roomId: string, clientId: string, displayName = "Guest") => {
@@ -75,7 +75,7 @@ export const connectRoomSocket = (roomId: string, clientId: string, displayName 
   socket.onmessage = (message) => {
     const event = JSON.parse(message.data) as { type: string; sender_id?: string; payload?: Record<string, unknown> };
     const store = useCoachStore.getState();
-    if (event.sender_id === store.clientId) return;
+    if (event.sender_id === store.clientId && event.type !== "chat.message") return;
     if (event.type === "room.snapshot") {
       void applyRoomSnapshot((event.payload ?? {}) as RoomSnapshot);
       return;
