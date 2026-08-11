@@ -1343,7 +1343,7 @@ body { background: #050910; }
 .utility-titlebar-actions { display: flex; align-items: center; gap: 5px; }
 .utility-primary-tabs,
 .utility-secondary-tabs { flex: 0 0 auto; display: grid; border-bottom: 1px solid #253247; background: #0e1724; }
-.utility-primary-tabs { height: 44px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.utility-primary-tabs { height: 44px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .utility-secondary-tabs { height: 38px; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #0a121d; }
 .utility-primary-tabs button,
 .utility-secondary-tabs button {
@@ -1361,6 +1361,37 @@ body { background: #050910; }
 .utility-primary-tabs .chat-unread,
 .utility-secondary-tabs .chat-unread { position: absolute; right: 3px; top: 3px; }
 .utility-pane { min-width: 0; min-height: 0; flex: 1; overflow: auto; }
+.analysis-pane { padding: 12px; }
+.live-eval-card { min-height: 100%; }
+.eval-card { min-height:100%;display:flex;flex-direction:column;gap:12px;padding:15px;border:1px solid var(--line);border-top:2px solid var(--cyan);border-radius:7px;background:#0a111d;color:#edf5ff; }
+.eval-card--failed { border-top-color:var(--coral); }
+.eval-card--unsupported-variant { border-top-color:#e8b93c; }
+.eval-card__header { display:flex;justify-content:space-between;align-items:flex-start;gap:14px; }
+.eval-card__kicker { display:block;color:var(--cyan);font:9px Consolas,monospace;letter-spacing:.13em; }
+.eval-card__header h3 { margin:2px 0 0;font-size:14px; }
+.eval-card__depth,.eval-card__board { display:block;color:#71839c;font:10px Consolas,monospace; }
+.eval-card__board { margin-top:5px;color:#a7b8cc;line-height:1.4; }
+.eval-card__toggle { display:flex;align-items:center;gap:7px;color:#a7b8cc;font:10px Consolas,monospace;cursor:pointer; }
+.eval-card__toggle:has(input:disabled) { color:#647184;cursor:not-allowed; }
+.eval-card__toggle input { width:17px;height:17px;accent-color:var(--cyan); }
+.eval-card__score-row { display:flex;align-items:center;gap:8px;min-height:33px; }
+.eval-card__score { font:700 26px/1 Consolas,monospace;letter-spacing:-.04em; }
+.eval-card__pulse { width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 5px #24d6e81f; }
+.eval-card__failure { margin:0;padding:8px 10px;border:1px solid #e0656a80;border-radius:5px;background:#e0656a14;color:#f0a1a5;font-size:11px; }
+.eval-card__state { margin:0;color:#a7b8cc;font-size:11px;line-height:1.5; }
+.eval-card__lines { display:flex;flex-direction:column;gap:7px; }
+.eval-card__line { display:grid;grid-template-columns:28px minmax(0,1fr);gap:7px;align-items:start;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel); }
+.eval-card__rank { color:var(--cyan);font:10px Consolas,monospace; }
+.eval-card__line code { overflow-wrap:anywhere;color:#edf5ff;font:11px/1.55 Consolas,monospace; }
+.eval-card__expand { align-self:flex-start;border:0;background:transparent;color:var(--cyan);font:10px Consolas,monospace;cursor:pointer;text-decoration:underline;text-underline-offset:3px; }
+.eval-card__expand:focus-visible,.eval-card__toggle input:focus-visible { outline:2px solid var(--cyan);outline-offset:3px; }
+.eval-card__pockets { display:grid;grid-template-columns:auto 1fr 1fr;gap:7px;align-items:center;padding-top:10px;border-top:1px solid var(--line); }
+.eval-card__pocket-label { color:#71839c;font:9px Consolas,monospace;letter-spacing:.1em; }
+.eval-card__pockets>span:not(.eval-card__pocket-label) { display:flex;justify-content:space-between;gap:7px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--panel);font-size:10px; }
+.eval-card__pockets b { color:#a7b8cc;font-weight:500; }
+.eval-card__pockets code { color:var(--cyan);font:11px Consolas,monospace; }
+.eval-card__context { margin:0;padding:9px 10px;border-left:3px solid #287385;background:#24d6e80f;color:#a7b8cc;font-size:10.5px;line-height:1.5; }
+.eval-card__footer { margin-top:auto;padding-top:9px;border-top:1px solid var(--line);color:#71839c;font:9px Consolas,monospace; }
 .moves-pane.inactive { position: absolute; inset: 112px 0 0; visibility: hidden; pointer-events: none; }
 .board-pane { padding: var(--grid-y) var(--grid-x); }
 .board-pane:not(.active) { position: absolute; inset: 112px 0 0; visibility: hidden; pointer-events: none; }

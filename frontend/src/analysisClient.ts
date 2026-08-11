@@ -153,7 +153,7 @@ const parseJob = (value: unknown): JobResponse => {
   if (!isRecord(value)) throw new AnalysisProtocolError("analysis job must be an object");
   const status = value.status;
   const commonRequired = ["status", "engine", "board", "global_ply", "depth"];
-  const common = (record: Record<string, unknown>) => ({
+  const common = (record: Record<string, unknown>): { engine: string; board: AnalysisBoard; global_ply: number; depth: number } => ({
     engine: requiredString(record.engine, "analysis job engine"),
     board: requiredBoard(record.board),
     global_ply: requiredInteger(record.global_ply, "analysis job global_ply", 0),

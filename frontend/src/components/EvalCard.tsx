@@ -19,6 +19,9 @@ export interface EvalCardProps {
   white_pocket: string;
   black_pocket: string;
   failure_message?: string;
+  state_message?: string;
+  board_label?: string;
+  toggle_disabled?: boolean;
   onEnabledChange?: (enabled: boolean) => void;
 }
 
@@ -49,12 +52,14 @@ export function EvalCard(props: EvalCardProps) {
           <span className="eval-card__kicker">ENGINE EVALUATION</span>
           <h3>{props.engine_identity}</h3>
           <span className="eval-card__depth">Depth {props.depth}</span>
+          {props.board_label && <span className="eval-card__board">{props.status === "complete" ? "Analysed" : "Staged target"}: {props.board_label}</span>}
         </div>
         <label className="eval-card__toggle">
           <span>Enable</span>
           <input
             type="checkbox"
             checked={props.enabled}
+            disabled={props.toggle_disabled}
             onChange={(event) => props.onEnabledChange?.(event.currentTarget.checked)}
           />
         </label>
@@ -71,8 +76,8 @@ export function EvalCard(props: EvalCardProps) {
         </p>
       )}
 
-      {props.status === "idle" && <p className="eval-card__state" role="status">Enable analysis when you want a freeze-frame reading.</p>}
-      {props.status === "analysing" && <p className="eval-card__state" role="status">Waiting for a scored principal line.</p>}
+      {props.status === "idle" && <p className="eval-card__state" role="status">{props.state_message ?? "Enable analysis when you want a freeze-frame reading."}</p>}
+      {props.status === "analysing" && <p className="eval-card__state" role="status">{props.state_message ?? "Waiting for a scored principal line."}</p>}
 
       {props.status === "complete" && (
         <div className="eval-card__lines" id={linesId}>

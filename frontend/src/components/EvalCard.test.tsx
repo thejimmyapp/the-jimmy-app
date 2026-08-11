@@ -46,6 +46,12 @@ describe("EvalCard", () => {
     expect(onEnabledChange).toHaveBeenCalledWith(false);
   });
 
+  it("identifies the analysed board and can disable the toggle", () => {
+    render(<EvalCard {...baseProps} board_label="First Board · Board A · ply 14" toggle_disabled />);
+    expect(screen.getByText("Analysed: First Board · Board A · ply 14")).toBeTruthy();
+    expect((screen.getByRole("checkbox", { name: "Enable" }) as HTMLInputElement).disabled).toBe(true);
+  });
+
   it.each([
     ["idle", "Idle"],
     ["analysing", "Analysing…"],
