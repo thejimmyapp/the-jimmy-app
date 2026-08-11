@@ -41,6 +41,23 @@ class AnalysisRequest(BaseModel):
     depth: int = Field(default=10, ge=4, le=24)
 
 
+class MomentCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    game_id: int = Field(gt=0, strict=True)
+    move_token: str = Field(pattern=r"^[1-9]\d*[AaBb]$", max_length=20)
+    glyph: Literal["!", "?", "!!", "??", "!?", "?!"]
+    alternative_move: str = Field(min_length=1, max_length=64)
+    written_answer: str = Field(max_length=5000)
+
+    @field_validator("alternative_move")
+    @classmethod
+    def require_board_move(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("alternative move is required")
+        return value
+
+
 class CoachAnnotationInput(BaseModel):
     board: Literal["A", "B"]
     type: Literal["arrow", "highlight"]

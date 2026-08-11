@@ -42,6 +42,7 @@ from backend.schemas import (
     ExplorationMoveRequest,
     ExplorationSanMoveRequest,
     LeakMapAnalysisRequest,
+    MomentCreateRequest,
     NoteCreateRequest,
     PgnImportRequest,
     PuzzleHistoryRequest,
@@ -53,7 +54,8 @@ from backend.game_resolution import canonical_chesscom_game_urls, normalize_ches
 from thejimmyapp.chesscom_api import parse_pgn_headers
 from thejimmyapp.chesscom_pgn_info import PgnInfoClient, merge_pgn_info, parse_curl_auth
 from thejimmyapp.game_completion import is_completed_pgn, pgn_result, player_results
-from backend.services import AnalysisJobs, GameService, GuestReplayIngestError
+from backend.services import AnalysisJobs, GameService, GuestReplayIngestError, MomentPersistenceError
+from thejimmyapp.db import DailyMomentCapReached
 
 
 settings = get_settings()
@@ -268,6 +270,78 @@ async def store_chesscom_guest_match(game_id: int, request: Request) -> dict[str
             detail={"code": "guest_replay_refused", "message": str(exc)},
         ) from exc
     return {"game_id": internal_game_id}
+
+
+@app.post("/api/moments", status_code=status.HTTP_201_CREATED)
+async def create_moment(payload: MomentCreateRequest, request: Request) -> dict[str, object]:
+    guest_number = await _guest_number_from_request(request)
+    if guest_number is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "guest_identity_missing", "message": "Open the guest landing page first."},
+        )
+    try:
+        private_moment, public_moment = await asyncio.to_thread(
+            games.create_moment,
+            payload.game_id,
+            payload.move_token,
+            payload.glyph,
+            payload.alternative_move,
+            payload.written_answer,
+            guest_number,
+        )
+    except DailyMomentCapReached as exc:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "daily_moment_cap_reached", "message": str(exc)},
+        ) from exc
+    except MomentPersistenceError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "moment_refused", "message": str(exc)},
+        ) from exc
+    return {"private_moment": private_moment, "public_moment": public_moment}
+
+
+@app.get("/api/moments/mine")
+async def list_my_moments(request: Request) -> dict[str, object]:
+    guest_number = await _guest_number_from_request(request)
+    if guest_number is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "guest_identity_missing", "message": "Open the guest landing page first."},
+        )
+    moments = await asyncio.to_thread(games.list_private_moments, guest_number)
+    return {"moments": moments}
+
+
+@app.get("/api/moments/public")
+async def list_public_moments() -> dict[str, object]:
+    moments = await asyncio.to_thread(games.list_public_moments)
+    return {"moments": moments}
+
+
+@app.delete("/api/moments/{moment_id}")
+async def delete_moment(moment_id: int, request: Request) -> dict[str, bool]:
+    guest_number = await _guest_number_from_request(request)
+    if guest_number is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "guest_identity_missing", "message": "Open the guest landing page first."},
+        )
+    try:
+        deleted = await asyncio.to_thread(games.delete_private_moment, moment_id, guest_number)
+    except MomentPersistenceError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "moment_refused", "message": str(exc)},
+        ) from exc
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "moment_not_found", "message": "Moment not found."},
+        )
+    return {"deleted": True}
 
 
 @app.get("/api/chesscom/guest-matchups")
