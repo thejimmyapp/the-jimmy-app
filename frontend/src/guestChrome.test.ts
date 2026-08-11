@@ -20,6 +20,7 @@ describe("owner-approved guest chrome copy", () => {
     const rendered = landingHeadline({ guest_number: 0, total_guests: 0, completions_to_date: 0 });
     expect(rendered).toContain("SirGuest#0! 0 of 0 visitors");
     expect(rendered).toContain("new name, SirGuest#0.");
-    expect(rendered).not.toMatch(/[\[\]]/);
+    expect(rendered).not.toContain("[");
+    expect(rendered).not.toContain("]");
   });
 });
