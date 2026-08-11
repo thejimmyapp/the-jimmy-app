@@ -1,8 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { AnnotationWizardShell } from "./components/AnnotationWizardShell";
 import { EvalCard, type EvalCardProps } from "./components/EvalCard";
+import { GlyphPicker } from "./components/GlyphPicker";
 import { LearningMomentCard, type LearningMomentCardProps } from "./components/LearningMomentCard";
+import type { MomentGlyph } from "./guestProgress";
 
 const fixtures: Array<{ label: string; props: Omit<EvalCardProps, "enabled" | "onEnabledChange"> }> = [
   {
@@ -178,6 +181,20 @@ function LearningMomentFixtures() {
   );
 }
 
+function GlyphPickerFixture() {
+  const [glyph, setGlyph] = useState<MomentGlyph | null>(null);
+  return <GlyphPicker value={glyph} onChange={setGlyph} />;
+}
+
+function WizardShellFixture() {
+  return <AnnotationWizardShell move_options={[
+    { token: "16B", move: "N@h6" },
+    { token: "17A", move: "Nxf7" },
+    { token: "17B", move: "Q@h4" },
+    { token: "18A", move: "P@f7+" },
+  ]} />;
+}
+
 const root = document.getElementById("eval-card-fixtures");
 if (root) {
   createRoot(root).render(<StrictMode><EvalCardFixtures /></StrictMode>);
@@ -186,4 +203,14 @@ if (root) {
 const momentRoot = document.getElementById("moment-card-fixtures");
 if (momentRoot) {
   createRoot(momentRoot).render(<StrictMode><LearningMomentFixtures /></StrictMode>);
+}
+
+const glyphRoot = document.getElementById("glyph-picker-fixture");
+if (glyphRoot) {
+  createRoot(glyphRoot).render(<StrictMode><GlyphPickerFixture /></StrictMode>);
+}
+
+const wizardRoot = document.getElementById("wizard-shell-fixture");
+if (wizardRoot) {
+  createRoot(wizardRoot).render(<StrictMode><WizardShellFixture /></StrictMode>);
 }
