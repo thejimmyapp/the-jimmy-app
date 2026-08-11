@@ -6,7 +6,7 @@ import logging
 import re
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -53,7 +53,7 @@ from backend.game_resolution import canonical_chesscom_game_urls, normalize_ches
 from thejimmyapp.chesscom_api import parse_pgn_headers
 from thejimmyapp.chesscom_pgn_info import PgnInfoClient, merge_pgn_info, parse_curl_auth
 from thejimmyapp.game_completion import is_completed_pgn, pgn_result, player_results
-from backend.services import AnalysisJobs, GameService
+from backend.services import AnalysisJobs, GameService, GuestReplayIngestError
 
 
 settings = get_settings()
@@ -65,6 +65,7 @@ qwen_runtime = QwenRuntime(settings)
 coach_jobs = CoachJobs(settings, games, qwen_runtime)
 leak_map_jobs = LeakMapJobs(settings, games)
 chesscom_matchups = ChessComMatchupService(settings)
+GUEST_IDENTITY_COOKIE = "jimmy_guest_identity"
 app = FastAPI(title=settings.app_name, version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -209,18 +210,59 @@ async def chesscom_match_replay(game_id: int) -> dict[str, object]:
         raise _matchup_http_error(exc) from exc
 
 
+@app.post("/api/chesscom/matches/{game_id}/store")
+async def store_chesscom_guest_match(game_id: int, request: Request) -> dict[str, int]:
+    guest_number = _guest_number_from_request(request)
+    if guest_number is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "guest_identity_missing", "message": "Open the guest landing page first."},
+        )
+    try:
+        replay = await chesscom_matchups.replay_source(game_id)
+    except (MatchProxyDisabledError, MatchExcludedError, MatchUpstreamError) as exc:
+        raise _matchup_http_error(exc) from exc
+    try:
+        internal_game_id = await asyncio.to_thread(games.ingest_guest_replay, replay, guest_number)
+    except GuestReplayIngestError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "guest_replay_refused", "message": str(exc)},
+        ) from exc
+    return {"game_id": internal_game_id}
+
+
 @app.get("/api/chesscom/guest-matchups")
 async def chesscom_guest_matchups(
+    request: Request,
+    response: Response,
     refresh: bool = False,
     exclude_game_id: list[int] | None = Query(default=None),
 ) -> dict[str, object]:
     try:
-        return await chesscom_matchups.guest_matchups(
+        payload = await chesscom_matchups.guest_matchups(
             refresh=refresh,
             exclude_game_ids=exclude_game_id or (),
         )
     except (MatchProxyDisabledError, MatchExcludedError, MatchUpstreamError) as exc:
         raise _matchup_http_error(exc) from exc
+    if _guest_number_from_request(request) is None:
+        _guest_number, identity_token = games.create_guest_identity()
+        response.set_cookie(
+            GUEST_IDENTITY_COOKIE,
+            identity_token,
+            httponly=True,
+            max_age=31_536_000,
+            samesite="lax",
+        )
+    return payload
+
+
+def _guest_number_from_request(request: Request) -> int | None:
+    identity_token = request.cookies.get(GUEST_IDENTITY_COOKIE)
+    if not identity_token:
+        return None
+    return games.guest_number_for_token(identity_token)
 
 
 @app.post("/api/games/resolve")
