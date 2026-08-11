@@ -9,4 +9,10 @@ describe("direct legal routes", () => {
     expect(legalPageFromPath("/terms/")).toBe("terms");
     expect(legalPageFromPath("/")).toBeNull();
   });
+
+  it("resolves notices and rejects an unknown legal path", () => {
+    expect(legalPageFromPath("/third-party-notices")).toBe("notices");
+    expect(legalPageFromPath("/third-party-notices/")).toBe("notices");
+    expect(legalPageFromPath("/not-a-legal-page")).toBeNull();
+  });
 });
