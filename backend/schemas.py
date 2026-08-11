@@ -81,6 +81,23 @@ class MomentCreateRequest(BaseModel):
         return self
 
 
+class AccountClaimRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=1, max_length=254)
+
+    @field_validator("email")
+    @classmethod
+    def require_valid_email(cls, value: str) -> str:
+        cleaned = value.strip()
+        if cleaned.count("@") != 1 or any(character.isspace() for character in cleaned):
+            raise ValueError("email must contain exactly one @ and no whitespace")
+        local_part, domain = cleaned.split("@")
+        if not local_part or not domain:
+            raise ValueError("email local and domain parts are required")
+        return cleaned
+
+
 class CoachAnnotationInput(BaseModel):
     board: Literal["A", "B"]
     type: Literal["arrow", "highlight"]

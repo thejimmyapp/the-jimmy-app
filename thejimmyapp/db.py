@@ -20,6 +20,10 @@ class DailyMomentCapReached(RuntimeError):
     pass
 
 
+class SignupRequiresCompletion(RuntimeError):
+    pass
+
+
 _MOMENT_FIELDS = (
     "game_id",
     "move_token",
@@ -105,6 +109,14 @@ class Database:
                     guest_number INTEGER PRIMARY KEY REFERENCES guest_identities(guest_number),
                     completed_at TEXT NOT NULL,
                     completion_ordinal INTEGER NOT NULL UNIQUE CHECK(completion_ordinal > 0)
+                );
+
+                CREATE TABLE IF NOT EXISTS accounts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guest_number INTEGER NOT NULL UNIQUE REFERENCES guest_identities(guest_number),
+                    email TEXT NOT NULL,
+                    account_token TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS moment_save_sequence (
@@ -975,6 +987,87 @@ class Database:
         with closing(self.connect()) as conn:
             row = conn.execute("SELECT COUNT(*) AS total FROM guest_identities").fetchone()
         return int(row["total"]) if row else 0
+
+    def claim_account(
+        self,
+        guest_number: int,
+        email: str,
+        account_token: str,
+    ) -> dict[str, object]:
+        with closing(self.connect()) as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                completion = conn.execute(
+                    """
+                    SELECT completion_ordinal
+                    FROM guest_completions
+                    WHERE guest_number = ?
+                    """,
+                    (guest_number,),
+                ).fetchone()
+                if completion is None:
+                    raise SignupRequiresCompletion("complete the three-for-five challenge before claiming an identity")
+                account = conn.execute(
+                    """
+                    SELECT id, guest_number, email, account_token, created_at
+                    FROM accounts
+                    WHERE guest_number = ?
+                    """,
+                    (guest_number,),
+                ).fetchone()
+                if account is None:
+                    cursor = conn.execute(
+                        """
+                        INSERT INTO accounts (
+                            guest_number, email, account_token, created_at
+                        )
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (guest_number, email, account_token, _utc_now()),
+                    )
+                    if cursor.lastrowid is None:
+                        raise RuntimeError("account creation failed")
+                    account = conn.execute(
+                        """
+                        SELECT id, guest_number, email, account_token, created_at
+                        FROM accounts
+                        WHERE id = ?
+                        """,
+                        (cursor.lastrowid,),
+                    ).fetchone()
+                if account is None:
+                    raise RuntimeError("account could not be read after creation")
+                result = {
+                    **dict(account),
+                    "completion_ordinal": int(completion["completion_ordinal"]),
+                }
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return result
+
+    def account_for_token(self, account_token: str) -> dict[str, object] | None:
+        if not account_token:
+            return None
+        with closing(self.connect()) as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    accounts.id,
+                    accounts.guest_number,
+                    accounts.email,
+                    accounts.account_token,
+                    accounts.created_at,
+                    guest_completions.completion_ordinal
+                FROM accounts
+                JOIN guest_completions
+                    ON guest_completions.guest_number = accounts.guest_number
+                WHERE accounts.account_token = ?
+                """,
+                (account_token,),
+            ).fetchone()
+        return dict(row) if row is not None else None
 
     def create_moment_copies(
         self,

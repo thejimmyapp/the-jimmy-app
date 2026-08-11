@@ -60,6 +60,19 @@ class GameService:
     def guest_completion_count(self) -> int:
         return self.db.guest_completion_count()
 
+    def claim_account(
+        self,
+        guest_number: int,
+        email: str,
+        account_token: str,
+    ) -> dict[str, object]:
+        if isinstance(guest_number, bool) or guest_number <= 0:
+            raise MomentPersistenceError("guest number must be a positive integer")
+        return self.db.claim_account(guest_number, email, account_token)
+
+    def account_for_token(self, account_token: str) -> dict[str, object] | None:
+        return self.db.account_for_token(account_token)
+
     def create_moment(
         self,
         game_id: int,

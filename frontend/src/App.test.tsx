@@ -11,6 +11,8 @@ import type { CallbackReplayBoard, GamePayload, NormalizedMatch } from "./types"
 const apiMock = vi.hoisted(() => ({
   guestSession: vi.fn(),
   resetGuestSession: vi.fn(),
+  accountMe: vi.fn(),
+  claimAccount: vi.fn(),
   games: vi.fn(),
   guestMatchups: vi.fn(),
   chessComMatchReplay: vi.fn(),
@@ -116,6 +118,7 @@ describe("URL-first exact review", () => {
     useCoachStore.setState({ username: "", game: null, guestMatch: null, games: [], roomId: null });
     apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
     apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
+    apiMock.accountMe.mockResolvedValue({ account: null });
     apiMock.games.mockResolvedValue({ games: [] });
     apiMock.guestMatchups.mockResolvedValue({
       matches: Array.from({ length: 5 }, (_, index) => ({
@@ -184,6 +187,25 @@ describe("URL-first exact review", () => {
     expect(screen.getByText("No flashcards yet.")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("dialog", { name: "SirGuest#13 Flashcard library" }), { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "SirGuest#13 Flashcard library" })).toBeNull();
+  });
+
+  it("hydrates an existing account for a server-completed guest", async () => {
+    apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: 13, saved_moment_count: 3, analysis_unlocked: false, completed: true, completion_ordinal: 7 });
+    apiMock.accountMe.mockResolvedValue({
+      account: {
+        guest_number: 13,
+        email: "claimed@example.com",
+        completion_ordinal: 7,
+        founder_eligible: true,
+        created_at: "2026-08-11T00:00:00+00:00",
+      },
+    });
+    renderApp();
+
+    await waitFor(() => expect(apiMock.accountMe).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Open flashcard library" }));
+    expect(await screen.findByText("Claimed — Founder #7")).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Email" })).toBeNull();
   });
 
   it("keeps the building-blocks rail link unlocked and opens it in a new tab", () => {
