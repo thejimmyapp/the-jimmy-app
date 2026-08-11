@@ -212,7 +212,7 @@ async def chesscom_match_replay(game_id: int) -> dict[str, object]:
 
 @app.post("/api/chesscom/matches/{game_id}/store")
 async def store_chesscom_guest_match(game_id: int, request: Request) -> dict[str, int]:
-    guest_number = _guest_number_from_request(request)
+    guest_number = await _guest_number_from_request(request)
     if guest_number is None:
         raise HTTPException(
             status_code=409,
@@ -246,8 +246,8 @@ async def chesscom_guest_matchups(
         )
     except (MatchProxyDisabledError, MatchExcludedError, MatchUpstreamError) as exc:
         raise _matchup_http_error(exc) from exc
-    if _guest_number_from_request(request) is None:
-        _guest_number, identity_token = games.create_guest_identity()
+    if await _guest_number_from_request(request) is None:
+        _guest_number, identity_token = await asyncio.to_thread(games.create_guest_identity)
         response.set_cookie(
             GUEST_IDENTITY_COOKIE,
             identity_token,
@@ -258,11 +258,11 @@ async def chesscom_guest_matchups(
     return payload
 
 
-def _guest_number_from_request(request: Request) -> int | None:
+async def _guest_number_from_request(request: Request) -> int | None:
     identity_token = request.cookies.get(GUEST_IDENTITY_COOKIE)
     if not identity_token:
         return None
-    return games.guest_number_for_token(identity_token)
+    return await asyncio.to_thread(games.guest_number_for_token, identity_token)
 
 
 @app.post("/api/games/resolve")

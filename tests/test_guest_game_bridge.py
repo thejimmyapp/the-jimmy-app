@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import asyncio
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -131,6 +133,36 @@ def test_guest_numbers_are_monotonic_and_persisted(tmp_path) -> None:
     assert (first_number, second_number, third_number) == (1, 2, 3)
     assert len({first_token, second_token, third_token}) == 3
     assert reloaded_service.guest_number_for_token(first_token) == 1
+
+
+def test_guest_identity_write_does_not_block_the_event_loop(monkeypatch) -> None:
+    class FakeMatchups:
+        async def guest_matchups(self, **_kwargs):
+            return {"matches": []}
+
+    class SlowIdentityService:
+        def create_guest_identity(self):
+            time.sleep(0.2)
+            return 1, "identity-token"
+
+    monkeypatch.setattr(main_module, "chesscom_matchups", FakeMatchups())
+    monkeypatch.setattr(main_module, "games", SlowIdentityService())
+
+    async def exercise() -> tuple[float, dict[str, object]]:
+        from starlette.requests import Request
+        from starlette.responses import Response
+
+        request = Request({"type": "http", "method": "GET", "path": "/api/chesscom/guest-matchups", "headers": []})
+        started = time.perf_counter()
+        endpoint = asyncio.create_task(main_module.chesscom_guest_matchups(request, Response()))
+        await asyncio.sleep(0.02)
+        loop_delay = time.perf_counter() - started
+        return loop_delay, await endpoint
+
+    loop_delay, payload = asyncio.run(exercise())
+
+    assert loop_delay < 0.1
+    assert payload == {"matches": []}
 
 
 def test_guest_store_route_uses_landing_identity_and_returns_internal_id(tmp_path, monkeypatch) -> None:

@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+import time
 from typing import Any
 
 import httpx
 import pytest
 
+import backend.main as main_module
 from backend.chesscom_matchups import (
     ChessComMatchupService,
     MatchExcludedError,
     MatchProxyDisabledError,
 )
 from backend.config import Settings
+from backend.services import GameService
 
 
 NOW = 1_786_320_000
@@ -252,6 +255,75 @@ def test_guest_list_widens_to_three_hours_filters_short_match_and_reuses_cache(m
     assert first["cached"] is False
     assert second["cached"] is True
     assert len(requests) == request_count
+
+
+def test_guest_endpoint_returns_validated_partial_list_within_cold_budget(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.chesscom_matchups.time.time", lambda: NOW)
+    monkeypatch.setattr("backend.chesscom_matchups._GUEST_ASSEMBLY_BUDGET_SECONDS", 0.05)
+    callback_payloads: dict[str, dict[str, Any]] = {}
+    for game_id in (101, 102):
+        primary_uuid = f"{game_id:08x}-0000-4000-8000-{game_id:012x}"
+        partner_id = game_id + 1000
+        partner_uuid = f"{partner_id:08x}-0000-4000-8000-{partner_id:012x}"
+        callback_payloads[str(game_id)] = callback_board(
+            game_id,
+            primary_uuid,
+            partner_uuid,
+            white=(f"High{game_id}", 2500),
+            black=(f"Low{game_id}", 2100),
+            winner="white",
+            reason="checkmated",
+        )
+        callback_payloads[partner_uuid] = callback_board(
+            partner_id,
+            partner_uuid,
+            primary_uuid,
+            white=(f"PartnerOpponent{game_id}", 2000),
+            black=(f"Partner{game_id}", 2200),
+            winner="black",
+            reason="bughousepartnerlose",
+        )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith("/alpha/games/archives"):
+            payload = {"archives": ["https://api.chess.com/pub/player/alpha/games/2026/08"]}
+        elif path.endswith("/alpha/games/2026/08"):
+            payload = {"games": [
+                {"rules": "bughouse", "url": f"https://www.chess.com/game/live/{game_id}", "end_time": NOW - 600}
+                for game_id in (101, 102)
+            ]}
+        elif path.endswith("/beta/games/archives"):
+            await asyncio.sleep(0.2)
+            payload = {"archives": []}
+        else:
+            payload = callback_payloads[path.rsplit("/", 1)[-1]]
+        return httpx.Response(200, json=payload, request=request)
+
+    service = ChessComMatchupService(
+        Settings(
+            chesscom_players_of_interest="Alpha,Beta",
+            chesscom_guest_max_archives_per_player=1,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    monkeypatch.setattr(main_module, "chesscom_matchups", service)
+    monkeypatch.setattr(main_module, "games", GameService(tmp_path / "legacy.sqlite"))
+
+    async def request_endpoint() -> tuple[httpx.Response, float]:
+        transport = httpx.ASGITransport(app=main_module.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            started = time.perf_counter()
+            response = await client.get("/api/chesscom/guest-matchups")
+            return response, time.perf_counter() - started
+
+    response, elapsed = asyncio.run(request_endpoint())
+
+    assert elapsed < 0.2
+    assert response.status_code == 200
+    assert len(response.json()["matches"]) == 2
+    assert response.json()["partial"] is True
+    assert response.json()["assembly_budget_exhausted"] is True
 
 
 def test_configured_players_of_interest_preserve_priority_order() -> None:
