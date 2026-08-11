@@ -40,6 +40,9 @@ class GameService:
     def guest_number_for_token(self, token: str) -> int | None:
         return self.db.guest_number_for_token(token)
 
+    def guest_identity_count(self) -> int:
+        return self.db.guest_identity_count()
+
     def ingest_guest_replay(self, replay_source: dict[str, Any], guest_number: int) -> int:
         if isinstance(guest_number, bool) or not isinstance(guest_number, int) or guest_number <= 0:
             raise GuestReplayIngestError("guest number must be a positive integer")

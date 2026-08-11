@@ -4,12 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { reconstructGuestMatch } from "./bughouseDecoder";
 import replayFixtures from "./fixtures/guest-match-replays.json";
-import { GUEST_PROGRESS_KEY, emptyGuestProgress, loadGuestProgress, storeGuestProgress } from "./guestProgress";
+import { emptyGuestProgress, loadGuestProgress, storeGuestProgress } from "./guestProgress";
 import { startGuestQuest } from "./quest";
 import { useCoachStore } from "./store";
 import type { CallbackReplayBoard, NormalizedMatch } from "./types";
 
 const apiMock = vi.hoisted(() => ({
+  guestSession: vi.fn(),
+  resetGuestSession: vi.fn(),
   guestMatchups: vi.fn(),
   chessComMatchReplay: vi.fn(),
 }));
@@ -79,6 +81,8 @@ describe("guest learning moment library", () => {
     localStorage.clear();
     history.replaceState(null, "", "/");
     useCoachStore.setState({ game: null, guestMatch: null, roomId: null, globalPly: 0, mode: "review" });
+    apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: 0 });
+    apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: 0 });
     apiMock.guestMatchups.mockResolvedValue({
       matches: [firstMatch, secondMatch],
       examined: 2,
@@ -107,7 +111,10 @@ describe("guest learning moment library", () => {
     fireEvent.keyDown(list, { key: "Enter" });
     expect(await screen.findAllByLabelText(/Board chessboard/)).toHaveLength(2);
     expect(loadGuestProgress().questDeadline).not.toBeNull();
-    expect(screen.getByRole("tab", { name: /^(5:00|4:59)$/ })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Quest" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open flashcard library" }));
+    expect(screen.getByRole("timer", { name: "Session countdown" }).textContent).toMatch(/^(5:00|4:59)$/);
+    fireEvent.click(screen.getByRole("button", { name: "Close flashcard library" }));
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     saveMoment("!!", "The first game starts to squeeze the king.");
@@ -163,17 +170,29 @@ describe("guest learning moment library", () => {
     storeGuestProgress({ ...running, questDeadline: Date.now() + 1_000 });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
-    expect(screen.getByRole("tab", { name: "0:01" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Quest" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open flashcard library" }));
+    expect(screen.getByRole("timer", { name: "Session countdown" }).textContent).toBe("0:01");
 
     await act(async () => {
-      vi.advanceTimersByTime(1_250);
+      vi.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(document.querySelector(".session-expiry-wipe")).not.toBeNull();
+    expect(apiMock.resetGuestSession).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(800);
       await Promise.resolve();
     });
 
+    expect(apiMock.resetGuestSession).toHaveBeenCalledOnce();
     expect(useCoachStore.getState().game).toBeNull();
     expect(useCoachStore.getState().guestMatch).toBeNull();
-    expect(localStorage.getItem(GUEST_PROGRESS_KEY)).toBeNull();
-    expect(screen.getByRole("heading", { name: "Greetings small children" })).toBeTruthy();
+    const restarted = loadGuestProgress();
+    expect(restarted.firstGameOpened).toBe(false);
+    expect(restarted.savedMoments).toHaveLength(0);
+    expect(restarted.questDeadline).toBeGreaterThan(Date.now());
+    expect(screen.getByRole("heading", { name: "Salutations, SirGuest#14! 0 of 14 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#15. Mwahaha! Kittens and cookies! Mwahaha, yessss." })).toBeTruthy();
   });
 
   it("completes the quest after three moments saved from one guest game", async () => {

@@ -77,6 +77,24 @@ app.add_middleware(
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_host_list)
 
 
+def _set_guest_identity_cookie(response: Response, identity_token: str) -> None:
+    response.set_cookie(
+        GUEST_IDENTITY_COOKIE,
+        identity_token,
+        httponly=True,
+        max_age=31_536_000,
+        samesite="lax",
+    )
+
+
+def _guest_session_payload(guest_number: int) -> dict[str, int]:
+    return {
+        "guest_number": guest_number,
+        "total_guests": games.guest_identity_count(),
+        "completions_to_date": 0,
+    }
+
+
 def _is_disk_full_error(exc: Exception) -> bool:
     return "disk is full" in str(exc).lower() or "database or disk is full" in str(exc).lower()
 
@@ -210,6 +228,22 @@ async def chesscom_match_replay(game_id: int) -> dict[str, object]:
         raise _matchup_http_error(exc) from exc
 
 
+@app.post("/api/guests")
+def guest_session(request: Request, response: Response) -> dict[str, int]:
+    guest_number = _guest_number_from_request(request)
+    if guest_number is None:
+        guest_number, identity_token = games.create_guest_identity()
+        _set_guest_identity_cookie(response, identity_token)
+    return _guest_session_payload(guest_number)
+
+
+@app.post("/api/guests/reset")
+def reset_guest_session(response: Response) -> dict[str, int]:
+    guest_number, identity_token = games.create_guest_identity()
+    _set_guest_identity_cookie(response, identity_token)
+    return _guest_session_payload(guest_number)
+
+
 @app.post("/api/chesscom/matches/{game_id}/store")
 async def store_chesscom_guest_match(game_id: int, request: Request) -> dict[str, int]:
     guest_number = _guest_number_from_request(request)
@@ -248,13 +282,7 @@ async def chesscom_guest_matchups(
         raise _matchup_http_error(exc) from exc
     if _guest_number_from_request(request) is None:
         _guest_number, identity_token = games.create_guest_identity()
-        response.set_cookie(
-            GUEST_IDENTITY_COOKIE,
-            identity_token,
-            httponly=True,
-            max_age=31_536_000,
-            samesite="lax",
-        )
+        _set_guest_identity_cookie(response, identity_token)
     return payload
 
 
