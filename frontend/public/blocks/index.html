@@ -158,6 +158,36 @@
   .specimen-window{max-height:760px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#080d16}
   .specimen-window img{border:0;border-radius:0}
   .specimen-meta{font-size:11px;color:var(--txt3);margin-top:9px}
+  .eval-fixture-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+  .eval-fixture{min-width:0;padding:0;border:0;border-radius:0;background:transparent;display:block}
+  .eval-fixture__label{margin:0 0 7px;color:var(--txt2);font:10px var(--mono);letter-spacing:.05em;text-transform:uppercase}
+  .eval-card{min-height:100%;display:flex;flex-direction:column;gap:12px;padding:15px;border:1px solid var(--line);border-top:2px solid var(--cyan);border-radius:7px;background:#0a111d;color:var(--txt)}
+  .eval-card--failed{border-top-color:var(--red)}
+  .eval-card--unsupported-variant{border-top-color:#e8b93c}
+  .eval-card__header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+  .eval-card__kicker{display:block;color:var(--cyan);font:9px var(--mono);letter-spacing:.13em}
+  .eval-card__header h3{margin:2px 0 0;font-size:14px}
+  .eval-card__depth{color:var(--txt3);font:10px var(--mono)}
+  .eval-card__toggle{display:flex;align-items:center;gap:7px;color:var(--txt2);font:10px var(--mono);cursor:pointer}
+  .eval-card__toggle input{width:17px;height:17px;accent-color:var(--cyan)}
+  .eval-card__score-row{display:flex;align-items:center;gap:8px;min-height:33px}
+  .eval-card__score{font:700 26px/1 var(--mono);letter-spacing:-.04em}
+  .eval-card__pulse{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 5px rgba(53,200,232,.12)}
+  .eval-card__failure{padding:8px 10px;border:1px solid rgba(224,101,106,.5);border-radius:5px;background:rgba(224,101,106,.08);color:#f0a1a5;font-size:11px}
+  .eval-card__state{color:var(--txt2);font-size:11px}
+  .eval-card__lines{display:flex;flex-direction:column;gap:7px}
+  .eval-card__line{display:grid;grid-template-columns:28px minmax(0,1fr);gap:7px;align-items:start;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
+  .eval-card__rank{color:var(--cyan);font:10px var(--mono)}
+  .eval-card__line code{overflow-wrap:anywhere;color:var(--txt);font:11px/1.55 var(--mono)}
+  .eval-card__expand{align-self:flex-start;border:0;background:transparent;color:var(--cyan);font:10px var(--mono);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .eval-card__expand:focus-visible,.eval-card__toggle input:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+  .eval-card__pockets{display:grid;grid-template-columns:auto 1fr 1fr;gap:7px;align-items:center;padding-top:10px;border-top:1px solid var(--line)}
+  .eval-card__pocket-label{color:var(--txt3);font:9px var(--mono);letter-spacing:.1em}
+  .eval-card__pockets>span:not(.eval-card__pocket-label){display:flex;justify-content:space-between;gap:7px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--panel);font-size:10px}
+  .eval-card__pockets b{color:var(--txt2);font-weight:500}
+  .eval-card__pockets code{color:var(--cyan);font:11px var(--mono)}
+  .eval-card__context{padding:9px 10px;border-left:3px solid var(--cyan-dim);background:rgba(53,200,232,.06);color:var(--txt2);font-size:10.5px}
+  .eval-card__footer{margin-top:auto;padding-top:9px;border-top:1px solid var(--line);color:var(--txt3);font:9px var(--mono)}
   .leave-timer{position:fixed;top:14px;right:14px;z-index:9999;width:194px;padding:11px 12px 10px;border:1px solid #7a5a1e;border-top:2px solid #e8b93c;border-radius:7px;background:rgba(8,13,22,.94);box-shadow:0 10px 32px rgba(0,0,0,.42);font-family:var(--mono);pointer-events:none;backdrop-filter:blur(8px)}
   .leave-timer[hidden]{display:none}
   .leave-timer__kicker{display:block;margin-bottom:6px;color:#e8b93c;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
@@ -227,10 +257,10 @@
     <span class="specimen-title">12 · Engine eval-line row</span>
   </summary>
   <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">Ranked line, engine identity, depth, expand affordance, enable toggle, and a variation written in drop notation. Target: the Queue Engine result card in a grouped DOCK stack.</p>
-      <img src="./specimens/specimen-12-eval-row.jpg" width="2504" height="454" loading="lazy" alt="Fairy-Stockfish analysis row with rank, depth, expand control, toggle, and drop-notation principal variation">
-      <p class="specimen-meta">Source: <a href="https://online-dropchess-stockfish.onrender.com/analysis.html">online-dropchess-stockfish</a> · Owner-supplied capture · Do not migrate this asset.</p>
+      <p class="specimen-copy">Live fixture component: score formatting, explicit job states, ranked drop-notation lines, pockets, enable and expand controls, partner-board limitation, and Fairy-Stockfish attribution. No engine endpoint is called.</p>
+      <div id="eval-card-fixtures"><p class="specimen-meta">Loading eval-card fixtures…</p></div>
+      <noscript><p class="specimen-meta">JavaScript is required to render the live eval-card fixtures.</p></noscript>
+      <p class="specimen-meta">Fixture data only · The former screenshot remains in the specimen archive but is no longer rendered for block 12.</p>
 
   </div>
 </details>
@@ -586,6 +616,9 @@
     <div class="source-cell reserved" aria-label="Reserved source slot 36"><b>reserved</b><span>36</span></div>
   </div>
 </section>
+<script type="module">
+  import("/assets/blocks.js").catch(() => import("/src/blocks.tsx"));
+</script>
 <script>
 (() => {
   "use strict";
