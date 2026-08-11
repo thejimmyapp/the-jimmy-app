@@ -77,6 +77,24 @@ app.add_middleware(
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_host_list)
 
 
+def _set_guest_identity_cookie(response: Response, identity_token: str) -> None:
+    response.set_cookie(
+        GUEST_IDENTITY_COOKIE,
+        identity_token,
+        httponly=True,
+        max_age=31_536_000,
+        samesite="lax",
+    )
+
+
+async def _guest_session_payload(guest_number: int) -> dict[str, int]:
+    return {
+        "guest_number": guest_number,
+        "total_guests": await asyncio.to_thread(games.guest_identity_count),
+        "completions_to_date": 0,
+    }
+
+
 def _is_disk_full_error(exc: Exception) -> bool:
     return "disk is full" in str(exc).lower() or "database or disk is full" in str(exc).lower()
 
@@ -123,7 +141,7 @@ async def connect_chesscom(request: ChessComConnectRequest) -> dict[str, object]
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    stored = sum(games.db.upsert_game(request.username, game) for game in imported)
+    stored = await asyncio.to_thread(_store_imported_games, request.username, imported)
     return {
         "username": request.username,
         "profile": {"avatar": profile.get("avatar"), "url": profile.get("url")},
@@ -172,6 +190,10 @@ def _raw_chesscom_game_id(game: dict[str, object]) -> str | None:
     return match.group(1) if match else None
 
 
+def _store_imported_games(username: str, imported: list[dict[str, object]]) -> int:
+    return sum(games.db.upsert_game(username, game) for game in imported)
+
+
 @app.get("/api/chesscom/{username}/bughouse-games")
 def list_bughouse_games(username: str, limit: int = Query(default=500, ge=1, le=5000)) -> dict[str, object]:
     return {"username": username, "games": games.list_games(username, limit)}
@@ -208,6 +230,22 @@ async def chesscom_match_replay(game_id: int) -> dict[str, object]:
         return await chesscom_matchups.replay_source(game_id)
     except (MatchProxyDisabledError, MatchExcludedError, MatchUpstreamError) as exc:
         raise _matchup_http_error(exc) from exc
+
+
+@app.post("/api/guests")
+async def guest_session(request: Request, response: Response) -> dict[str, int]:
+    guest_number = await _guest_number_from_request(request)
+    if guest_number is None:
+        guest_number, identity_token = await asyncio.to_thread(games.create_guest_identity)
+        _set_guest_identity_cookie(response, identity_token)
+    return await _guest_session_payload(guest_number)
+
+
+@app.post("/api/guests/reset")
+async def reset_guest_session(response: Response) -> dict[str, int]:
+    guest_number, identity_token = await asyncio.to_thread(games.create_guest_identity)
+    _set_guest_identity_cookie(response, identity_token)
+    return await _guest_session_payload(guest_number)
 
 
 @app.post("/api/chesscom/matches/{game_id}/store")
@@ -248,13 +286,7 @@ async def chesscom_guest_matchups(
         raise _matchup_http_error(exc) from exc
     if await _guest_number_from_request(request) is None:
         _guest_number, identity_token = await asyncio.to_thread(games.create_guest_identity)
-        response.set_cookie(
-            GUEST_IDENTITY_COOKIE,
-            identity_token,
-            httponly=True,
-            max_age=31_536_000,
-            samesite="lax",
-        )
+        _set_guest_identity_cookie(response, identity_token)
     return payload
 
 
@@ -276,7 +308,7 @@ async def resolve_chesscom_game(request: ChessComGameResolveRequest) -> dict[str
         ) from exc
 
     canonical_urls = canonical_chesscom_game_urls(external_game_id)
-    payload = games.resolve_stored_game(canonical_urls, request.username)
+    payload = await asyncio.to_thread(games.resolve_stored_game, canonical_urls, request.username)
     source = "stored"
     if payload is None and request.username:
         service = ChessComService(settings)
@@ -298,8 +330,8 @@ async def resolve_chesscom_game(request: ChessComGameResolveRequest) -> dict[str
                 },
             ) from exc
         if imported is not None:
-            games.db.upsert_game(request.username, imported)
-            payload = games.resolve_stored_game(canonical_urls, request.username)
+            await asyncio.to_thread(games.db.upsert_game, request.username, imported)
+            payload = await asyncio.to_thread(games.resolve_stored_game, canonical_urls, request.username)
             source = "chesscom_public_archive"
 
     if payload is None:
@@ -447,7 +479,7 @@ def puzzle_solution(puzzle_id: str, request: PuzzleHistoryRequest) -> dict[str, 
 
 @app.post("/api/analysis", status_code=status.HTTP_202_ACCEPTED)
 async def start_analysis(request: AnalysisRequest) -> dict[str, str]:
-    if not games.is_completed_game(request.game_id):
+    if not await asyncio.to_thread(games.is_completed_game, request.game_id):
         raise HTTPException(status_code=409, detail="Engine analysis is available only for stored completed games")
     try:
         job_id = await analysis_jobs.submit(
@@ -493,7 +525,7 @@ def coach_status() -> dict[str, object]:
 
 @app.post("/api/coach/analyze")
 async def analyze_with_coach(request: CoachPrepareRequest) -> dict[str, object]:
-    if not games.is_completed_game(request.game_id):
+    if not await asyncio.to_thread(games.is_completed_game, request.game_id):
         raise HTTPException(status_code=409, detail="Coach analysis is available only for stored completed games")
     try:
         job_id = await coach_jobs.submit(request)
@@ -608,6 +640,38 @@ def create_note(room_id: str, request: NoteCreateRequest, session: Session = Dep
         return {"id": str(uuid4()), "created_at": None}
 
 
+def _persist_room_game_selection(room_id: str, game_id: int) -> None:
+    try:
+        with SessionLocal() as session:
+            room = session.get(ReviewRoom, room_id)
+            if room:
+                room.game_id = game_id
+                session.commit()
+    except SQLAlchemyError as exc:
+        if not _is_disk_full_error(exc):
+            raise
+
+
+def _persist_room_chat_message(room_id: str, payload: dict[str, object], content: str) -> None:
+    try:
+        with SessionLocal() as session:
+            session.add(ChatMessage(room_id=room_id, author=str(payload.get("author") or "Guest")[:64], content=content, board=payload.get("board"), global_ply=payload.get("ply")))
+            session.commit()
+    except SQLAlchemyError as exc:
+        if not _is_disk_full_error(exc):
+            raise
+
+
+def _persist_room_note(room_id: str, payload: dict[str, object], content: str) -> None:
+    try:
+        with SessionLocal() as session:
+            session.add(SharedNote(room_id=room_id, author=str(payload.get("author") or "Guest")[:64], content=content, board=payload.get("board"), global_ply=payload.get("ply")))
+            session.commit()
+    except SQLAlchemyError as exc:
+        if not _is_disk_full_error(exc):
+            raise
+
+
 @app.websocket("/ws/rooms/{room_id}")
 async def room_socket(
     websocket: WebSocket,
@@ -633,36 +697,16 @@ async def room_socket(
             if event.type == "game.select":
                 selected_game_id = payload.get("game_id")
                 if isinstance(selected_game_id, int):
-                    try:
-                        with SessionLocal() as session:
-                            room = session.get(ReviewRoom, room_id)
-                            if room:
-                                room.game_id = selected_game_id
-                                session.commit()
-                    except SQLAlchemyError as exc:
-                        if not _is_disk_full_error(exc):
-                            raise
+                    await asyncio.to_thread(_persist_room_game_selection, room_id, selected_game_id)
                     room_hub.set_room_game(room_id, selected_game_id)
             if event.type == "chat.message":
                 content = str(payload.get("content") or "").strip()[:5000]
                 if content:
-                    try:
-                        with SessionLocal() as session:
-                            session.add(ChatMessage(room_id=room_id, author=str(payload.get("author") or "Guest")[:64], content=content, board=payload.get("board"), global_ply=payload.get("ply")))
-                            session.commit()
-                    except SQLAlchemyError as exc:
-                        if not _is_disk_full_error(exc):
-                            raise
+                    await asyncio.to_thread(_persist_room_chat_message, room_id, payload, content)
             elif event.type == "note.create":
                 content = str(payload.get("content") or "").strip()[:5000]
                 if content:
-                    try:
-                        with SessionLocal() as session:
-                            session.add(SharedNote(room_id=room_id, author=str(payload.get("author") or "Guest")[:64], content=content, board=payload.get("board"), global_ply=payload.get("ply")))
-                            session.commit()
-                    except SQLAlchemyError as exc:
-                        if not _is_disk_full_error(exc):
-                            raise
+                    await asyncio.to_thread(_persist_room_note, room_id, payload, content)
             await room_hub.publish(room_id, event.model_dump(mode="json"))
     except WebSocketDisconnect:
         await room_hub.disconnect(room_id, client_id)

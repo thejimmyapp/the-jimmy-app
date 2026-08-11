@@ -19,7 +19,6 @@ interface Props {
   savedLessons: SavedLesson[];
   savedMoments?: SavedMoment[];
   savedMomentCount?: number;
-  questCountdown?: string | null;
   questCompleted?: boolean;
   questProgress?: number;
   roomQuestRemainingSeconds?: number | null;
@@ -52,7 +51,7 @@ const primaryCapability: Record<PrimaryTab, CapabilityKey> = {
   quest: "dock_quest",
 };
 
-export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, questCountdown = null, questCompleted = false, questProgress = Math.min(QUEST_TARGET_MOMENTS, savedMomentCount), roomQuestRemainingSeconds = null, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
+export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, questCompleted = false, questProgress = Math.min(QUEST_TARGET_MOMENTS, savedMomentCount), roomQuestRemainingSeconds = null, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
   const [reviewTab, setReviewTab] = useState<ReviewTab | null>(null);
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
@@ -155,7 +154,7 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, infoContent
           const locked = isCapabilityLocked(capabilities, primaryCapability[tab]);
           const label = tab === "collaborate" ? <>Collaborate{unreadChat > 0 && <span className="chat-unread">{unreadChat}</span>}</>
             : tab === "library" ? <>Library{savedMomentCount > 0 && <span className="library-count">{savedMomentCount}</span>}</>
-              : tab === "quest" ? (questCompleted ? "Complete" : questCountdown ?? "Quest")
+              : tab === "quest" ? (questCompleted ? "Complete" : "Quest")
                 : tab[0].toUpperCase() + tab.slice(1);
           return <button key={tab} role="tab" aria-selected={primaryTab === tab} disabled={locked && tab !== "quest"} className={`${primaryTab === tab ? "active" : ""} ${locked ? "capability-locked" : ""} ${locked && tab === "quest" ? "quest-preview" : ""}`} onClick={() => choosePrimary(tab)}>{label}{locked && <LockKeyhole className="capability-lock-badge" size={11} aria-hidden="true" />}</button>;
         })}

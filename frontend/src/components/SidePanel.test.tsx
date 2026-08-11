@@ -98,10 +98,10 @@ describe("review utility panel", () => {
     expect(props.onRemoveSavedLesson).toHaveBeenCalledWith(saved.id);
   });
 
-  it("keeps the locked quest timer operable and shows live progress plus the room warning", () => {
+  it("keeps the locked quest preview operable and shows progress plus the room warning", () => {
     useCoachStore.setState({ roomId: "room-1" });
-    renderPanel({ questCountdown: "4:37", questProgress: 2, roomQuestRemainingSeconds: 277 });
-    const questTab = screen.getByRole("tab", { name: "4:37" }) as HTMLButtonElement;
+    renderPanel({ questProgress: 2, roomQuestRemainingSeconds: 277 });
+    const questTab = screen.getByRole("tab", { name: "Quest" }) as HTMLButtonElement;
     expect(questTab.disabled).toBe(false);
     expect(questTab.classList.contains("capability-locked")).toBe(true);
     fireEvent.click(questTab);

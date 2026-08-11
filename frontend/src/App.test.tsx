@@ -9,6 +9,8 @@ import { useCoachStore } from "./store";
 import type { CallbackReplayBoard, GamePayload, NormalizedMatch } from "./types";
 
 const apiMock = vi.hoisted(() => ({
+  guestSession: vi.fn(),
+  resetGuestSession: vi.fn(),
   games: vi.fn(),
   guestMatchups: vi.fn(),
   chessComMatchReplay: vi.fn(),
@@ -112,6 +114,8 @@ describe("URL-first exact review", () => {
     localStorage.clear();
     history.replaceState(null, "", "/");
     useCoachStore.setState({ username: "", game: null, guestMatch: null, games: [], roomId: null });
+    apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: 0 });
+    apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: 0 });
     apiMock.games.mockResolvedValue({ games: [] });
     apiMock.guestMatchups.mockResolvedValue({
       matches: Array.from({ length: 5 }, (_, index) => ({
@@ -149,7 +153,7 @@ describe("URL-first exact review", () => {
     apiMock.enrichChessCom.mockResolvedValue({ checked: 0, enriched: 0, remaining_without_second_board: 0, credentials_stored: false });
   });
 
-  it("locks RAIL chrome and DOCK while leaving only the easel accessible during onboarding", () => {
+  it("locks ordinary RAIL chrome and DOCK while leaving the three active onboarding items accessible", () => {
     const { container } = renderApp();
     const rail = container.querySelector(".app-rail");
     const lockedRailContent = container.querySelector(".app-rail-locked-content");
@@ -162,8 +166,23 @@ describe("URL-first exact review", () => {
     expect(screen.queryByRole("navigation", { name: "Main views" })).toBeNull();
     expect(screen.queryByRole("complementary", { name: "Task tools" })).toBeNull();
     expect(screen.getByRole("link", { name: "Open building blocks" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open mission" }).getAttribute("href")).toBe("/mission");
+    expect(screen.getByRole("button", { name: "Open flashcard library" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Privacy" })).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: /Click me\?/ }));
+  });
+
+  it("renders real guest counters and opens the keyboard-reachable countdown panel", async () => {
+    renderApp();
+    expect(await screen.findByRole("heading", { name: "Salutations, SirGuest#13! 0 of 13 visitors have completed the three-for-five challenge to date. Fail to complete it in time and you will be returned to the landing page under your new name, SirGuest#14. Mwahaha! Kittens and cookies! Mwahaha, yessss." })).toBeTruthy();
+    const libraryButton = screen.getByRole("button", { name: "Open flashcard library" });
+    libraryButton.focus();
+    fireEvent.click(libraryButton);
+    expect(screen.getByRole("dialog", { name: "SirGuest#13 Flashcard library" })).toBeTruthy();
+    expect(screen.getByRole("timer", { name: "Session countdown" }).textContent).toMatch(/^(5:00|4:59)$/);
+    expect(screen.getByText("No flashcards yet.")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "SirGuest#13 Flashcard library" }), { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "SirGuest#13 Flashcard library" })).toBeNull();
   });
 
   it("keeps the building-blocks rail link unlocked and opens it in a new tab", () => {

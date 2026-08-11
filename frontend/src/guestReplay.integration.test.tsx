@@ -7,6 +7,8 @@ import { useCoachStore } from "./store";
 import type { CallbackReplayBoard, GuestMatchReplaySource, NormalizedMatch } from "./types";
 
 const apiMock = vi.hoisted(() => ({
+  guestSession: vi.fn(),
+  resetGuestSession: vi.fn(),
   guestMatchups: vi.fn(),
   chessComMatchReplay: vi.fn(),
 }));
@@ -48,6 +50,8 @@ describe("guest replay workspace integration", () => {
     localStorage.clear();
     history.replaceState(null, "", "/");
     useCoachStore.setState({ game: null, guestMatch: null, roomId: null, globalPly: 0, mode: "review" });
+    apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: 0 });
+    apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: 0 });
     apiMock.guestMatchups.mockResolvedValue({
       matches: [match],
       examined: 1,

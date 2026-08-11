@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BarChart3, Bot, Check, Copy, ExternalLink, FileInput, Home, LockKeyhole, LogOut, Palette, Radio, Redo2, RotateCcw, Settings, ShieldCheck, Swords, Undo2, UserRoundPlus, Users, X } from "lucide-react";
+import { BarChart3, BookOpen, Bot, Check, Copy, ExternalLink, FileInput, Flag, Home, LockKeyhole, LogOut, Palette, Radio, Redo2, RotateCcw, Settings, ShieldCheck, Swords, Undo2, UserRoundPlus, Users, X } from "lucide-react";
 import { CSSProperties, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./api";
@@ -13,6 +13,7 @@ import { AppShell } from "./components/AppShell";
 import { AnalysisAcknowledgement } from "./components/AnalysisAcknowledgement";
 import { LegalLinks } from "./components/LegalLinks";
 import { GuestMatchupList } from "./components/GuestMatchupList";
+import { GuestFlashcardPanel } from "./components/GuestFlashcardPanel";
 import { OnboardingMap } from "./components/OnboardingMap";
 import { MomentEditor } from "./components/MomentEditor";
 import { ReviewLesson } from "./components/ReviewLesson";
@@ -21,8 +22,9 @@ import { SidePanel } from "./components/SidePanel";
 import { StatsDashboard } from "./components/StatsDashboard";
 import { TeamCoach } from "./components/TeamCoach";
 import { acceptAnalysisAcknowledgement, clearGuestProgress, emptyGuestProgress, hasAnalysisAcknowledgement, isCapabilityLocked, lessonStorageId, loadGuestProgress, qualifyingGameCount, savedLessonFrom, savedMomentCount, savedMomentKey, storeGuestProgress, type CapabilityKey, type GuestProgress, type MomentGlyph, type SavedLesson, type SavedMoment } from "./guestProgress";
+import { EMPTY_GUEST_SESSION } from "./guestChrome";
 import { captureMomentContext, matchForSavedMoment, playerNamesForMoment, savedMomentFromCapture, type MomentCapture } from "./learningMoments";
-import { completeGuestQuestIfReady, formatQuestCountdown, questMomentProgress, questRemainingSeconds, startGuestQuest } from "./quest";
+import { completeGuestQuestIfReady, questMomentProgress, questRemainingSeconds, startGuestQuest } from "./quest";
 import { applyRoomSnapshot, connectRoomSocket, disconnectRoomSocket, sendRoomEvent } from "./socket";
 import { currentPosition, useCoachStore } from "./store";
 import { replayNotices } from "./replayIntegrity";
@@ -101,6 +103,9 @@ export default function App() {
   const [boardsSwapped, setBoardsSwapped] = useState(false);
   const [momentCapture, setMomentCapture] = useState<MomentCapture | null>(null);
   const [questNow, setQuestNow] = useState(Date.now);
+  const [guestLibraryOpen, setGuestLibraryOpen] = useState(false);
+  const [sessionWipeActive, setSessionWipeActive] = useState(false);
+  const expiryRunningRef = useRef(false);
   const analysisResolverRef = useRef<((accepted: boolean) => void) | null>(null);
   const [reviewGameId, setReviewGameId] = useState<number | null>(() => {
     if (store.roomId) return null;
@@ -130,6 +135,7 @@ export default function App() {
     updateGuestProgress((current) => ({ ...current, firstGameOpened: true, mapNode: current.mapNode === "start" ? "analyze" : current.mapNode }));
   }, [setGame, updateGuestProgress]);
   const gamesQuery = useQuery({ queryKey: ["games", store.username], queryFn: () => api.games(store.username), enabled: Boolean(store.username) });
+  const guestSessionQuery = useQuery({ queryKey: ["guest-session"], queryFn: api.guestSession, staleTime: Infinity });
   const momentMatchupsQuery = useQuery({ ...guestMatchupsQuery, enabled: guestProgress.savedMoments.length > 0 });
   const roomQuery = useQuery({ queryKey: ["room", store.roomId], queryFn: () => api.room(store.roomId as string), enabled: Boolean(store.roomId) });
   const restoredGameQuery = useQuery({ queryKey: ["game", reviewGameId], queryFn: () => api.game(reviewGameId as number), enabled: Boolean(reviewGameId && !store.roomId && !store.game) });
@@ -222,9 +228,9 @@ export default function App() {
     return [savedMomentKey(moment), playerNamesForMoment(currentMatch ?? matchForSavedMoment(availableMomentMatches, moment))];
   }));
   const momentCount = savedMomentCount(guestProgress);
+  const guestSession = guestSessionQuery.data ?? EMPTY_GUEST_SESSION;
   const questProgress = questMomentProgress(guestProgress);
   const questRemaining = questRemainingSeconds(guestProgress.questDeadline, questNow);
-  const questCountdown = questRemaining === null ? null : formatQuestCountdown(questRemaining);
   const roomQuestDeadline = store.roomQuestDeadline;
   const sharedQuestDeadline = roomQuestDeadline ?? (store.guestMatch ? guestProgress.questDeadline : null);
   const roomQuestRemaining = questRemainingSeconds(sharedQuestDeadline, questNow);
@@ -273,6 +279,11 @@ export default function App() {
   const lessonSaved = Boolean(currentLessonId && guestProgress.savedLessons.some((item) => item.id === currentLessonId));
 
   useEffect(() => {
+    if (!showOnboarding || guestProgress.questCompleted || guestProgress.questDeadline !== null) return;
+    updateGuestProgress((current) => startGuestQuest(current));
+  }, [guestProgress.questCompleted, guestProgress.questDeadline, showOnboarding, updateGuestProgress]);
+
+  useEffect(() => {
     setActiveReviewBoard("A");
     setBoardsSwapped(false);
     setMomentCapture(null);
@@ -307,6 +318,7 @@ export default function App() {
     setView("review");
     setReviewGameId(null);
     setMomentCapture(null);
+    setGuestLibraryOpen(false);
     const browserUrl = new URL(location.href);
     browserUrl.searchParams.delete("game");
     browserUrl.searchParams.delete("room");
@@ -323,8 +335,29 @@ export default function App() {
   }, [guestProgress.questCompleted, guestProgress.questDeadline, sharedQuestDeadline]);
 
   useEffect(() => {
-    if (guestProgress.questDeadline !== null && !guestProgress.questCompleted && questRemaining === 0) resetGuestSession();
-  }, [guestProgress.questCompleted, guestProgress.questDeadline, questRemaining, resetGuestSession]);
+    if (questRemaining !== 0 || guestProgress.questDeadline === null || guestProgress.questCompleted || expiryRunningRef.current) return;
+    expiryRunningRef.current = true;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    if (!reducedMotion) setSessionWipeActive(true);
+    const finishReset = async () => {
+      try {
+        const nextIdentity = await api.resetGuestSession();
+        queryClient.setQueryData(["guest-session"], nextIdentity);
+      } catch {
+        queryClient.setQueryData(["guest-session"], EMPTY_GUEST_SESSION);
+      } finally {
+        resetGuestSession();
+        setSessionWipeActive(false);
+        expiryRunningRef.current = false;
+      }
+    };
+    if (reducedMotion) {
+      void finishReset();
+      return;
+    }
+    const timer = window.setTimeout(() => void finishReset(), 800);
+    return () => window.clearTimeout(timer);
+  }, [guestProgress.questCompleted, guestProgress.questDeadline, queryClient, questRemaining, resetGuestSession]);
 
   useEffect(() => {
     if (roomQuestDeadline !== null && roomQuestRemaining === 0) setRoomQuestDeadline(null);
@@ -495,7 +528,11 @@ export default function App() {
       pieceSize={pieceSize}
       onboardingLocked={showOnboarding}
       dockOverlayActive={showOnboarding && wordVertigoActive}
-      railUnlockedAction={<a className="rail-blocks-link" href="/blocks/index.html" target="_blank" rel="noreferrer" aria-label="Open building blocks" title="Open building blocks"><span className="rail-blocks-glyph" aria-hidden="true">🎨</span></a>}
+      railUnlockedAction={<div className="rail-unlocked-actions">
+        <a className="rail-blocks-link rail-active-item" data-onboarding-active-rail href="/blocks/index.html" target="_blank" rel="noreferrer" aria-label="Open building blocks" title="Open building blocks"><span className="rail-blocks-glyph" aria-hidden="true">🎨</span></a>
+        <a className="rail-active-item" data-onboarding-active-rail href="/mission" aria-label="Open mission" title="Mission"><Flag size={17} /></a>
+        <button className="rail-active-item" data-onboarding-active-rail type="button" aria-label="Open flashcard library" title="Flashcard library" onClick={() => setGuestLibraryOpen(true)}><BookOpen size={17} /></button>
+      </div>}
       rail={<>
         <div className={`rail-brand ${capabilityLocked("rail_onboarding") ? "capability-locked" : ""}`} title="The Jimmy App"><span className="brand-mark">J</span></div>
         <nav className="rail-nav" aria-label="Main views">
@@ -508,17 +545,19 @@ export default function App() {
           <button disabled={capabilityLocked("rail_chesscom")} className={capabilityLocked("rail_chesscom") ? "capability-locked" : ""} aria-label="Connect Chess.com" title="Connect Chess.com" onClick={() => setConnectOpen(true)}><Radio size={17} />{capabilityLocked("rail_chesscom") && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>
         </div>
       </>}
-      stage={showOnboarding ? (onboardingPhase === "entry" ? <OnboardingMap onGuestSpawn={onGuestSpawn} onWordVertigoActiveChange={setWordVertigoActive} onWordVertigoUnmute={escapeWordVertigo} /> : <GuestMatchupList onSelect={selectGuestMatch} />) : view === "review" ? <section className="workspace">
+      stage={showOnboarding ? (onboardingPhase === "entry" ? <OnboardingMap {...guestSession} onGuestSpawn={onGuestSpawn} onWordVertigoActiveChange={setWordVertigoActive} onWordVertigoUnmute={escapeWordVertigo} /> : <GuestMatchupList onSelect={selectGuestMatch} />) : view === "review" ? <section className="workspace">
         <div className={`boards-zone ${store.game ? "has-game" : ""}`}>
           {store.mode === "exploration" && <div className="stage-actions"><button title="Undo exploration move" onClick={store.undoExploration}><Undo2 size={16} /></button>{store.explorationFuture.length > 0 && <button title="Redo exploration move" onClick={store.redoExploration}><Redo2 size={16} /></button>}<button title="Return to game" onClick={() => { store.returnToGame(); sendRoomEvent("variation.return_to_game", {}); }}><RotateCcw size={16} /></button></div>}
           {store.game ? <div className="boards-grid"><BoardPanel boardId={stagedSourceBoard} position={stagedPosition} orientation={stagedOrientation} pieceStyle={pieceStyle} layout="primary" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "A"} title={stagedBoardName} showTitle={false} onCaptureMoment={store.guestMatch ? openMomentEditor : undefined} captureMomentDisabled={!captureMomentContext(store.guestMatch, store.game, store.globalPly, stagedSourceBoard)} playerTop={stagedPlayerTop} playerBottom={stagedPlayerBottom} /></div> : <div className="empty-workspace"><strong>Select a Bughouse game</strong><span>Choose a game from the Games tab.</span></div>}
         </div>
       </section> : <StatsDashboard username={store.username} />}
-      dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" activeBoard={activeReviewBoard} boardFocusEnabled={Boolean(store.guestMatch)} onActiveBoardChange={setActiveReviewBoard} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} onSwapBoards={store.guestMatch ? () => setBoardsSwapped((current) => !current) : undefined} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} savedMoments={guestProgress.savedMoments} savedMomentCount={momentCount} questCountdown={questCountdown} questCompleted={guestProgress.questCompleted} questProgress={questProgress} roomQuestRemainingSeconds={roomQuestRemaining} momentPlayers={momentPlayers} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} onOpenSavedMoment={openSavedMoment} onRemoveSavedMoment={removeSavedMoment} infoContent={reviewInfo} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button disabled={guestCoachLocked} className={`coach-button ${guestCoachLocked ? "capability-locked" : ""}`} title={guestCoachLocked ? "Team Coach unlocks in a future guest capability" : "Run the coupled Bughouse coaching pipeline"} onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach{guestCoachLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>}</> : undefined} boardContent={store.game ? <BoardPanel boardId={dockSourceBoard} position={dockPosition} orientation={dockOrientation} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "B"} title={dockBoardName} playerTop={dockBoardAvailable ? dockPlayerTop : "Diagonal Opponent Unknown"} playerBottom={dockBoardAvailable ? dockPlayerBottom : "Partner Unknown"} unavailable={!dockBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : undefined} />}
+      dock={<SidePanel capabilities={guestProgress.capabilities} initialTab="review" activeBoard={activeReviewBoard} boardFocusEnabled={Boolean(store.guestMatch)} onActiveBoardChange={setActiveReviewBoard} stagedSourceBoard={stagedSourceBoard} dockSourceBoard={dockSourceBoard} stagedBoardName={stagedBoardName} dockBoardName={dockBoardName} onSwapBoards={store.guestMatch ? () => setBoardsSwapped((current) => !current) : undefined} onSelectGame={selectGame} loadingGame={gameMutation.isPending} onMap={goToMap} savedLessons={guestProgress.savedLessons} savedMoments={guestProgress.savedMoments} savedMomentCount={momentCount} questCompleted={guestProgress.questCompleted} questProgress={questProgress} roomQuestRemainingSeconds={roomQuestRemaining} momentPlayers={momentPlayers} qualifyingGames={qualifyingGames} onOpenSavedLesson={openSavedLesson} onRemoveSavedLesson={removeSavedLesson} onOpenSavedMoment={openSavedMoment} onRemoveSavedMoment={removeSavedMoment} infoContent={reviewInfo} dockActions={store.game ? <><button className="share-button" disabled={roomMutation.isPending} onClick={() => { if (store.roomId) void copyInviteLink(); else roomMutation.mutate(); }} title={store.roomId ? inviteUrl : "Create a shared review room"}>{store.roomId ? <Copy size={16} /> : <UserRoundPlus size={16} />} {store.roomId ? "Copy invite link" : roomMutation.isPending ? "Creating room..." : "Invite partner"}</button>{shareCopied && <span className="copy-confirm">Link copied</span>}{roomMutation.error && <span className="room-error" title={roomMutation.error.message}>Invite failed</span>}{store.roomId && <span className="viewer-pill" title={store.participants.map((item) => item.display_name).join(", ") || "Waiting for viewers"}><Users size={14} /> {viewerCount}</span>}{view === "review" && <button disabled={guestCoachLocked} className={`coach-button ${guestCoachLocked ? "capability-locked" : ""}`} title={guestCoachLocked ? "Team Coach unlocks in a future guest capability" : "Run the coupled Bughouse coaching pipeline"} onClick={() => setCoachOpen(true)}><Bot size={16} /> Team Coach{guestCoachLocked && <LockKeyhole className="capability-lock-badge" size={10} aria-hidden="true" />}</button>}</> : undefined} boardContent={store.game ? <BoardPanel boardId={dockSourceBoard} position={dockPosition} orientation={dockOrientation} pieceStyle={pieceStyle} layout="compact" beforeAnalyze={beforeAnalyze} analysisLocked={guestAnalysisLocked} keyboardFocused={Boolean(store.guestMatch) && activeReviewBoard === "B"} title={dockBoardName} playerTop={dockBoardAvailable ? dockPlayerTop : "Diagonal Opponent Unknown"} playerBottom={dockBoardAvailable ? dockPlayerBottom : "Partner Unknown"} unavailable={!dockBoardAvailable} onImportBothBoards={openImport} externalFallbackUrl={currentGameFallbackUrl} /> : undefined} />}
     />
+      {guestLibraryOpen && document.getElementById("app-stage-panel") && createPortal(<GuestFlashcardPanel guestNumber={guestSession.guest_number} remainingSeconds={questRemaining} questCompleted={guestProgress.questCompleted} onClose={() => setGuestLibraryOpen(false)} />, document.getElementById("app-stage-panel")!)}
     {store.game && <TeamCoach open={coachOpen} onClose={() => setCoachOpen(false)} boardA={sourceBoardA} boardB={sourceBoardB} />}
       {momentCapture && document.getElementById("app-stage-panel") && createPortal(<MomentEditor capture={momentCapture} onSave={saveLearningMoment} onCancel={() => setMomentCapture(null)} />, document.getElementById("app-stage-panel")!)}
       <AnalysisAcknowledgement open={acknowledgementOpen} onClose={closeAcknowledgement} onContinue={continueAcknowledgement} />
+      {sessionWipeActive && <div className="session-expiry-wipe" role="presentation" />}
       {connectOpen && (document.getElementById("app-dock-panel") ?? document.getElementById("app-stage-panel")) && createPortal(
           <form className={`connect-modal dock-tool-panel ${manualImportOpen || authenticatedOpen ? "connector-mode" : ""}`} onSubmit={connect}>
             <button type="button" className="modal-close" onClick={() => setConnectOpen(false)} aria-label="Close"><X /></button>

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { OnboardingMap } from "./OnboardingMap";
 
 const renderMap = (overrides: Partial<Parameters<typeof OnboardingMap>[0]> = {}) => render(
-  <OnboardingMap onGuestSpawn={vi.fn()} onWordVertigoUnmute={vi.fn()} {...overrides} />,
+  <OnboardingMap guest_number={13} total_guests={13} completions_to_date={0} onGuestSpawn={vi.fn()} onWordVertigoUnmute={vi.fn()} {...overrides} />,
 );
 
 const addDockTarget = () => {

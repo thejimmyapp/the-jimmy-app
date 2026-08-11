@@ -1,4 +1,5 @@
 import type { BoardId, CoachJob, CoachPreparedPayload, CoachPrepareRequest, ExplorationMoveResult, GamePayload, GameSummary, GuestMatchReplaySource, GuestMatchupList, LeakMapJob, NormalizedMatch, PlayerStats, PuzzleMove, PuzzlePayload, PuzzleResponse, QwenStatus, RoomPayload } from "./types";
+import type { GuestSessionIdentity } from "./guestChrome";
 
 type ApiErrorDetail = { code?: string; message?: string; external_game_id?: string };
 
@@ -28,6 +29,8 @@ const json = async <T>(responsePromise: Promise<Response>): Promise<T> => {
 };
 
 export const api = {
+  guestSession: () => json<GuestSessionIdentity>(fetch("/api/guests", { method: "POST" })),
+  resetGuestSession: () => json<GuestSessionIdentity>(fetch("/api/guests/reset", { method: "POST" })),
   chessComMatch: (gameId: number) => json<NormalizedMatch>(fetch(`/api/chesscom/matches/${gameId}`)),
   chessComMatchReplay: (gameId: number) => json<GuestMatchReplaySource>(fetch(`/api/chesscom/matches/${gameId}/replay`)),
   guestMatchups: ({ refresh = false, excludeGameIds = [] }: { refresh?: boolean; excludeGameIds?: number[] } = {}) => {

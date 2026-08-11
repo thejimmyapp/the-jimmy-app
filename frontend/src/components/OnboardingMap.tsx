@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { LogIn, UserRound, Volume2, VolumeX } from "lucide-react";
+import { CLICK_ME_COPY, landingHeadline, SIGN_IN_COPY, SIGN_IN_NOTICE, SUB_CARD_COPY, type GuestSessionIdentity } from "../guestChrome";
 import { formatWordVertigoCountdown, WORD_VERTIGO_BASE_CHARACTER_MS, WORD_VERTIGO_SECONDS, WORD_VERTIGO_SPEEDS, wordVertigoBlurb } from "../wordVertigo";
 
-interface Props {
+interface Props extends GuestSessionIdentity {
   onGuestSpawn: () => void;
   onWordVertigoActiveChange?: (active: boolean) => void;
   onWordVertigoUnmute: () => void | Promise<void>;
 }
 
-export function OnboardingMap({ onGuestSpawn, onWordVertigoActiveChange, onWordVertigoUnmute }: Props) {
+export function OnboardingMap({ guest_number, total_guests, completions_to_date, onGuestSpawn, onWordVertigoActiveChange, onWordVertigoUnmute }: Props) {
   const surfaceRef = useRef<HTMLElement>(null);
   const guestRef = useRef<HTMLButtonElement>(null);
   const wordInputRef = useRef<HTMLInputElement>(null);
@@ -40,7 +41,8 @@ export function OnboardingMap({ onGuestSpawn, onWordVertigoActiveChange, onWordV
     const keepFocusInside = (event: FocusEvent) => {
       const target = event.target as HTMLElement;
       const isVertigoControl = Boolean(target.closest("[data-word-vertigo-control]"));
-      if (surfaceRef.current?.contains(target) || (activeRef.current && isVertigoControl)) {
+      const isActiveChrome = Boolean(target.closest("[data-onboarding-active-rail], [data-onboarding-active-panel]"));
+      if (surfaceRef.current?.contains(target) || isActiveChrome || (activeRef.current && isVertigoControl)) {
         lastFocusedRef.current = target;
         return;
       }
@@ -90,6 +92,13 @@ export function OnboardingMap({ onGuestSpawn, onWordVertigoActiveChange, onWordV
     else wordInputRef.current?.focus();
   };
 
+  const focusActiveRail = (last = false) => {
+    const controls = Array.from(document.querySelectorAll<HTMLElement>("[data-onboarding-active-rail]"));
+    const target = controls[last ? controls.length - 1 : 0];
+    target?.focus();
+    return Boolean(target);
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (active) return;
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
@@ -99,7 +108,12 @@ export function OnboardingMap({ onGuestSpawn, onWordVertigoActiveChange, onWordV
     }
     if (event.key === "Tab") {
       event.preventDefault();
-      focusOtherNode(event.target);
+      if (event.shiftKey && event.target === guestRef.current) {
+        if (!focusActiveRail(true)) wordInputRef.current?.focus();
+      } else if (!event.shiftKey && event.target === wordInputRef.current) {
+        if (!focusActiveRail()) guestRef.current?.focus();
+      }
+      else focusOtherNode(event.target);
       return;
     }
     if (event.key === "Enter" && event.target === guestRef.current) {
@@ -139,17 +153,16 @@ export function OnboardingMap({ onGuestSpawn, onWordVertigoActiveChange, onWordV
     <section ref={surfaceRef} className={`onboarding-map-shell locked-shell-onboarding ${active ? "word-vertigo-active" : ""}`} aria-label="Choose how to enter The Jimmy App" onKeyDown={handleKeyDown}>
       <div className="onboarding-entry-copy" inert={active || undefined} aria-hidden={active || undefined}>
         <span>THE JIMMY APP</span>
-        <h1>Greetings small children</h1>
-        <p>as well as those who are not small children. Basically check out what I made using nothing but dirt and junk food and intermittent bursts of unchaperoned AI. That's right. I use AI. And I used it for this.</p>
+        <h1>{landingHeadline({ guest_number, total_guests, completions_to_date })}</h1>
       </div>
       <div className="onboarding-entry-nodes">
         <button ref={guestRef} type="button" className="onboarding-entry-node guest-entry-node" onClick={onGuestSpawn} inert={active || undefined} aria-hidden={active || undefined}>
           <UserRound size={22} />
-          <span><strong>Click me?</strong><small>Do not click me. Use the keyboard you've infested with your hoomanness and goopey goop disgusting clumps and dirt. Your keyboard hates you. Now tap that keyboard, tap that ← or → and ⏎ buttons.</small></span>
+          <span><strong>Click me?</strong><small>{CLICK_ME_COPY}</small></span>
         </button>
         <div className={`onboarding-entry-node username-entry-node word-vertigo-entry-node ${active ? "active" : ""}`}>
           <LogIn size={22} aria-hidden="true" />
-          <label htmlFor="onboarding-username"><strong>Sign in</strong><small>Do not sign in but be amazed by an obscure long word starting with the first letter you typed. You will be given ninety-nine seconds to reflect on why you are a hooman while AI automatically reads the proper pronunciation, and highly optimistic predictions of what people would think about you if you tried using that word with your friends; should you hypothetically decide to casually in conversation inject it like it's a normal part of your new and growing vocabulary.</small></label>
+          <label htmlFor="onboarding-username"><strong>Sign in</strong><small>{SIGN_IN_COPY}</small><em>{SIGN_IN_NOTICE}</em></label>
           <input ref={wordInputRef} id="onboarding-username" value={typedCharacter} onChange={(event) => beginSequence(event.target.value)} maxLength={1} autoComplete="off" readOnly={active} aria-disabled={active || undefined} />
           {active && (
             <button ref={revealRef} type="button" className="word-vertigo-reveal" data-speed={speed} aria-label={blurb} onClick={cycleSpeed}>
@@ -158,7 +171,7 @@ export function OnboardingMap({ onGuestSpawn, onWordVertigoActiveChange, onWordV
           )}
         </div>
       </div>
-      <div className="onboarding-entry-status" role="status" inert={active || undefined} aria-hidden={active || undefined}>The timer has started. You shouldn't be clicking still. Are you clicking? No more clicking.</div>
+      <div className="onboarding-entry-status" role="status" inert={active || undefined} aria-hidden={active || undefined}>{SUB_CARD_COPY}</div>
       {dockTarget && createPortal(
         <section className="word-vertigo-dock-panel" data-word-vertigo-control>
           <div className="word-vertigo-timer" role="timer">{formatWordVertigoCountdown(remainingSeconds)}</div>

@@ -854,6 +854,11 @@ class Database:
             ).fetchone()
         return int(row["guest_number"]) if row else None
 
+    def guest_identity_count(self) -> int:
+        with closing(self.connect()) as conn:
+            row = conn.execute("SELECT COUNT(*) AS total FROM guest_identities").fetchone()
+        return int(row["total"]) if row else 0
+
     def record_import(
         self,
         username: str,

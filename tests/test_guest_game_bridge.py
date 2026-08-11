@@ -165,6 +165,29 @@ def test_guest_identity_write_does_not_block_the_event_loop(monkeypatch) -> None
     assert payload == {"matches": []}
 
 
+def test_guest_session_reports_real_arrival_counts_and_rotates_identity(tmp_path, monkeypatch) -> None:
+    service = GameService(tmp_path / "legacy.sqlite")
+    monkeypatch.setattr(main_module, "games", service)
+
+    with TestClient(main_module.app) as client:
+        first = client.post("/api/guests")
+        repeated = client.post("/api/guests")
+        rotated = client.post("/api/guests/reset")
+
+    assert first.json() == {
+        "guest_number": 1,
+        "total_guests": 1,
+        "completions_to_date": 0,
+    }
+    assert repeated.json() == first.json()
+    assert rotated.json() == {
+        "guest_number": 2,
+        "total_guests": 2,
+        "completions_to_date": 0,
+    }
+    assert service.guest_identity_count() == 2
+
+
 def test_guest_store_route_uses_landing_identity_and_returns_internal_id(tmp_path, monkeypatch) -> None:
     service = GameService(tmp_path / "legacy.sqlite")
     replay = guest_replay()
