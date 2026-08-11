@@ -76,9 +76,11 @@ describe("review utility panel", () => {
   it("keeps the Analysis tab active regardless of onboarding capabilities", () => {
     renderPanel({ capabilities: initialCapabilityMap() });
     const analysis = screen.getByRole("tab", { name: "Analysis" }) as HTMLButtonElement;
+    expect(screen.getByText("Live engine card").closest(".analysis-pane")?.getAttribute("aria-hidden")).toBe("true");
     expect(analysis.disabled).toBe(false);
     fireEvent.click(analysis);
     expect(screen.getByText("Live engine card")).toBeTruthy();
+    expect(screen.getByText("Live engine card").closest(".analysis-pane")?.getAttribute("aria-hidden")).toBe("false");
   });
 
   it("exposes a native swap button and keeps focus attached to the same named board", async () => {

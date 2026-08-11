@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { formatEvaluation } from "../evalScore";
 
-export type EvalCardStatus = "idle" | "analysing" | "complete" | "failed" | "unsupported-variant";
+export type EvalCardStatus = "idle" | "preparing" | "analysing" | "complete" | "prepare-failed" | "failed" | "unsupported-variant";
 
 export interface EvalPrincipalLine {
   rank: number;
@@ -30,7 +30,9 @@ const displayPocket = (pocket: string) => pocket.trim() || "—";
 const displayMove = (move: string) => move.replace(/^([pnbrq])@/i, (_, piece: string) => `${piece.toUpperCase()}@`);
 
 const stateLabel = (props: EvalCardProps) => {
+  if (props.status === "preparing") return "Preparing…";
   if (props.status === "analysing") return "Analysing…";
+  if (props.status === "prepare-failed") return "Preparation failed";
   if (props.status === "failed") return "Analysis failed";
   if (props.status === "unsupported-variant") return "Unsupported variant";
   if (props.status === "idle") return "Idle";
@@ -43,10 +45,10 @@ export function EvalCard(props: EvalCardProps) {
   const lines = props.principal_lines ?? [];
   const visibleLines = expanded ? lines : lines.slice(0, 1);
   const additionalLineCount = Math.max(0, lines.length - 1);
-  const isFailure = props.status === "failed" || props.status === "unsupported-variant";
+  const isFailure = props.status === "prepare-failed" || props.status === "failed" || props.status === "unsupported-variant";
 
   return (
-    <article className={`eval-card eval-card--${props.status}`} aria-busy={props.status === "analysing"}>
+    <article className={`eval-card eval-card--${props.status}`} aria-busy={props.status === "preparing" || props.status === "analysing"}>
       <header className="eval-card__header">
         <div>
           <span className="eval-card__kicker">ENGINE EVALUATION</span>
@@ -77,6 +79,7 @@ export function EvalCard(props: EvalCardProps) {
       )}
 
       {props.status === "idle" && <p className="eval-card__state" role="status">{props.state_message ?? "Enable analysis when you want a freeze-frame reading."}</p>}
+      {props.status === "preparing" && <p className="eval-card__state" role="status">{props.state_message ?? "Preparing this game for analysis."}</p>}
       {props.status === "analysing" && <p className="eval-card__state" role="status">{props.state_message ?? "Waiting for a scored principal line."}</p>}
 
       {props.status === "complete" && (
