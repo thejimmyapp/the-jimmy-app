@@ -52,6 +52,15 @@ describe("EvalCard", () => {
     expect((screen.getByRole("checkbox", { name: "Enable" }) as HTMLInputElement).disabled).toBe(true);
   });
 
+  it("supports a custom body and header control without changing its default fixtures", () => {
+    render(<EvalCard {...baseProps} body_override={<p>Replacement body</p>} header_control={<span>Replacement control</span>} />);
+    expect(screen.getByText("Replacement body")).toBeTruthy();
+    expect(screen.getByText("Replacement control")).toBeTruthy();
+    expect(screen.queryByText("1.37")).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Enable" })).toBeNull();
+    expect(screen.getByText("Analysis by Fairy-Stockfish")).toBeTruthy();
+  });
+
   it.each([
     ["idle", "Idle"],
     ["preparing", "Preparing…"],

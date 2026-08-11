@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { formatEvaluation } from "../evalScore";
 
 export type EvalCardStatus = "idle" | "preparing" | "analysing" | "complete" | "prepare-failed" | "failed" | "unsupported-variant";
@@ -22,6 +22,9 @@ export interface EvalCardProps {
   state_message?: string;
   board_label?: string;
   toggle_disabled?: boolean;
+  header_control?: ReactNode;
+  body_override?: ReactNode;
+  body_after?: ReactNode;
   onEnabledChange?: (enabled: boolean) => void;
 }
 
@@ -56,7 +59,7 @@ export function EvalCard(props: EvalCardProps) {
           <span className="eval-card__depth">Depth {props.depth}</span>
           {props.board_label && <span className="eval-card__board">{props.status === "complete" ? "Analysed" : "Staged target"}: {props.board_label}</span>}
         </div>
-        <label className="eval-card__toggle">
+        {props.header_control ?? <label className="eval-card__toggle">
           <span>Enable</span>
           <input
             type="checkbox"
@@ -64,9 +67,10 @@ export function EvalCard(props: EvalCardProps) {
             disabled={props.toggle_disabled}
             onChange={(event) => props.onEnabledChange?.(event.currentTarget.checked)}
           />
-        </label>
+        </label>}
       </header>
 
+      {props.body_override ?? <>
       <div className="eval-card__score-row">
         <strong className="eval-card__score">{stateLabel(props)}</strong>
         {props.status === "analysing" && <span className="eval-card__pulse" aria-hidden="true" />}
@@ -113,6 +117,9 @@ export function EvalCard(props: EvalCardProps) {
       <p className="eval-card__context" data-copy-placeholder="true">
         [COPY-PLACEHOLDER] This number comes from one board and its pocket. Fairy-Stockfish cannot see the partner board, so partner-board context may change the number; it is still useful as a tactical signal.
       </p>
+      </>}
+
+      {props.body_after}
 
       <footer className="eval-card__footer">Analysis by Fairy-Stockfish</footer>
     </article>
