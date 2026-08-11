@@ -12,6 +12,33 @@ from thejimmyapp.chesscom_api import parse_pgn_headers
 from thejimmyapp.versioning import ANALYSIS_VERSION
 
 
+DAILY_NOTE_CAP = 10
+
+
+class DailyMomentCapReached(RuntimeError):
+    pass
+
+
+_MOMENT_FIELDS = (
+    "game_id",
+    "move_token",
+    "glyph",
+    "alternative_move",
+    "written_answer",
+    "author_guest_number",
+    "board_a_white_pocket",
+    "board_a_black_pocket",
+    "board_b_white_pocket",
+    "board_b_black_pocket",
+    "board_a_white_clock",
+    "board_a_black_clock",
+    "board_b_white_clock",
+    "board_b_black_clock",
+)
+
+_MOMENT_SELECT = ", ".join(("id", "save_order", *_MOMENT_FIELDS, "created_at"))
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -66,6 +93,67 @@ class Database:
                     token TEXT NOT NULL UNIQUE,
                     created_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS moment_save_sequence (
+                    value INTEGER PRIMARY KEY AUTOINCREMENT
+                );
+
+                CREATE TABLE IF NOT EXISTS private_moments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    save_order INTEGER NOT NULL UNIQUE CHECK(save_order > 0),
+                    game_id INTEGER NOT NULL CHECK(game_id > 0),
+                    move_token TEXT NOT NULL,
+                    glyph TEXT NOT NULL CHECK(glyph IN ('!', '?', '!!', '??', '!?', '?!')),
+                    alternative_move TEXT NOT NULL CHECK(length(alternative_move) > 0),
+                    written_answer TEXT NOT NULL,
+                    author_guest_number INTEGER NOT NULL CHECK(author_guest_number > 0),
+                    board_a_white_pocket TEXT NOT NULL CHECK(length(board_a_white_pocket) > 0),
+                    board_a_black_pocket TEXT NOT NULL CHECK(length(board_a_black_pocket) > 0),
+                    board_b_white_pocket TEXT NOT NULL CHECK(length(board_b_white_pocket) > 0),
+                    board_b_black_pocket TEXT NOT NULL CHECK(length(board_b_black_pocket) > 0),
+                    board_a_white_clock TEXT NOT NULL CHECK(length(board_a_white_clock) > 0),
+                    board_a_black_clock TEXT NOT NULL CHECK(length(board_a_black_clock) > 0),
+                    board_b_white_clock TEXT NOT NULL CHECK(length(board_b_white_clock) > 0),
+                    board_b_black_clock TEXT NOT NULL CHECK(length(board_b_black_clock) > 0),
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS public_moments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    save_order INTEGER NOT NULL UNIQUE CHECK(save_order > 0),
+                    game_id INTEGER NOT NULL CHECK(game_id > 0),
+                    move_token TEXT NOT NULL,
+                    glyph TEXT NOT NULL CHECK(glyph IN ('!', '?', '!!', '??', '!?', '?!')),
+                    alternative_move TEXT NOT NULL CHECK(length(alternative_move) > 0),
+                    written_answer TEXT NOT NULL,
+                    author_guest_number INTEGER NOT NULL CHECK(author_guest_number > 0),
+                    board_a_white_pocket TEXT NOT NULL CHECK(length(board_a_white_pocket) > 0),
+                    board_a_black_pocket TEXT NOT NULL CHECK(length(board_a_black_pocket) > 0),
+                    board_b_white_pocket TEXT NOT NULL CHECK(length(board_b_white_pocket) > 0),
+                    board_b_black_pocket TEXT NOT NULL CHECK(length(board_b_black_pocket) > 0),
+                    board_a_white_clock TEXT NOT NULL CHECK(length(board_a_white_clock) > 0),
+                    board_a_black_clock TEXT NOT NULL CHECK(length(board_a_black_clock) > 0),
+                    board_b_white_clock TEXT NOT NULL CHECK(length(board_b_white_clock) > 0),
+                    board_b_black_clock TEXT NOT NULL CHECK(length(board_b_black_clock) > 0),
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_private_moments_author_order
+                    ON private_moments(author_guest_number, save_order);
+                CREATE INDEX IF NOT EXISTS idx_public_moments_order
+                    ON public_moments(save_order);
+
+                CREATE TRIGGER IF NOT EXISTS freeze_public_moment_updates
+                BEFORE UPDATE ON public_moments
+                BEGIN
+                    SELECT RAISE(ABORT, 'public moments are frozen');
+                END;
+
+                CREATE TRIGGER IF NOT EXISTS freeze_public_moment_deletes
+                BEFORE DELETE ON public_moments
+                BEGIN
+                    SELECT RAISE(ABORT, 'public moments are frozen');
+                END;
 
                 CREATE TABLE IF NOT EXISTS import_runs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -858,6 +946,118 @@ class Database:
         with closing(self.connect()) as conn:
             row = conn.execute("SELECT COUNT(*) AS total FROM guest_identities").fetchone()
         return int(row["total"]) if row else 0
+
+    def create_moment_copies(
+        self,
+        moment: dict[str, object],
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        if set(moment) != set(_MOMENT_FIELDS):
+            raise ValueError("moment content does not match the required schema")
+        now = _utc_now()
+        values = [moment[field] for field in _MOMENT_FIELDS]
+        columns = ", ".join(("save_order", *_MOMENT_FIELDS, "created_at"))
+        placeholders = ", ".join("?" for _ in range(len(_MOMENT_FIELDS) + 2))
+
+        with closing(self.connect()) as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                daily_count = conn.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM private_moments
+                    WHERE author_guest_number = ? AND substr(created_at, 1, 10) = ?
+                    """,
+                    (moment["author_guest_number"], now[:10]),
+                ).fetchone()
+                if daily_count and int(daily_count["total"]) >= DAILY_NOTE_CAP:
+                    raise DailyMomentCapReached("daily moment cap reached")
+
+                sequence = conn.execute("INSERT INTO moment_save_sequence DEFAULT VALUES")
+                if sequence.lastrowid is None:
+                    raise RuntimeError("moment ordering allocation failed")
+                save_order = int(sequence.lastrowid)
+                stored_values = [save_order, *values, now]
+                private_cursor = conn.execute(
+                    f"INSERT INTO private_moments ({columns}) VALUES ({placeholders})",
+                    stored_values,
+                )
+                public_cursor = conn.execute(
+                    f"INSERT INTO public_moments ({columns}) VALUES ({placeholders})",
+                    stored_values,
+                )
+                if private_cursor.lastrowid is None or public_cursor.lastrowid is None:
+                    raise RuntimeError("moment copies were not both stored")
+                private_row = conn.execute(
+                    f"SELECT {_MOMENT_SELECT} FROM private_moments WHERE id = ?",
+                    (private_cursor.lastrowid,),
+                ).fetchone()
+                public_row = conn.execute(
+                    f"SELECT {_MOMENT_SELECT} FROM public_moments WHERE id = ?",
+                    (public_cursor.lastrowid,),
+                ).fetchone()
+                if private_row is None or public_row is None:
+                    raise RuntimeError("moment copies could not be read after storage")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return _moment_row(private_row), _moment_row(public_row)
+
+    def list_private_moments(self, author_guest_number: int) -> list[dict[str, object]]:
+        with closing(self.connect()) as conn:
+            rows = conn.execute(
+                f"""
+                SELECT {_MOMENT_SELECT}
+                FROM private_moments
+                WHERE author_guest_number = ?
+                ORDER BY save_order ASC
+                """,
+                (author_guest_number,),
+            ).fetchall()
+        return [_moment_row(row) for row in rows]
+
+    def list_public_moments(self) -> list[dict[str, object]]:
+        with closing(self.connect()) as conn:
+            rows = conn.execute(
+                f"""
+                SELECT {_MOMENT_SELECT}
+                FROM public_moments
+                ORDER BY save_order ASC
+                """
+            ).fetchall()
+        return [_moment_row(row) for row in rows]
+
+    def update_private_moment(
+        self,
+        moment_id: int,
+        author_guest_number: int,
+        glyph: str,
+        alternative_move: str,
+        written_answer: str,
+    ) -> bool:
+        with closing(self.connect()) as conn:
+            cursor = conn.execute(
+                """
+                UPDATE private_moments
+                SET glyph = ?, alternative_move = ?, written_answer = ?
+                WHERE id = ? AND author_guest_number = ?
+                """,
+                (glyph, alternative_move, written_answer, moment_id, author_guest_number),
+            )
+            conn.commit()
+        return cursor.rowcount == 1
+
+    def delete_private_moment(self, moment_id: int, author_guest_number: int) -> bool:
+        with closing(self.connect()) as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM private_moments
+                WHERE id = ? AND author_guest_number = ?
+                """,
+                (moment_id, author_guest_number),
+            )
+            conn.commit()
+        return cursor.rowcount == 1
 
     def record_import(
         self,
@@ -2288,6 +2488,12 @@ def _json_object(value: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _moment_row(row: sqlite3.Row) -> dict[str, object]:
+    moment = dict(row)
+    moment["author"] = f"guest_{int(moment['author_guest_number'])}"
+    return moment
 
 
 def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:

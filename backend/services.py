@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,14 @@ from thejimmyapp.pgn_parser import parse_game_data, parse_partner_game_data
 
 class GuestReplayIngestError(ValueError):
     pass
+
+
+class MomentPersistenceError(ValueError):
+    pass
+
+
+_MOMENT_TOKEN_RE = re.compile(r"(?P<move_number>[1-9]\d*)(?P<board>[AaBb])")
+_MOMENT_GLYPHS = {"!", "?", "!!", "??", "!?", "?!"}
 
 
 class GameService:
@@ -42,6 +51,110 @@ class GameService:
 
     def guest_identity_count(self) -> int:
         return self.db.guest_identity_count()
+
+    def create_moment(
+        self,
+        game_id: int,
+        move_token: str,
+        glyph: str,
+        alternative_move: str,
+        written_answer: str,
+        author_guest_number: int,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        _validate_moment_annotation(
+            game_id=game_id,
+            move_token=move_token,
+            glyph=glyph,
+            alternative_move=alternative_move,
+            written_answer=written_answer,
+            author_guest_number=author_guest_number,
+        )
+        global_ply = self._moment_global_ply(game_id, move_token)
+        snapshot = self.snapshot(game_id, global_ply)
+        if snapshot is None or snapshot.get("global_ply") != global_ply:
+            raise MomentPersistenceError("the exact coupled replay frame is unavailable")
+        coupled_state = _capture_coupled_state(snapshot)
+        return self.db.create_moment_copies(
+            {
+                "game_id": game_id,
+                "move_token": move_token,
+                "glyph": glyph,
+                "alternative_move": alternative_move,
+                "written_answer": written_answer,
+                "author_guest_number": author_guest_number,
+                **coupled_state,
+            }
+        )
+
+    def list_private_moments(self, author_guest_number: int) -> list[dict[str, object]]:
+        if isinstance(author_guest_number, bool) or author_guest_number <= 0:
+            raise MomentPersistenceError("guest number must be a positive integer")
+        return self.db.list_private_moments(author_guest_number)
+
+    def list_public_moments(self) -> list[dict[str, object]]:
+        return self.db.list_public_moments()
+
+    def update_private_moment(
+        self,
+        moment_id: int,
+        author_guest_number: int,
+        glyph: str,
+        alternative_move: str,
+        written_answer: str,
+    ) -> bool:
+        _validate_moment_annotation(
+            game_id=1,
+            move_token="1A",
+            glyph=glyph,
+            alternative_move=alternative_move,
+            written_answer=written_answer,
+            author_guest_number=author_guest_number,
+        )
+        if isinstance(moment_id, bool) or not isinstance(moment_id, int) or moment_id <= 0:
+            raise MomentPersistenceError("moment id must be a positive integer")
+        return self.db.update_private_moment(
+            moment_id,
+            author_guest_number,
+            glyph,
+            alternative_move,
+            written_answer,
+        )
+
+    def delete_private_moment(self, moment_id: int, author_guest_number: int) -> bool:
+        if (
+            isinstance(moment_id, bool)
+            or not isinstance(moment_id, int)
+            or moment_id <= 0
+            or isinstance(author_guest_number, bool)
+            or not isinstance(author_guest_number, int)
+            or author_guest_number <= 0
+        ):
+            raise MomentPersistenceError("moment and guest numbers must be positive integers")
+        return self.db.delete_private_moment(moment_id, author_guest_number)
+
+    def _moment_global_ply(self, game_id: int, move_token: str) -> int:
+        match = _MOMENT_TOKEN_RE.fullmatch(move_token)
+        if match is None:
+            raise MomentPersistenceError("move token is invalid")
+        payload = self.get_game_payload(game_id)
+        timeline = payload.get("timeline") if payload else None
+        if not isinstance(timeline, list) or not timeline:
+            raise MomentPersistenceError("a complete coupled replay is required")
+
+        board_token = match.group("board")
+        board = board_token.upper()
+        move_number = int(match.group("move_number"))
+        local_ply = move_number * 2 - (1 if board_token.isupper() else 0)
+        matches = [
+            frame
+            for frame in timeline
+            if isinstance(frame, dict)
+            and frame.get("board") == board
+            and frame.get("local_ply") == local_ply
+        ]
+        if len(matches) != 1 or not isinstance(matches[0].get("global_ply"), int):
+            raise MomentPersistenceError("move token does not identify exactly one replay frame")
+        return int(matches[0]["global_ply"])
 
     def ingest_guest_replay(self, replay_source: dict[str, Any], guest_number: int) -> int:
         if isinstance(guest_number, bool) or not isinstance(guest_number, int) or guest_number <= 0:
@@ -233,6 +346,48 @@ class GameService:
                 "analyzed_games": coverage.get("analyzed_at_depth", 0),
             },
         }
+
+
+def _validate_moment_annotation(
+    *,
+    game_id: int,
+    move_token: str,
+    glyph: str,
+    alternative_move: str,
+    written_answer: str,
+    author_guest_number: int,
+) -> None:
+    if isinstance(game_id, bool) or not isinstance(game_id, int) or game_id <= 0:
+        raise MomentPersistenceError("game id must be a positive integer")
+    if not isinstance(move_token, str) or _MOMENT_TOKEN_RE.fullmatch(move_token) is None:
+        raise MomentPersistenceError("move token is invalid")
+    if not isinstance(glyph, str) or glyph not in _MOMENT_GLYPHS:
+        raise MomentPersistenceError("glyph is invalid")
+    if not isinstance(alternative_move, str) or not alternative_move.strip():
+        raise MomentPersistenceError("alternative move is required")
+    if not isinstance(written_answer, str):
+        raise MomentPersistenceError("written answer is required")
+    if (
+        isinstance(author_guest_number, bool)
+        or not isinstance(author_guest_number, int)
+        or author_guest_number <= 0
+    ):
+        raise MomentPersistenceError("guest number must be a positive integer")
+
+
+def _capture_coupled_state(snapshot: dict[str, object]) -> dict[str, str]:
+    captured: dict[str, str] = {}
+    for board_key in ("board_a", "board_b"):
+        board = snapshot.get(board_key)
+        if not isinstance(board, dict):
+            raise MomentPersistenceError("both boards are required in the coupled replay frame")
+        prefix = board_key
+        for field in ("white_pocket", "black_pocket", "white_clock", "black_clock"):
+            value = board.get(field)
+            if not isinstance(value, str) or not value:
+                raise MomentPersistenceError(f"coupled replay frame is missing {board_key}.{field}")
+            captured[f"{prefix}_{field}"] = value
+    return captured
 
 
 def _flatten_guest_replay(replay_source: dict[str, Any]) -> tuple[dict[str, Any], int, int]:
