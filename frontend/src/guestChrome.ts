@@ -4,6 +4,8 @@ export interface GuestSessionIdentity {
   completions_to_date: number | null;
   saved_moment_count: number;
   analysis_unlocked: boolean;
+  completed: boolean;
+  completion_ordinal: number | null;
 }
 
 export const EMPTY_GUEST_SESSION: GuestSessionIdentity = {
@@ -12,6 +14,8 @@ export const EMPTY_GUEST_SESSION: GuestSessionIdentity = {
   completions_to_date: null,
   saved_moment_count: 0,
   analysis_unlocked: false,
+  completed: false,
+  completion_ordinal: null,
 };
 
 export const CLICK_ME_COPY = "Do not click me. Use the keyboard — the one you have covered in crumbs and fingerprints. Your keyboard hates you. Tap it anyway: ← or → and ⏎.";

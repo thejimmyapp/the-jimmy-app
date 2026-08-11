@@ -37,6 +37,7 @@ from backend.rooms import room_hub
 from backend.puzzles import check_move, get_puzzle, next_move, solution
 from backend.qwen_runtime import QwenRuntime
 from backend.schemas import (
+    AccountClaimRequest,
     AnalysisRequest,
     ChessComConnectRequest,
     ChessComEnrichRequest,
@@ -58,7 +59,7 @@ from thejimmyapp.chesscom_api import parse_pgn_headers
 from thejimmyapp.chesscom_pgn_info import PgnInfoClient, merge_pgn_info, parse_curl_auth
 from thejimmyapp.game_completion import is_completed_pgn, pgn_result, player_results
 from backend.services import AnalysisJobs, GameService, GuestReplayIngestError, MomentPersistenceError
-from thejimmyapp.db import DailyMomentCapReached
+from thejimmyapp.db import DailyMomentCapReached, SignupRequiresCompletion
 
 
 settings = get_settings()
@@ -71,6 +72,7 @@ coach_jobs = CoachJobs(settings, games, qwen_runtime)
 leak_map_jobs = LeakMapJobs(settings, games)
 chesscom_matchups = ChessComMatchupService(settings)
 GUEST_IDENTITY_COOKIE = "jimmy_guest_identity"
+ACCOUNT_IDENTITY_COOKIE = "jimmy_account_token"
 ENGINE_UNLOCK_MOMENT_COUNT = 10
 app = FastAPI(title=settings.app_name, version="0.1.0")
 
@@ -81,6 +83,11 @@ async def structured_request_validation_error(request: Request, exc: RequestVali
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={"detail": {"code": "moment_refused", "message": "Moment payload is incomplete or invalid."}},
+        )
+    if request.method == "POST" and request.url.path == "/api/accounts/claim":
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": {"code": "invalid_email", "message": "Enter a valid email."}},
         )
     return await request_validation_exception_handler(request, exc)
 
@@ -103,6 +110,27 @@ def _set_guest_identity_cookie(response: Response, identity_token: str) -> None:
         max_age=31_536_000,
         samesite="lax",
     )
+
+
+def _set_account_identity_cookie(response: Response, account_token: str) -> None:
+    response.set_cookie(
+        ACCOUNT_IDENTITY_COOKIE,
+        account_token,
+        httponly=True,
+        max_age=31_536_000,
+        samesite="lax",
+    )
+
+
+def _account_payload(account: dict[str, object]) -> dict[str, object]:
+    completion_ordinal = int(account["completion_ordinal"])
+    return {
+        "guest_number": int(account["guest_number"]),
+        "email": str(account["email"]),
+        "completion_ordinal": completion_ordinal,
+        "founder_eligible": completion_ordinal <= 10,
+        "created_at": str(account["created_at"]),
+    }
 
 
 async def _guest_session_payload(guest_number: int) -> dict[str, object]:
@@ -288,6 +316,43 @@ async def reset_guest_session(response: Response) -> dict[str, object]:
     guest_number, identity_token = await asyncio.to_thread(games.create_guest_identity)
     _set_guest_identity_cookie(response, identity_token)
     return await _guest_session_payload(guest_number)
+
+
+@app.post("/api/accounts/claim")
+async def claim_account(
+    payload: AccountClaimRequest,
+    request: Request,
+    response: Response,
+) -> dict[str, object]:
+    guest_number = await _guest_number_from_request(request)
+    if guest_number is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "guest_identity_missing", "message": "Open the guest landing page first."},
+        )
+    try:
+        account = await asyncio.to_thread(
+            games.claim_account,
+            guest_number,
+            payload.email,
+            str(uuid4()),
+        )
+    except SignupRequiresCompletion as exc:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "signup_requires_completion", "message": str(exc)},
+        ) from exc
+    _set_account_identity_cookie(response, str(account["account_token"]))
+    return _account_payload(account)
+
+
+@app.get("/api/accounts/me")
+async def current_account(request: Request) -> dict[str, object]:
+    account_token = request.cookies.get(ACCOUNT_IDENTITY_COOKIE)
+    if not account_token:
+        return {"account": None}
+    account = await asyncio.to_thread(games.account_for_token, account_token)
+    return {"account": _account_payload(account) if account is not None else None}
 
 
 @app.post("/api/chesscom/matches/{game_id}/store")

@@ -61,9 +61,23 @@ export interface CreateMomentRequest {
   engine_depth: number | null;
 }
 
+export interface AccountSummary {
+  guest_number: number;
+  email: string;
+  completion_ordinal: number;
+  founder_eligible: boolean;
+  created_at: string;
+}
+
 export const api = {
   guestSession: () => json<GuestSessionIdentity>(fetch("/api/guests", { method: "POST" })),
   resetGuestSession: () => json<GuestSessionIdentity>(fetch("/api/guests/reset", { method: "POST" })),
+  accountMe: () => json<{ account: AccountSummary | null }>(fetch("/api/accounts/me")),
+  claimAccount: (email: string) => json<AccountSummary>(fetch("/api/accounts/claim", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })),
   chessComMatch: (gameId: number) => json<NormalizedMatch>(fetch(`/api/chesscom/matches/${gameId}`)),
   chessComMatchReplay: (gameId: number) => json<GuestMatchReplaySource>(fetch(`/api/chesscom/matches/${gameId}/replay`)),
   storeChessComGuestMatch: (gameId: number) =>
