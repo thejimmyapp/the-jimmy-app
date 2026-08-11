@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { LegalPage } from "./LegalPage";
 
@@ -19,5 +19,15 @@ describe("public legal pages", () => {
     expect(screen.getByText(/Public Chess.com imports are limited to completed archive records/i)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "No live assistance or cheating" })).toBeTruthy();
     expect(screen.getByText(/not affiliated with, sponsored by, or endorsed by Chess.com/i)).toBeTruthy();
+  });
+
+  it("renders third-party attributions and the notices navigation link", () => {
+    const { container } = render(<LegalPage page="notices" />);
+    const notices = within(container);
+    expect(notices.getByRole("heading", { name: "Third-Party Notices" })).toBeTruthy();
+    expect(notices.getByRole("link", { name: "Fairy-Stockfish" }).closest("p")?.textContent).toContain("GPL-3.0-or-later");
+    expect(notices.getByRole("link", { name: "lila" }).closest("p")?.textContent).toContain("AGPL-3.0");
+    expect(notices.getByRole("heading", { name: "Chess.com acknowledgment" }).nextElementSibling?.textContent).toContain("Chess.com trademarks, game records, and assets belong to Chess.com");
+    expect(notices.getByRole("link", { name: "Notices" }).getAttribute("href")).toBe("/third-party-notices");
   });
 });

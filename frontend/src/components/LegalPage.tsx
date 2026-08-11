@@ -2,15 +2,39 @@ import { LegalLinks } from "./LegalLinks";
 
 const CONTACT_EMAIL = "hello@thejimmyapp.com";
 
-export function LegalPage({ page }: { page: "privacy" | "terms" }) {
+export function LegalPage({ page }: { page: "privacy" | "terms" | "notices" }) {
   return (
     <main className="legal-shell">
       <header className="legal-header">
         <a className="brand legal-brand" href="/"><span className="brand-mark">J</span><span><strong>THE JIMMY APP</strong><small>POST-GAME BUGHOUSE REVIEW</small></span></a>
         <LegalLinks />
       </header>
-      {page === "privacy" ? <PrivacyPolicy /> : <TermsOfService />}
+      {page === "privacy" ? <PrivacyPolicy /> : page === "terms" ? <TermsOfService /> : <ThirdPartyNotices />}
     </main>
+  );
+}
+
+function ThirdPartyNotices() {
+  return (
+    <article className="legal-document">
+      <h1>Third-Party Notices</h1>
+      <p>This page provides factual attribution for third-party projects referenced or used by The Jimmy App. It does not reproduce license text.</p>
+
+      <h2>Fairy-Stockfish</h2>
+      <p><a href="https://github.com/fairy-stockfish/Fairy-Stockfish">Fairy-Stockfish</a> is licensed under <strong>GPL-3.0-or-later</strong>. It runs server-side and is not conveyed to users as a binary or bundled in an artifact produced by this repository.</p>
+
+      <h2>Stockfish</h2>
+      <p><a href="https://github.com/official-stockfish/Stockfish">Stockfish</a> is licensed under <strong>GPL-3.0-or-later</strong>. Fairy-Stockfish derives from the Stockfish engine lineage.</p>
+
+      <h2>lichess / lila</h2>
+      <p><a href="https://github.com/lichess-org/lila">lila</a> is licensed under <strong>AGPL-3.0</strong>. It was used only as a pattern reference; no lila code was copied, and this service does not run lila.</p>
+
+      <h2>Chess.com acknowledgment</h2>
+      <p><a href="https://www.chess.com/">Chess.com</a> trademarks, game records, and assets belong to Chess.com and their respective rights holders. The Jimmy App is unaffiliated with Chess.com and copies no Chess.com assets. This is an acknowledgment, not a software-license entry.</p>
+
+      <h2>Direct software dependencies</h2>
+      <p>The complete attribution list for production frontend dependencies and direct backend requirements is maintained in <a href="https://github.com/thejimmyapp/the-jimmy-app/blob/main/THIRD-PARTY-NOTICES.md">THIRD-PARTY-NOTICES.md</a>.</p>
+    </article>
   );
 }
 
