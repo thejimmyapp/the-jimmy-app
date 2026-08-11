@@ -126,9 +126,26 @@ def test_moment_refuses_each_incomplete_wizard_step_without_writing(tmp_path, mo
             payload = {"game_id": game_id, **BASE_MOMENT}
             del payload[missing_field]
             assert client.post("/api/moments", json=payload).status_code == 422
+        for invalid_answer in ("", "   ", "Because", "Because   "):
+            refused = _create(client, game_id, written_answer=invalid_answer)
+            assert refused.status_code == 422
+            assert refused.json()["detail"]["code"] == "moment_refused"
 
     assert service.list_private_moments(1) == []
     assert service.list_public_moments() == []
+
+
+def test_one_word_written_answer_saves_and_increments_server_count(tmp_path, monkeypatch) -> None:
+    service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        created = _create(client, game_id, written_answer="Because Timing")
+        identity = client.post("/api/guests")
+
+    assert created.status_code == 201
+    assert identity.json()["saved_moment_count"] == 1
+    assert len(service.list_private_moments(1)) == 1
+    assert len(service.list_public_moments()) == 1
 
 
 def test_editing_private_copy_leaves_public_copy_byte_identical(tmp_path, monkeypatch) -> None:

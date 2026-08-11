@@ -47,9 +47,10 @@ export function AnnotationWizardShell({ move_options, alternative_move_options =
   };
 
   const currentStep = alternativeMove ? 4 : glyph ? 3 : selectedMove ? 2 : 1;
+  const hasWrittenAnswer = answer.trim().length >= 1;
   const save = async () => {
-    if (!onSave || !selectedMove || !glyph || !alternativeMove || saving) return;
-    const writtenAnswer = answer.trim() ? `Because ${answer.trim()}` : "Because";
+    if (!onSave || !selectedMove || !glyph || !alternativeMove || !hasWrittenAnswer || saving) return;
+    const writtenAnswer = `Because ${answer.trim()}`;
     await onSave({ moveToken: selectedMove.token, glyph, alternativeMove, writtenAnswer });
   };
 
@@ -138,12 +139,14 @@ export function AnnotationWizardShell({ move_options, alternative_move_options =
             aria-label="Written answer after Because"
             value={answer}
             onChange={(event) => setAnswer(event.target.value)}
+            minLength={1}
+            required
           />
         </label>
         {onSave && (
           <div className="wizard-step__actions">
             {onCancel && <button type="button" onClick={onCancel} disabled={saving}>Cancel</button>}
-            <button type="button" className="primary" onClick={() => void save()} disabled={!selectedMove || !glyph || !alternativeMove || saving}>
+            <button type="button" className="primary" onClick={() => void save()} disabled={!selectedMove || !glyph || !alternativeMove || !hasWrittenAnswer || saving}>
               {saving ? "Saving…" : "Save moment"}
             </button>
           </div>

@@ -48,13 +48,21 @@ class MomentCreateRequest(BaseModel):
     move_token: str = Field(pattern=r"^[1-9]\d*[AaBb]$", max_length=20)
     glyph: Literal["!", "?", "!!", "??", "!?", "?!"]
     alternative_move: str = Field(min_length=1, max_length=64)
-    written_answer: str = Field(max_length=5000)
+    written_answer: str = Field(min_length=1, max_length=5000)
 
     @field_validator("alternative_move")
     @classmethod
     def require_board_move(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("alternative move is required")
+        return value
+
+    @field_validator("written_answer")
+    @classmethod
+    def require_written_answer(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned or cleaned == "Because":
+            raise ValueError("written answer is required")
         return value
 
 

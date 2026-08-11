@@ -7,8 +7,10 @@ import re
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -70,6 +72,18 @@ chesscom_matchups = ChessComMatchupService(settings)
 GUEST_IDENTITY_COOKIE = "jimmy_guest_identity"
 ENGINE_UNLOCK_MOMENT_COUNT = 10
 app = FastAPI(title=settings.app_name, version="0.1.0")
+
+
+@app.exception_handler(RequestValidationError)
+async def structured_request_validation_error(request: Request, exc: RequestValidationError):
+    if request.method == "POST" and request.url.path == "/api/moments":
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": {"code": "moment_refused", "message": "Moment payload is incomplete or invalid."}},
+        )
+    return await request_validation_exception_handler(request, exc)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

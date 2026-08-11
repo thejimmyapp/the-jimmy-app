@@ -160,7 +160,7 @@ describe("guest learning moment library", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close flashcard library" }));
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    await saveMoment("!!", "The first game starts to squeeze the king.");
+    await saveMoment("!!", "Timing");
     expect(container.querySelector(".side-panel")?.getAttribute("data-saved-moment-count")).toBe("1");
     expect(apiMock.storeChessComGuestMatch).toHaveBeenCalledWith(firstMatch.game_ids.A);
     expect(apiMock.storeChessComGuestMatch.mock.invocationCallOrder[0]).toBeLessThan(apiMock.createMoment.mock.invocationCallOrder[0]);
@@ -168,7 +168,7 @@ describe("guest learning moment library", () => {
       game_id: 901,
       glyph: "!!",
       alternative_move: "e3",
-      written_answer: "Because The first game starts to squeeze the king.",
+      written_answer: "Because Timing",
     });
     expect(apiMock.createMoment.mock.calls[0][0].move_token).toMatch(/^[1-9]\d*[AaBb]$/);
     fireEvent.keyDown(window, { key: "ArrowRight" });
