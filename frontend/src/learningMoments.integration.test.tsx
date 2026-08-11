@@ -21,6 +21,7 @@ const apiMock = vi.hoisted(() => ({
   explorationMove: vi.fn(),
   explorationSanMove: vi.fn(),
 }));
+const clipboardWrite = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const original = await importOriginal<typeof import("./api")>();
@@ -108,6 +109,8 @@ describe("guest learning moment library", () => {
     useCoachStore.setState({ game: null, guestMatch: null, roomId: null, globalPly: 0, mode: "review" });
     serverMomentCount = 0;
     nextMomentId = 1;
+    clipboardWrite.mockReset().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: clipboardWrite } });
     apiMock.guestSession.mockImplementation(async () => ({ guest_number: 13, total_guests: 13, completions_to_date: null, saved_moment_count: serverMomentCount, analysis_unlocked: serverMomentCount >= 10 }));
     apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
     apiMock.guestMatchups.mockResolvedValue({
@@ -217,6 +220,68 @@ describe("guest learning moment library", () => {
     await waitFor(() => expect(loadGuestProgress().savedMoments).toHaveLength(2));
     expect(container.querySelector(".side-panel")?.getAttribute("data-saved-moment-count")).toBe("2");
     expect(screen.getAllByRole("button", { name: "Open" })).toHaveLength(2);
+  }, 10_000);
+
+  it("shows a malformed moment address without loading or seeking a game", async () => {
+    history.replaceState(null, "", "/?game=101&moment=1Aextra");
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
+
+    expect((await screen.findByRole("alert")).textContent).toContain("is malformed");
+    expect(useCoachStore.getState().game).toBeNull();
+    expect(useCoachStore.getState().globalPly).toBe(0);
+    expect(apiMock.guestMatchups).not.toHaveBeenCalled();
+    expect(apiMock.chessComMatchReplay).not.toHaveBeenCalled();
+  });
+
+  it("shows an unknown bridge game without loading or seeking a replay", async () => {
+    history.replaceState(null, "", "/?game=999999999&moment=1A");
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
+
+    expect((await screen.findByRole("alert")).textContent).toContain("could not resolve bridge game 999999999");
+    expect(useCoachStore.getState().game).toBeNull();
+    expect(useCoachStore.getState().globalPly).toBe(0);
+    expect(apiMock.chessComMatchReplay).not.toHaveBeenCalled();
+  });
+
+  it("shows a zero-frame moment address without committing the loaded replay", async () => {
+    history.replaceState(null, "", `/?game=${firstMatch.game_ids.A}&moment=999A`);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><App /></QueryClientProvider>);
+
+    expect((await screen.findByRole("alert")).textContent).toContain("does not identify any coupled replay frame");
+    expect(useCoachStore.getState().game).toBeNull();
+    expect(useCoachStore.getState().globalPly).toBe(0);
+    expect(apiMock.chessComMatchReplay).toHaveBeenCalledWith(firstMatch.game_ids.A);
+  });
+
+  it("round-trips a copied saved-moment link through the fail-closed reader", async () => {
+    const firstClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={firstClient}><App /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole("button", { name: /Click me\?/ }));
+    fireEvent.keyDown(await screen.findByRole("listbox", { name: "Guest matchups" }), { key: "Enter" });
+    expect(await screen.findAllByLabelText(/Board chessboard/)).toHaveLength(2);
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await saveMoment("!", "the copied address returns to this exact frame");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Library/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Copy moment link for/ }));
+    await waitFor(() => expect(clipboardWrite).toHaveBeenCalledOnce());
+    const copied = new URL(String(clipboardWrite.mock.calls[0][0]));
+    const savedRequest = apiMock.createMoment.mock.calls[0][0];
+    expect(copied.searchParams.get("game")).toBe(String(firstMatch.game_ids.A));
+    expect(copied.searchParams.get("moment")).toBe(savedRequest.move_token);
+
+    cleanup();
+    useCoachStore.setState({ game: null, guestMatch: null, roomId: null, globalPly: 0, mode: "review" });
+    history.replaceState(null, "", `${copied.pathname}${copied.search}`);
+    const secondClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={secondClient}><App /></QueryClientProvider>);
+
+    await waitFor(() => expect(useCoachStore.getState().guestMatch?.game_ids).toEqual(firstMatch.game_ids));
+    expect(useCoachStore.getState().globalPly).toBe(1);
+    expect(screen.queryByRole("alert")).toBeNull();
   }, 10_000);
 
   it("sends a playable engine line with provenance, clears it on divergence, and refuses an unplayable line", async () => {

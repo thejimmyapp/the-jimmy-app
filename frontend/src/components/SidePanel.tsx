@@ -1,4 +1,4 @@
-import { Bell, BookOpen, Home, LockKeyhole, Search, Send, Trash2 } from "lucide-react";
+import { Bell, BookOpen, Copy, Home, LockKeyhole, Search, Send, Trash2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { isCapabilityLocked, savedMomentKey, type CapabilityKey, type CapabilityMap, type SavedLesson, type SavedMoment } from "../guestProgress";
 import { QUEST_COPY, QUEST_TARGET_MOMENTS, questRoomMessage } from "../quest";
@@ -28,6 +28,7 @@ interface Props {
   onOpenSavedLesson: (lesson: SavedLesson) => Promise<boolean>;
   onRemoveSavedLesson: (id: string) => void;
   onOpenSavedMoment?: (moment: SavedMoment) => Promise<boolean>;
+  onCopySavedMoment?: (moment: SavedMoment) => Promise<void>;
   onRemoveSavedMoment?: (key: string) => void;
   onMap: () => void;
   initialTab?: PrimaryTab;
@@ -52,7 +53,7 @@ const primaryCapability: Partial<Record<PrimaryTab, CapabilityKey>> = {
   quest: "dock_quest",
 };
 
-export function SidePanel({ onSelectGame, loadingGame, boardContent, analysisContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, questCompleted = false, questProgress = Math.min(QUEST_TARGET_MOMENTS, savedMomentCount), roomQuestRemainingSeconds = null, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
+export function SidePanel({ onSelectGame, loadingGame, boardContent, analysisContent, infoContent, savedLessons, savedMoments = [], savedMomentCount = savedMoments.length, questCompleted = false, questProgress = Math.min(QUEST_TARGET_MOMENTS, savedMomentCount), roomQuestRemainingSeconds = null, momentPlayers = {}, qualifyingGames, onOpenSavedLesson, onRemoveSavedLesson, onOpenSavedMoment, onCopySavedMoment, onRemoveSavedMoment, onMap, initialTab = "review", dockActions, dockPanel, capabilities, activeBoard = "A", boardFocusEnabled = false, onActiveBoardChange, stagedSourceBoard = "A", dockSourceBoard = "B", stagedBoardName = "First Board", dockBoardName = "Second Board", onSwapBoards }: Props) {
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(initialTab);
   const [reviewTab, setReviewTab] = useState<ReviewTab | null>(null);
   const [collaborateTab, setCollaborateTab] = useState<CollaborateTab>("chat");
@@ -65,6 +66,8 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, analysisCon
   const [lastNotice, setLastNotice] = useState("");
   const [unavailableLessons, setUnavailableLessons] = useState<string[]>([]);
   const [unavailableMoments, setUnavailableMoments] = useState<string[]>([]);
+  const [copiedMoment, setCopiedMoment] = useState<string | null>(null);
+  const [momentCopyError, setMomentCopyError] = useState<{ key: string; message: string } | null>(null);
   const { games, game, guestMatch, messages, addMessage, displayName, globalPly, participants, roomId } = useCoachStore();
 
   const filteredGames = useMemo(() => {
@@ -203,7 +206,20 @@ export function SidePanel({ onSelectGame, loadingGame, boardContent, analysisCon
               <span className="moment-card-glyph">{moment.glyph}</span>
               <div><strong>{moment.move} · {moment.seat}</strong><p>{moment.note}</p><small>{momentPlayers[key] ?? "Players unavailable"}</small></div>
               <button type="button" className="moment-card-open" onClick={async () => { const opened = await onOpenSavedMoment?.(moment); setUnavailableMoments((items) => opened ? items.filter((item) => item !== key) : [...new Set([...items, key])]); }}>Open</button>
+              <button type="button" className="moment-card-copy" aria-label={`Copy moment link for ${moment.moveToken ?? `ply ${moment.ply}`}`} onClick={async () => {
+                setCopiedMoment(null);
+                setMomentCopyError(null);
+                try {
+                  if (!onCopySavedMoment) throw new Error("Moment link copying is unavailable.");
+                  await onCopySavedMoment(moment);
+                  setCopiedMoment(key);
+                } catch (error) {
+                  setMomentCopyError({ key, message: error instanceof Error ? error.message : "The moment link could not be copied." });
+                }
+              }}><Copy size={13} /></button>
               <button type="button" className="moment-card-delete" aria-label={`Delete saved moment at ply ${moment.ply}`} onClick={() => onRemoveSavedMoment?.(key)}><Trash2 size={14} /></button>
+              {copiedMoment === key && <em className="moment-copy-status" role="status">Moment link copied.</em>}
+              {momentCopyError?.key === key && <em className="moment-copy-error" role="alert">{momentCopyError.message}</em>}
               {unavailableMoments.includes(key) && <em>That guest match is not in the current matchup list.</em>}
             </article>;
           })}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captureMomentContext, matchForSavedMoment, playerNamesForMoment, savedMomentFromCapture } from "./learningMoments";
+import { captureMomentContext, matchForSavedMoment, momentPermalinkPath, playerNamesForMoment, resolveMomentAddress, savedMomentFromCapture } from "./learningMoments";
 import type { GamePayload, NormalizedMatch, ReplayPosition } from "./types";
 
 const position: ReplayPosition = {
@@ -70,5 +70,22 @@ describe("learning moment capture", () => {
     const saved = savedMomentFromCapture(captureMomentContext(match, game, 1)!, "!", "N@f6", "Because timing", 72);
     expect(matchForSavedMoment([match], saved)).toBe(match);
     expect(playerNamesForMoment(match)).toBe("Alpha · Beta · Gamma · Delta");
+  });
+
+  it("resolves a canonical address only when exactly one coupled frame matches", () => {
+    expect(resolveMomentAddress(game, "1a")).toEqual({ ok: true, globalPly: 2 });
+    expect(resolveMomentAddress(game, "9A")).toEqual({ ok: false, reason: "zero_frames" });
+    expect(resolveMomentAddress(game, "1aextra")).toEqual({ ok: false, reason: "malformed" });
+
+    const duplicate = {
+      ...game,
+      timeline: [...game.timeline, { ...game.timeline[2], global_ply: 3 }],
+    };
+    expect(resolveMomentAddress(duplicate, "1a")).toEqual({ ok: false, reason: "multiple_frames" });
+  });
+
+  it("builds a canonical moment permalink from the stored bridge id and shared address validator", () => {
+    expect(momentPermalinkPath(101, "1a")).toBe("/?game=101&moment=1a");
+    expect(() => momentPermalinkPath(101, "1aextra")).toThrow("canonical moment address");
   });
 });
