@@ -191,6 +191,46 @@
   .eval-card__pockets code{color:var(--cyan);font:11px var(--mono)}
   .eval-card__context{padding:9px 10px;border-left:3px solid var(--cyan-dim);background:rgba(53,200,232,.06);color:var(--txt2);font-size:10.5px}
   .eval-card__footer{margin-top:auto;padding-top:9px;border-top:1px solid var(--line);color:var(--txt3);font:9px var(--mono)}
+  .moment-fixture-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:14px}
+  .moment-fixture{min-width:0;padding:0;border:0;border-radius:0;background:transparent;display:block}
+  .moment-fixture__label{margin:0 0 7px;color:var(--txt2);font:10px var(--mono);letter-spacing:.05em;text-transform:uppercase}
+  .learning-moment-card{display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid var(--line);border-top:2px solid var(--cyan);border-radius:7px;background:#0a111d;color:var(--txt)}
+  .learning-moment-card section{display:block;padding:0;border:0;border-radius:0;background:transparent}
+  .learning-moment__header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  .learning-moment__kicker,.learning-moment__field-label,.learning-moment__board-label{display:block;color:var(--cyan);font:9px var(--mono);letter-spacing:.11em;text-transform:uppercase}
+  .learning-moment__header h3{margin:2px 0 0;font-size:15px}
+  .learning-moment__address{padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--txt2);font:10px var(--mono)}
+  .learning-moment__position-row{display:grid;grid-template-columns:minmax(190px,240px) minmax(0,1fr);gap:16px;align-items:start}
+  .learning-moment__board-label{margin-bottom:6px;color:var(--txt3)}
+  .learning-moment__board{display:grid;grid-template-columns:repeat(8,1fr);width:100%;aspect-ratio:1;border:1px solid var(--line)}
+  .learning-moment__square{display:flex;align-items:center;justify-content:center;min-width:0;color:#f4f7fb;font-size:clamp(15px,2vw,25px);line-height:1;text-shadow:0 1px 2px #000}
+  .learning-moment__square--light{background:#8194a8}
+  .learning-moment__square--dark{background:#334b63}
+  .learning-moment__played{display:flex;justify-content:space-between;gap:10px;margin-top:7px;padding:7px 9px;border:1px solid var(--line);border-radius:4px;background:var(--panel);font:10px var(--mono)}
+  .learning-moment__played span{color:var(--txt3);text-transform:uppercase}
+  .learning-moment__played strong{color:var(--cyan)}
+  .learning-moment__annotation{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start}
+  .learning-moment__glyph{grid-row:span 2;display:flex;align-items:center;justify-content:center;width:62px;height:62px;border:1px solid var(--cyan-dim);border-radius:7px;background:rgba(53,200,232,.08);color:var(--cyan);font:700 28px var(--mono)}
+  .learning-moment__prompt{margin-top:4px;color:var(--txt);font-size:13px;line-height:1.5}
+  .learning-moment__alternative{grid-column:2;padding:9px 10px;border-left:3px solid var(--cyan-dim);background:rgba(53,200,232,.05)}
+  .learning-moment__alternative strong{display:block;margin-top:3px;color:var(--cyan);font:15px var(--mono)}
+  .learning-moment__coupled{padding-top:12px!important;border-top:1px solid var(--line)!important}
+  .learning-moment__coupled>h3,.learning-moment__clocks>h3{margin-bottom:8px;color:var(--txt);font-size:12px}
+  .learning-moment__pocket-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .learning-moment__pocket-board{padding:10px!important;border:1px solid var(--cyan-dim)!important;border-radius:6px!important;background:rgba(53,200,232,.05)!important}
+  .learning-moment__pocket-board h4{margin-bottom:7px;color:var(--cyan);font:10px var(--mono);text-transform:uppercase;letter-spacing:.08em}
+  .learning-moment__pocket-board div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-top:1px solid rgba(34,48,74,.7)}
+  .learning-moment__pocket-board span{color:var(--txt2);font-size:10px}
+  .learning-moment__pocket-board strong{overflow-wrap:anywhere;color:var(--txt);font:600 13px var(--mono)}
+  .learning-moment__clock-matrix{width:100%;border-spacing:0;border-collapse:separate;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .learning-moment__clock-matrix th,.learning-moment__clock-matrix td{width:calc((100% - 74px)/2);padding:7px 9px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;font:11px var(--mono)}
+  .learning-moment__clock-matrix th:first-child,.learning-moment__clock-matrix td:first-child{width:74px}
+  .learning-moment__clock-matrix tr>*:last-child{border-right:0}
+  .learning-moment__clock-matrix tbody tr:last-child>*{border-bottom:0}
+  .learning-moment__clock-matrix th{color:var(--txt3);background:var(--panel);font-weight:500}
+  .learning-moment__clock-matrix time{color:var(--txt);font-weight:650;font-variant-numeric:tabular-nums}
+  .learning-moment__answer{padding:12px!important;border:1px solid var(--line)!important;border-radius:6px!important;background:var(--panel)!important}
+  .learning-moment__answer p{margin-top:6px;color:var(--txt2);font-size:12px;line-height:1.65;overflow-wrap:anywhere}
   .leave-timer{position:fixed;top:14px;right:14px;z-index:9999;width:194px;padding:11px 12px 10px;border:1px solid #7a5a1e;border-top:2px solid #e8b93c;border-radius:7px;background:rgba(8,13,22,.94);box-shadow:0 10px 32px rgba(0,0,0,.42);font-family:var(--mono);pointer-events:none;backdrop-filter:blur(8px)}
   .leave-timer[hidden]{display:none}
   .leave-timer__kicker{display:block;margin-bottom:6px;color:#e8b93c;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
@@ -215,6 +255,10 @@
     .source-matrix-count{display:block;margin-top:7px}
     .source-matrix{grid-template-columns:repeat(3,minmax(0,1fr))}
     .leave-timer{top:8px;right:8px;width:180px}
+    .moment-fixture-grid{grid-template-columns:minmax(0,1fr)}
+    .learning-moment__position-row{grid-template-columns:minmax(0,1fr)}
+    .learning-moment__position-row>div:first-child{max-width:280px}
+    .learning-moment__pocket-grid{grid-template-columns:minmax(0,1fr)}
   }
 </style>
 </head>
@@ -243,6 +287,18 @@
       <noscript><p class="specimen-meta">JavaScript is required to render the live eval-card fixtures.</p></noscript>
       <p class="specimen-meta">Fixture data only · The former screenshot remains in the specimen archive but is no longer rendered for block 12.</p>
 
+  </div>
+</details>
+
+<details class="specimen live-component" data-block="13" open>
+  <summary class="specimen-head">
+    <span class="specimen-title">13 · Flashcard / study card</span>
+  </summary>
+  <div class="specimen-body">
+      <p class="specimen-copy">Live fixture component: coupled position, played and alternative moves, glyph-specific question, both boards’ pockets and all four clocks, authored answer, and moment address. Nothing is persisted or editable.</p>
+      <div id="moment-card-fixtures"><p class="specimen-meta">Loading learning-moment fixtures…</p></div>
+      <noscript><p class="specimen-meta">JavaScript is required to render the live learning-moment fixtures.</p></noscript>
+      <p class="specimen-meta">Fixture data only · The former screenshot remains in the specimen archive but is no longer rendered for block 13.</p>
   </div>
 </details>
 
@@ -385,26 +441,12 @@
 </div>
 
 <section class="specimen-section" aria-labelledby="temporary-specimens">
-  <h2 id="temporary-specimens">13–25 · Screenshot specimens — temporary references</h2>
+  <h2 id="temporary-specimens">14–25 · Screenshot specimens — temporary references</h2>
     <p class="specimen-intro">Captured third-party UI is retained here only as a build target. These pixels never migrate into app components. Registry: 1–11 canonical · 12–16 Bv2 · 17–21 curated · 22–24 Bv2 annotation · 25 Bv2 paired viewer · next specimen is 26.</p>
-    <p class="design-backlog-note"><strong>Design backlog:</strong> block 13 to be redesigned as lichess-study × chess.com hybrid card (owner redline era).</p>
     <p class="license-boundary"><strong>License boundary:</strong> Lichess code references are AGPL-3.0 and exist only as clearly headed excerpts in <code>docs/specimens/</code>. No Lichess code is embedded on this page or elsewhere under <code>frontend/</code> or <code>backend/</code>; any future feature must be reimplemented from behavior, never pasted.</p>
 </section>
 
 <div class="specimen-group">
-<details class="specimen" data-block="13">
-  <summary class="specimen-head">
-    <span class="specimen-title">13 · Flashcard / study card</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">Board, numbered moves, personal prose annotation, replay controls, and share affordance. Target: a saved moment card combining a moment address, position, and the user's own written insight.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-13-flashcard.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 13"><img src="./specimens/specimen-13-flashcard.jpg" width="1560" height="854" loading="lazy" alt="Chess study embed with board, numbered moves, prose annotation, navigation controls, and share control"></a>
-      <p class="specimen-meta">Source: <a href="https://www.chess.com/blog/RyanTime/dear-lord-someone-please-explain-this-to-me-a-two-star-puzzle-rated-3600">RyanTime — “Dear Lord, someone please explain this to me”</a> · Owner-supplied capture · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
 <details class="specimen" data-block="14">
   <summary class="specimen-head">
     <span class="specimen-title">14 · Lichess analysis module</span>
