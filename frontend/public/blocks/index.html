@@ -231,6 +231,40 @@
   .learning-moment__clock-matrix time{color:var(--txt);font-weight:650;font-variant-numeric:tabular-nums}
   .learning-moment__answer{padding:12px!important;border:1px solid var(--line)!important;border-radius:6px!important;background:var(--panel)!important}
   .learning-moment__answer p{margin-top:6px;color:var(--txt2);font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+  .glyph-picker{min-width:0;padding:13px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--txt)}
+  .glyph-picker:focus-visible,.glyph-picker select:focus-visible,.wizard-step button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+  .glyph-picker[disabled]{opacity:.45}
+  .glyph-picker legend{padding:0 5px;color:var(--cyan);font:10px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+  .glyph-picker__instruction{margin-bottom:8px;color:var(--txt2);font-size:11px}
+  .glyph-picker__key-map{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;list-style:none}
+  .glyph-picker__key-map li{display:grid;grid-template-columns:auto 1fr;gap:2px 7px;align-items:center;min-width:0;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--bg2)}
+  .glyph-picker__key-map li.is-selected{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan-dim);background:rgba(53,200,232,.08)}
+  .glyph-picker__key-map kbd{grid-row:span 2;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;background:var(--panel);color:var(--cyan);font:11px var(--mono)}
+  .glyph-picker__key-map strong{font:700 17px var(--mono)}
+  .glyph-picker__key-map span{overflow:hidden;color:var(--txt2);font-size:9px;text-overflow:ellipsis}
+  .glyph-picker__key-map code{grid-column:1/-1;color:var(--txt3);font:8px var(--mono)}
+  .glyph-picker__fallback{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;margin-top:11px;color:var(--txt2);font:10px var(--mono)}
+  .glyph-picker__fallback select{min-width:0;padding:7px 9px;border:1px solid var(--line);border-radius:4px;background:var(--bg2);color:var(--txt);font:11px var(--mono)}
+  .glyph-picker__status{min-height:18px;margin-top:9px;color:var(--cyan);font:10px var(--mono)}
+  .annotation-wizard{display:flex;flex-direction:column;gap:10px;padding:16px;border:1px solid var(--line);border-top:2px solid var(--cyan);border-radius:7px;background:#0a111d;color:var(--txt)}
+  .annotation-wizard section{display:block;padding:13px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
+  .annotation-wizard__header{display:flex;justify-content:space-between;gap:12px;color:var(--cyan);font:10px var(--mono);letter-spacing:.1em}
+  .wizard-step{position:relative}
+  .wizard-step.is-active{border-color:var(--cyan)}
+  .wizard-step.is-complete{border-color:var(--cyan-dim);background:rgba(53,200,232,.05)}
+  .wizard-step.is-locked{opacity:.42;filter:grayscale(.45)}
+  .wizard-step__number{display:block;margin-bottom:5px;color:var(--txt3);font:9px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+  .wizard-step h3{margin-bottom:5px;font-size:15px}
+  .wizard-step>p{color:var(--txt2);font-size:11px}
+  .wizard-step__moves{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:11px}
+  .wizard-step__moves button{display:flex;justify-content:space-between;gap:8px;padding:9px;border:1px solid var(--line);border-radius:5px;background:var(--bg2);color:var(--txt);cursor:pointer}
+  .wizard-step__moves button:hover{border-color:var(--cyan-dim)}
+  .wizard-step__moves span{color:var(--txt3);font:9px var(--mono)}
+  .wizard-step__moves strong{color:var(--cyan);font:12px var(--mono)}
+  .wizard-step__selection{color:var(--cyan)!important;font:13px var(--mono)!important}
+  .wizard-step__back{position:absolute;top:12px;right:12px;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg2);color:var(--txt2);font:9px var(--mono);cursor:pointer}
+  .wizard-step--glyph .glyph-picker{margin-top:10px}
+  .wizard-step--future{min-height:76px}
   .leave-timer{position:fixed;top:14px;right:14px;z-index:9999;width:194px;padding:11px 12px 10px;border:1px solid #7a5a1e;border-top:2px solid #e8b93c;border-radius:7px;background:rgba(8,13,22,.94);box-shadow:0 10px 32px rgba(0,0,0,.42);font-family:var(--mono);pointer-events:none;backdrop-filter:blur(8px)}
   .leave-timer[hidden]{display:none}
   .leave-timer__kicker{display:block;margin-bottom:6px;color:#e8b93c;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
@@ -259,6 +293,8 @@
     .learning-moment__position-row{grid-template-columns:minmax(0,1fr)}
     .learning-moment__position-row>div:first-child{max-width:280px}
     .learning-moment__pocket-grid{grid-template-columns:minmax(0,1fr)}
+    .glyph-picker__key-map{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .wizard-step__moves{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
 </style>
 </head>
@@ -299,6 +335,29 @@
       <div id="moment-card-fixtures"><p class="specimen-meta">Loading learning-moment fixtures…</p></div>
       <noscript><p class="specimen-meta">JavaScript is required to render the live learning-moment fixtures.</p></noscript>
       <p class="specimen-meta">Fixture data only · The former screenshot remains in the specimen archive but is no longer rendered for block 13.</p>
+  </div>
+</details>
+
+<details class="specimen live-component" data-block="23" open>
+  <summary class="specimen-head">
+    <span class="specimen-title">23 · Study glyph picker</span>
+  </summary>
+  <div class="specimen-body">
+      <p class="specimen-copy">Live fixture component: number keys 1–6 follow the required NAG mapping, with a native dropdown as the pointer fallback and an announced selection. Reimplemented from the interaction pattern only; no Lichess markup, CSS, or code is used.</p>
+      <div id="glyph-picker-fixture"><p class="specimen-meta">Loading glyph-picker fixture…</p></div>
+      <noscript><p class="specimen-meta">JavaScript is required to render the live glyph-picker fixture.</p></noscript>
+      <p class="specimen-meta">Fixture data only · The former screenshot remains in the specimen archive but is no longer rendered for block 23.</p>
+  </div>
+</details>
+
+<details class="specimen live-component" open>
+  <summary class="specimen-head">
+    <span class="specimen-title">wizard shell (unnumbered, pending block assignment)</span>
+  </summary>
+  <div class="specimen-body">
+      <p class="specimen-copy">Fixture harness for locked annotation steps 1 and 2. Steps 3 and 4 are visible inert placeholders; there is no save, submit, or persistence path.</p>
+      <div id="wizard-shell-fixture"><p class="specimen-meta">Loading wizard-shell fixture…</p></div>
+      <noscript><p class="specimen-meta">JavaScript is required to render the wizard-shell fixture.</p></noscript>
   </div>
 </details>
 
@@ -441,7 +500,7 @@
 </div>
 
 <section class="specimen-section" aria-labelledby="temporary-specimens">
-  <h2 id="temporary-specimens">14–25 · Screenshot specimens — temporary references</h2>
+  <h2 id="temporary-specimens">14–22 + 24–25 · Screenshot specimens — temporary references</h2>
     <p class="specimen-intro">Captured third-party UI is retained here only as a build target. These pixels never migrate into app components. Registry: 1–11 canonical · 12–16 Bv2 · 17–21 curated · 22–24 Bv2 annotation · 25 Bv2 paired viewer · next specimen is 26.</p>
     <p class="license-boundary"><strong>License boundary:</strong> Lichess code references are AGPL-3.0 and exist only as clearly headed excerpts in <code>docs/specimens/</code>. No Lichess code is embedded on this page or elsewhere under <code>frontend/</code> or <code>backend/</code>; any future feature must be reimplemented from behavior, never pasted.</p>
 </section>
@@ -559,19 +618,6 @@
     <span class="temporary">Temporary reference</span>
       <p class="specimen-copy">The selected position carries authored prose with visible attribution and edit/delete affordances. Target lesson only: a learning-moment note belongs to one position in one game, rather than to the game as an unanchored whole.</p>
       <a class="specimen-image-link" href="./specimens/specimen-22-lichess-position-comments.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 22"><img src="./specimens/specimen-22-lichess-position-comments.png" width="800" height="326" loading="lazy" alt="Historical Lichess study capture showing two comments attached to the selected move, each with author attribution and editing controls"></a>
-      <p class="specimen-meta">Source: <a href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA">Lichess — Study chess, the lichess way</a> · Official historical capture · Temporary structure reference only · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="23">
-  <summary class="specimen-head">
-    <span class="specimen-title">23 · Study glyph picker</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">Move glyphs are compact, named choices: <strong>!</strong>, <strong>?</strong>, <strong>!!</strong>, <strong>??</strong>, and <strong>!?</strong>, alongside position and observation annotations. Target lesson only: the chosen glyph is position context for a learning moment, not decorative text.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-23-lichess-glyph-picker.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 23"><img src="./specimens/specimen-23-lichess-glyph-picker.png" width="800" height="373" loading="lazy" alt="Historical Lichess study annotation picker with named move glyphs including good move, mistake, brilliant move, blunder, and interesting move"></a>
       <p class="specimen-meta">Source: <a href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA">Lichess — Study chess, the lichess way</a> · Official historical capture · Temporary structure reference only · Do not migrate this asset.</p>
 
   </div>
