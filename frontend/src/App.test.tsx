@@ -13,6 +13,7 @@ const apiMock = vi.hoisted(() => ({
   resetGuestSession: vi.fn(),
   accountMe: vi.fn(),
   claimAccount: vi.fn(),
+  listMyMoments: vi.fn(),
   games: vi.fn(),
   guestMatchups: vi.fn(),
   chessComMatchReplay: vi.fn(),
@@ -119,6 +120,7 @@ describe("URL-first exact review", () => {
     apiMock.guestSession.mockResolvedValue({ guest_number: 13, total_guests: 13, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
     apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
     apiMock.accountMe.mockResolvedValue({ account: null });
+    apiMock.listMyMoments.mockResolvedValue({ moments: [] });
     apiMock.games.mockResolvedValue({ games: [] });
     apiMock.guestMatchups.mockResolvedValue({
       matches: Array.from({ length: 5 }, (_, index) => ({
@@ -184,7 +186,7 @@ describe("URL-first exact review", () => {
     fireEvent.click(libraryButton);
     expect(screen.getByRole("dialog", { name: "SirGuest#13 Flashcard library" })).toBeTruthy();
     expect(screen.getByRole("timer", { name: "Session countdown" }).textContent).toMatch(/^(5:00|4:59)$/);
-    expect(screen.getByText("No flashcards yet.")).toBeTruthy();
+    expect(await screen.findByText("No flashcards yet.")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("dialog", { name: "SirGuest#13 Flashcard library" }), { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "SirGuest#13 Flashcard library" })).toBeNull();
   });

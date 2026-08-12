@@ -1,13 +1,43 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, type AccountSummary } from "../api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError, type AccountSummary, type MomentRecord } from "../api";
 import { GuestFlashcardPanel } from "./GuestFlashcardPanel";
+
+const apiMock = vi.hoisted(() => ({ listMyMoments: vi.fn() }));
+
+vi.mock("../api", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../api")>();
+  return { ...original, api: { ...original.api, ...apiMock } };
+});
 
 const account = (overrides: Partial<AccountSummary> = {}): AccountSummary => ({
   guest_number: 7,
   email: "guest@example.com",
   completion_ordinal: 7,
   founder_eligible: true,
+  created_at: "2026-08-11T00:00:00+00:00",
+  ...overrides,
+});
+
+const moment = (overrides: Partial<MomentRecord> = {}): MomentRecord => ({
+  id: 1,
+  save_order: 1,
+  game_id: 901,
+  move_token: "17A",
+  glyph: "!!",
+  alternative_move: "N@f7",
+  written_answer: "Because it forces the king into the mating net.",
+  engine_identity: "Fairy-Stockfish",
+  engine_depth: 18,
+  author_guest_number: 7,
+  board_a_white_pocket: "N",
+  board_a_black_pocket: "",
+  board_b_white_pocket: "P",
+  board_b_black_pocket: "q",
+  board_a_white_clock: "01:21",
+  board_a_black_clock: "01:15",
+  board_b_white_clock: "00:54",
+  board_b_black_clock: "00:48",
   created_at: "2026-08-11T00:00:00+00:00",
   ...overrides,
 });
@@ -28,7 +58,68 @@ const renderPanel = (overrides: Partial<Parameters<typeof GuestFlashcardPanel>[0
   return { ...render(<GuestFlashcardPanel {...props} />), props };
 };
 
-afterEach(cleanup);
+beforeEach(() => {
+  apiMock.listMyMoments.mockResolvedValue({ moments: [] });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe("saved moment flashcard deck", () => {
+  it("renders every authoritative moment and reveals the answer and provenance", async () => {
+    apiMock.listMyMoments.mockResolvedValue({
+      moments: [
+        moment(),
+        moment({ id: 2, save_order: 2, move_token: "18b", glyph: "?!", alternative_move: "Qh4", written_answer: "Because the diagonal stays defended.", engine_identity: null, engine_depth: null }),
+      ],
+    });
+    renderPanel();
+
+    expect(await screen.findByText("17A · Board A · !!")).toBeTruthy();
+    expect(screen.getByText("What's the stronger idea here?")).toBeTruthy();
+    expect(screen.getByLabelText("Flashcard position").textContent).toBe("1 of 2");
+    fireEvent.click(screen.getByRole("button", { name: "Flip" }));
+    expect(screen.getByText("N@f7")).toBeTruthy();
+    expect(screen.getByText("Because it forces the king into the mating net.")).toBeTruthy();
+    expect(screen.getByText("Fairy-Stockfish · depth 18")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("18b · Board B · ?!")).toBeTruthy();
+    expect(screen.getByLabelText("Flashcard position").textContent).toBe("2 of 2");
+    expect(screen.getByRole("button", { name: "Flip" })).toBeTruthy();
+  });
+
+  it("wraps next and previous and supports the deck keyboard controls", async () => {
+    apiMock.listMyMoments.mockResolvedValue({ moments: [moment(), moment({ id: 2, move_token: "18b", glyph: "?" })] });
+    renderPanel();
+    const dialog = await screen.findByRole("dialog", { name: "SirGuest#7 Flashcard library" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.getByText("18b · Board B · ?")).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    expect(screen.getByText("17A · Board A · !!")).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: " " });
+    expect(screen.getByText("N@f7")).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: "Enter" });
+    expect(screen.getByText("17A · Board A · !!")).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: "ArrowLeft" });
+    expect(screen.getByText("18b · Board B · ?")).toBeTruthy();
+  });
+
+  it("keeps the existing empty state for a guest with no saved moments", async () => {
+    renderPanel();
+    expect(await screen.findByText("No flashcards yet.")).toBeTruthy();
+  });
+
+  it("fails closed with an inline message when moments cannot be loaded", async () => {
+    apiMock.listMyMoments.mockRejectedValue(new ApiError(503, "unavailable"));
+    renderPanel();
+    expect((await screen.findByRole("alert")).textContent).toContain("Flashcards could not be loaded.");
+    expect(screen.queryByLabelText("Saved moment flashcards")).toBeNull();
+  });
+});
 
 describe("completed guest identity claim", () => {
   it("does not expose sign-up before the server records completion", () => {
