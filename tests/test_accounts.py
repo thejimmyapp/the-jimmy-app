@@ -120,6 +120,24 @@ def test_completed_guest_claim_is_idempotent_and_cookie_restores_account(tmp_pat
     ]
 
 
+@pytest.mark.parametrize("cookie_secure", [True, False])
+def test_identity_cookie_secure_attribute_follows_setting(tmp_path, monkeypatch, cookie_secure: bool) -> None:
+    service = GameService(tmp_path / f"cookies-{cookie_secure}.sqlite")
+    monkeypatch.setattr(main_module, "games", service)
+    monkeypatch.setattr(main_module.settings, "cookie_secure", cookie_secure)
+    scheme = "https" if cookie_secure else "http"
+
+    with TestClient(main_module.app, base_url=f"{scheme}://testserver") as client:
+        landing = client.post("/api/guests")
+        _stamp_completion(service, landing.json()["guest_number"])
+        claimed = client.post("/api/accounts/claim", json={"email": "guest@example.com"})
+
+    guest_set_cookie = landing.headers["set-cookie"]
+    account_set_cookie = claimed.headers["set-cookie"]
+    assert ("; Secure" in guest_set_cookie) is cookie_secure
+    assert ("; Secure" in account_set_cookie) is cookie_secure
+
+
 def test_founder_eligibility_flips_after_completion_ordinal_ten(tmp_path, monkeypatch) -> None:
     service, client = _service_client(tmp_path, monkeypatch)
     identities = [service.create_guest_identity() for _ in range(11)]
