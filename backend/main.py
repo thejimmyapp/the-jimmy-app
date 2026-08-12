@@ -924,8 +924,9 @@ def register_frontend_routes(frontend_app: FastAPI, dist: Path) -> None:
 
     @frontend_app.get("/{full_path:path}", include_in_schema=False, response_model=None)
     def serve_frontend(full_path: str) -> FileResponse | JSONResponse:
-        candidate = dist / full_path
-        decision = decide_frontend_response(full_path, candidate_is_file=candidate.is_file())
+        resolved = (dist / full_path).resolve()
+        safe_file = resolved.is_file() and resolved.is_relative_to(dist.resolve())
+        decision = decide_frontend_response(full_path, candidate_is_file=safe_file)
         if decision == "api_404":
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -936,7 +937,7 @@ def register_frontend_routes(frontend_app: FastAPI, dist: Path) -> None:
                     }
                 },
             )
-        return FileResponse(candidate if decision == "file" else dist / "index.html")
+        return FileResponse(resolved if decision == "file" else dist / "index.html")
 
 
 if frontend_dist.exists():

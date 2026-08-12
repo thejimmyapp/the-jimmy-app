@@ -40,11 +40,27 @@ def test_frontend_response_decision_serves_real_relative_file(tmp_path) -> None:
     ) == "file"
 
 
+def test_frontend_response_decision_refuses_file_outside_dist(tmp_path) -> None:
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    outside = tmp_path / "x"
+    outside.write_text("outside", encoding="utf-8")
+    resolved = (dist / "../x").resolve()
+    safe_file = resolved.is_file() and resolved.is_relative_to(dist.resolve())
+
+    assert safe_file is False
+    assert main_module.decide_frontend_response("../x", candidate_is_file=safe_file) == "index"
+
+
 def test_frontend_routes_return_json_for_unknown_api_and_html_for_spa(tmp_path) -> None:
     dist = tmp_path / "dist"
     (dist / "assets").mkdir(parents=True)
     index_body = "<!doctype html><title>temporary frontend</title>"
+    asset_body = "console.log('inside dist')"
+    outside_body = "outside-dist-secret"
     (dist / "index.html").write_text(index_body, encoding="utf-8")
+    (dist / "assets" / "app.js").write_text(asset_body, encoding="utf-8")
+    (tmp_path / "secret.txt").write_text(outside_body, encoding="utf-8")
     test_app = FastAPI()
     main_module.register_frontend_routes(test_app, dist)
 
@@ -52,6 +68,8 @@ def test_frontend_routes_return_json_for_unknown_api_and_html_for_spa(tmp_path) 
         missing_api = client.get("/api/does-not-exist")
         root = client.get("/")
         mission = client.get("/mission")
+        asset = client.get("/assets/app.js")
+        traversal = client.get("/%2E%2E/secret.txt")
 
     assert missing_api.status_code == 404
     assert missing_api.headers["content-type"].startswith("application/json")
@@ -68,6 +86,12 @@ def test_frontend_routes_return_json_for_unknown_api_and_html_for_spa(tmp_path) 
     assert mission.status_code == 200
     assert mission.headers["content-type"].startswith("text/html")
     assert mission.text == index_body
+    assert asset.status_code == 200
+    assert asset.text == asset_body
+    assert traversal.status_code == 200
+    assert traversal.headers["content-type"].startswith("text/html")
+    assert traversal.text == index_body
+    assert outside_body not in traversal.text
 
 
 def receive_event_type(socket, expected_type: str) -> dict:
