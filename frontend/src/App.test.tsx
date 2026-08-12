@@ -14,6 +14,7 @@ const apiMock = vi.hoisted(() => ({
   accountMe: vi.fn(),
   claimAccount: vi.fn(),
   listMyMoments: vi.fn(),
+  listPublicMoments: vi.fn(),
   games: vi.fn(),
   guestMatchups: vi.fn(),
   chessComMatchReplay: vi.fn(),
@@ -121,6 +122,7 @@ describe("URL-first exact review", () => {
     apiMock.resetGuestSession.mockResolvedValue({ guest_number: 14, total_guests: 14, completions_to_date: null, saved_moment_count: 0, analysis_unlocked: false });
     apiMock.accountMe.mockResolvedValue({ account: null });
     apiMock.listMyMoments.mockResolvedValue({ moments: [] });
+    apiMock.listPublicMoments.mockResolvedValue({ moments: [] });
     apiMock.games.mockResolvedValue({ games: [] });
     apiMock.guestMatchups.mockResolvedValue({
       matches: Array.from({ length: 5 }, (_, index) => ({
@@ -258,6 +260,10 @@ describe("URL-first exact review", () => {
     expect(apiMock.chessComMatchReplay).toHaveBeenCalledWith(guestMatch.game_ids.A);
     expect(apiMock.resolveGame).not.toHaveBeenCalled();
     expect(apiMock.connectChessCom).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Notes board" }));
+    expect(await screen.findByRole("heading", { name: "Notes board" })).toBeTruthy();
+    expect(await screen.findByText("No public moments yet.")).toBeTruthy();
+    expect(apiMock.listPublicMoments).toHaveBeenCalledOnce();
   });
 
   it("requires and persists the versioned acknowledgement only when analysis is requested", async () => {

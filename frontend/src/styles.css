@@ -1949,6 +1949,27 @@ button.onboarding-entry-node { cursor: pointer; }
 .guest-account-claim button:disabled { opacity: .6; cursor: wait; }
 .guest-account-claim [role="alert"] { color: #ff9eaa; }
 
+.notes-board { height: 100%; overflow-y: auto; padding: 28px clamp(18px, 4vw, 64px) 50px; background: #080d16; }
+.notes-board > * { width: min(1100px, 100%); margin-left: auto; margin-right: auto; }
+.notes-board-header { display: grid; gap: 7px; padding-bottom: 18px; border-bottom: 1px solid #243349; }
+.notes-board-header > span { display: flex; align-items: center; gap: 7px; color: var(--cyan); font-size: 9px; font-weight: 900; letter-spacing: .13em; }
+.notes-board-header h1 { margin: 0; color: #eff6ff; font-size: 30px; }
+.notes-board-header p { margin: 0; color: #8396ad; font-size: 11px; }
+.notes-board-state { min-height: 240px; display: grid; place-content: center; justify-items: center; gap: 7px; margin-top: 18px; border: 1px dashed #304057; border-radius: 4px; color: #71859d; text-align: center; font-size: 11px; }
+.notes-board-state strong { color: #b9c9da; font-size: 13px; }
+.notes-board-state[role="alert"] strong { color: #ff9eaa; }
+.notes-board-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.notes-board-card { min-width: 0; display: grid; gap: 14px; padding: 17px; border: 1px solid #30435a; border-top: 2px solid #2c91a1; border-radius: 4px; background: #0d1724; }
+.notes-board-card > header { display: flex; justify-content: space-between; gap: 12px; color: #dce9f7; font-size: 12px; }
+.notes-board-card > header span { color: #8ca1b8; font-size: 10px; white-space: nowrap; }
+.notes-board-card dl { display: grid; gap: 10px; margin: 0; }
+.notes-board-card dl div { display: grid; gap: 3px; }
+.notes-board-card dt { color: #71869e; font-size: 8px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.notes-board-card dd { margin: 0; color: #c9d6e4; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.notes-board-card footer { display: flex; justify-content: space-between; gap: 12px; color: #71859d; font-size: 9px; }
+.notes-board-card time { margin-left: auto; text-align: right; }
+@media (max-width: 1180px) { .notes-board-grid { grid-template-columns: 1fr; } }
+
 .session-expiry-wipe { position: fixed; inset: 0; z-index: 1000; background: #000; pointer-events: all; animation: session-expiry-fade 800ms ease-in forwards; }
 @keyframes session-expiry-fade { from { opacity: 0; } to { opacity: 1; } }
 
