@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { StickyNote } from "lucide-react";
-import { api, type MomentRecord } from "../api";
+import { StickyNote, ThumbsUp } from "lucide-react";
+import { api, type PublicMomentRecord } from "../api";
 
 export function NotesBoard() {
-  const [moments, setMoments] = useState<MomentRecord[] | null>(null);
+  const [moments, setMoments] = useState<PublicMomentRecord[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [pendingVoteIds, setPendingVoteIds] = useState<Set<number>>(() => new Set());
+  const [voteErrorId, setVoteErrorId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -17,6 +19,26 @@ export function NotesBoard() {
       active = false;
     };
   }, []);
+
+  const toggleVote = async (momentId: number) => {
+    if (pendingVoteIds.has(momentId)) return;
+    setPendingVoteIds((current) => new Set(current).add(momentId));
+    setVoteErrorId(null);
+    try {
+      const result = await api.togglePublicMomentVote(momentId);
+      setMoments((current) => current?.map((moment) => moment.id === momentId
+        ? { ...moment, voted: result.voted, vote_count: result.vote_count }
+        : moment) ?? null);
+    } catch {
+      setVoteErrorId(momentId);
+    } finally {
+      setPendingVoteIds((current) => {
+        const next = new Set(current);
+        next.delete(momentId);
+        return next;
+      });
+    }
+  };
 
   return (
     <section className="notes-board" aria-labelledby="notes-board-title">
@@ -57,6 +79,18 @@ export function NotesBoard() {
                   )}
                   <time dateTime={moment.created_at}>{moment.created_at}</time>
                 </footer>
+                <div className="notes-board-vote">
+                  <button
+                    type="button"
+                    className={moment.voted ? "voted" : ""}
+                    aria-pressed={moment.voted}
+                    disabled={pendingVoteIds.has(moment.id)}
+                    onClick={() => void toggleVote(moment.id)}
+                  >
+                    <ThumbsUp size={14} aria-hidden="true" /> Upvote · {moment.vote_count}
+                  </button>
+                  {voteErrorId === moment.id && <span role="alert">Vote could not be saved.</span>}
+                </div>
               </article>
             );
           })}

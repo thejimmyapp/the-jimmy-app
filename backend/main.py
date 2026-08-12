@@ -425,9 +425,34 @@ async def list_my_moments(request: Request) -> dict[str, object]:
 
 
 @app.get("/api/moments/public")
-async def list_public_moments() -> dict[str, object]:
-    moments = await asyncio.to_thread(games.list_public_moments)
+async def list_public_moments(request: Request) -> dict[str, object]:
+    guest_number = await _guest_number_from_request(request)
+    moments = await asyncio.to_thread(games.list_public_moments, guest_number)
     return {"moments": moments}
+
+
+@app.post("/api/moments/public/{moment_id}/vote")
+async def toggle_public_moment_vote(moment_id: int, request: Request) -> dict[str, object]:
+    guest_number = await _guest_number_from_request(request)
+    if guest_number is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "guest_identity_missing", "message": "Open the guest landing page first."},
+        )
+    try:
+        result = await asyncio.to_thread(
+            games.toggle_public_moment_vote,
+            moment_id,
+            guest_number,
+        )
+    except MomentPersistenceError as exc:
+        raise HTTPException(status_code=422, detail={"code": "vote_refused", "message": str(exc)}) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "public_moment_not_found", "message": "Public moment was not found."},
+        )
+    return result
 
 
 @app.delete("/api/moments/{moment_id}")

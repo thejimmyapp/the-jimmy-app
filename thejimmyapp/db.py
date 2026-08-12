@@ -163,6 +163,14 @@ class Database:
                     created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS moment_votes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    public_moment_id INTEGER NOT NULL REFERENCES public_moments(id),
+                    voter_guest_number INTEGER NOT NULL REFERENCES guest_identities(guest_number),
+                    created_at TEXT NOT NULL,
+                    UNIQUE(public_moment_id, voter_guest_number)
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_private_moments_author_order
                     ON private_moments(author_guest_number, save_order);
                 CREATE INDEX IF NOT EXISTS idx_public_moments_order
@@ -1230,16 +1238,73 @@ class Database:
             ).fetchone()
         return int(row["total"]) if row else 0
 
-    def list_public_moments(self) -> list[dict[str, object]]:
+    def list_public_moments(self, voter_guest_number: int | None = None) -> list[dict[str, object]]:
         with closing(self.connect()) as conn:
             rows = conn.execute(
                 f"""
-                SELECT {_MOMENT_SELECT}
+                SELECT {_MOMENT_SELECT},
+                    (
+                        SELECT COUNT(*)
+                        FROM moment_votes
+                        WHERE public_moment_id = public_moments.id
+                    ) AS vote_count,
+                    CASE WHEN ? IS NULL THEN 0 ELSE EXISTS (
+                        SELECT 1
+                        FROM moment_votes
+                        WHERE public_moment_id = public_moments.id
+                            AND voter_guest_number = ?
+                    ) END AS voted
                 FROM public_moments
                 ORDER BY save_order ASC
-                """
+                """,
+                (voter_guest_number, voter_guest_number),
             ).fetchall()
         return [_moment_row(row) for row in rows]
+
+    def toggle_public_moment_vote(
+        self,
+        public_moment_id: int,
+        voter_guest_number: int,
+    ) -> dict[str, object] | None:
+        with closing(self.connect()) as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                public_moment = conn.execute(
+                    "SELECT id FROM public_moments WHERE id = ?",
+                    (public_moment_id,),
+                ).fetchone()
+                if public_moment is None:
+                    conn.rollback()
+                    return None
+                existing = conn.execute(
+                    """
+                    SELECT id FROM moment_votes
+                    WHERE public_moment_id = ? AND voter_guest_number = ?
+                    """,
+                    (public_moment_id, voter_guest_number),
+                ).fetchone()
+                if existing is None:
+                    conn.execute(
+                        """
+                        INSERT INTO moment_votes (
+                            public_moment_id, voter_guest_number, created_at
+                        ) VALUES (?, ?, ?)
+                        """,
+                        (public_moment_id, voter_guest_number, _utc_now()),
+                    )
+                    voted = True
+                else:
+                    conn.execute("DELETE FROM moment_votes WHERE id = ?", (existing["id"],))
+                    voted = False
+                count_row = conn.execute(
+                    "SELECT COUNT(*) AS total FROM moment_votes WHERE public_moment_id = ?",
+                    (public_moment_id,),
+                ).fetchone()
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return {"voted": voted, "vote_count": int(count_row["total"]) if count_row else 0}
 
     def update_private_moment(
         self,
@@ -2707,6 +2772,8 @@ def _json_object(value: str) -> dict[str, Any]:
 def _moment_row(row: sqlite3.Row) -> dict[str, object]:
     moment = dict(row)
     moment["author"] = f"guest_{int(moment['author_guest_number'])}"
+    if "voted" in moment:
+        moment["voted"] = bool(moment["voted"])
     return moment
 
 
