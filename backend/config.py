@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 import os
+import platform
 import shutil
 
 from pydantic import Field
@@ -53,13 +54,16 @@ def _runtime_data_dir() -> Path:
 
 
 def _default_fairy_stockfish_path() -> Path:
-    bundled = ROOT_DIR / "engines" / "fairy-stockfish"
+    binary_name = (
+        "fairy-stockfish.exe" if platform.system() == "Windows" else "fairy-stockfish"
+    )
+    bundled = ROOT_DIR / "engines" / binary_name
     if bundled.exists():
         return bundled
-    installed = shutil.which("fairy-stockfish")
+    installed = shutil.which(binary_name)
     if installed:
         return Path(installed)
-    return ROOT_DIR / "engines" / "fairy-stockfish.exe"
+    return bundled
 
 
 class Settings(BaseSettings):
