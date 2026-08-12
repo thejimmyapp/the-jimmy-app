@@ -109,6 +109,7 @@ def _set_guest_identity_cookie(response: Response, identity_token: str) -> None:
         httponly=True,
         max_age=31_536_000,
         samesite="lax",
+        secure=settings.cookie_secure,
     )
 
 
@@ -119,6 +120,7 @@ def _set_account_identity_cookie(response: Response, account_token: str) -> None
         httponly=True,
         max_age=31_536_000,
         samesite="lax",
+        secure=settings.cookie_secure,
     )
 
 

@@ -67,6 +67,7 @@ class Settings(BaseSettings):
 
     app_name: str = "The Jimmy App — Collaborative Bughouse Coach"
     environment: str = "development"
+    cookie_secure: bool = True
     database_url: str = f"sqlite:///{(ROOT_DIR / 'data' / 'webapp.db').as_posix()}"
     legacy_database_path: Path = ROOT_DIR / "data" / "bughouse.db"
     fairy_stockfish_path: Path = Field(default_factory=_default_fairy_stockfish_path)
