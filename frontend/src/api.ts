@@ -51,6 +51,11 @@ export interface MomentRecord {
   created_at: string;
 }
 
+export interface PublicMomentRecord extends MomentRecord {
+  vote_count: number;
+  voted: boolean;
+}
+
 export interface CreateMomentRequest {
   game_id: number;
   move_token: string;
@@ -89,7 +94,9 @@ export const api = {
       body: JSON.stringify(request),
     })),
   listMyMoments: () => json<{ moments: MomentRecord[] }>(fetch("/api/moments/mine")),
-  listPublicMoments: () => json<{ moments: MomentRecord[] }>(fetch("/api/moments/public")),
+  listPublicMoments: () => json<{ moments: PublicMomentRecord[] }>(fetch("/api/moments/public")),
+  togglePublicMomentVote: (momentId: number) =>
+    json<{ voted: boolean; vote_count: number }>(fetch(`/api/moments/public/${momentId}/vote`, { method: "POST" })),
   deleteMoment: (momentId: number) =>
     json<{ deleted: true }>(fetch(`/api/moments/${momentId}`, { method: "DELETE" })),
   guestMatchups: ({ refresh = false, excludeGameIds = [] }: { refresh?: boolean; excludeGameIds?: number[] } = {}) => {

@@ -122,8 +122,23 @@ class GameService:
             raise MomentPersistenceError("guest number must be a positive integer")
         return self.db.private_moment_count(author_guest_number)
 
-    def list_public_moments(self) -> list[dict[str, object]]:
-        return self.db.list_public_moments()
+    def list_public_moments(self, voter_guest_number: int | None = None) -> list[dict[str, object]]:
+        if voter_guest_number is not None and (
+            isinstance(voter_guest_number, bool) or voter_guest_number <= 0
+        ):
+            raise MomentPersistenceError("guest number must be a positive integer")
+        return self.db.list_public_moments(voter_guest_number)
+
+    def toggle_public_moment_vote(
+        self,
+        public_moment_id: int,
+        voter_guest_number: int,
+    ) -> dict[str, object] | None:
+        if isinstance(public_moment_id, bool) or public_moment_id <= 0:
+            raise MomentPersistenceError("moment id must be a positive integer")
+        if isinstance(voter_guest_number, bool) or voter_guest_number <= 0:
+            raise MomentPersistenceError("guest number must be a positive integer")
+        return self.db.toggle_public_moment_vote(public_moment_id, voter_guest_number)
 
     def update_private_moment(
         self,

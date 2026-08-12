@@ -1,16 +1,16 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { MomentRecord } from "../api";
+import type { PublicMomentRecord } from "../api";
 import { NotesBoard } from "./NotesBoard";
 
-const apiMock = vi.hoisted(() => ({ listPublicMoments: vi.fn() }));
+const apiMock = vi.hoisted(() => ({ listPublicMoments: vi.fn(), togglePublicMomentVote: vi.fn() }));
 
 vi.mock("../api", async (importOriginal) => {
   const original = await importOriginal<typeof import("../api")>();
   return { ...original, api: { ...original.api, ...apiMock } };
 });
 
-const publicMoment = (overrides: Partial<MomentRecord> = {}): MomentRecord => ({
+const publicMoment = (overrides: Partial<PublicMomentRecord> = {}): PublicMomentRecord => ({
   id: 101,
   save_order: 1,
   game_id: 901,
@@ -30,11 +30,14 @@ const publicMoment = (overrides: Partial<MomentRecord> = {}): MomentRecord => ({
   board_b_white_clock: "00:54",
   board_b_black_clock: "00:48",
   created_at: "2026-08-11T18:00:00+00:00",
+  vote_count: 2,
+  voted: false,
   ...overrides,
 });
 
 beforeEach(() => {
   apiMock.listPublicMoments.mockResolvedValue({ moments: [] });
+  apiMock.togglePublicMomentVote.mockResolvedValue({ voted: true, vote_count: 3 });
 });
 afterEach(() => {
   cleanup();
@@ -46,7 +49,7 @@ describe("global public notes board", () => {
     apiMock.listPublicMoments.mockResolvedValue({
       moments: [
         publicMoment(),
-        publicMoment({ id: 102, save_order: 2, move_token: "18b", glyph: "?!", alternative_move: "Qh4", written_answer: "Because the diagonal stays defended.", author_guest_number: 34, engine_identity: null, engine_depth: null, created_at: "2026-08-11T18:01:00+00:00" }),
+        publicMoment({ id: 102, save_order: 2, move_token: "18b", glyph: "?!", alternative_move: "Qh4", written_answer: "Because the diagonal stays defended.", author_guest_number: 34, engine_identity: null, engine_depth: null, created_at: "2026-08-11T18:01:00+00:00", vote_count: 0 }),
       ],
     });
     render(<NotesBoard />);
@@ -60,7 +63,23 @@ describe("global public notes board", () => {
     expect(screen.getByText("Because it forces the king into the mating net.")).toBeTruthy();
     expect(screen.getByText("Fairy-Stockfish · depth 18")).toBeTruthy();
     expect(screen.getByText("2026-08-11T18:00:00+00:00")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Upvote · 2" }).getAttribute("aria-pressed")).toBe("false");
     expect(apiMock.listPublicMoments).toHaveBeenCalledOnce();
+  });
+
+  it("toggles the server-backed vote count and fails closed on a refusal", async () => {
+    apiMock.listPublicMoments.mockResolvedValue({ moments: [publicMoment()] });
+    render(<NotesBoard />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Upvote · 2" }));
+    const voted = await screen.findByRole("button", { name: "Upvote · 3" });
+    expect(voted.getAttribute("aria-pressed")).toBe("true");
+    expect(apiMock.togglePublicMomentVote).toHaveBeenCalledWith(101);
+
+    apiMock.togglePublicMomentVote.mockRejectedValueOnce(new Error("refused"));
+    fireEvent.click(voted);
+    expect((await screen.findByRole("alert")).textContent).toBe("Vote could not be saved.");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Upvote · 3" }).getAttribute("aria-pressed")).toBe("true"));
   });
 
   it("renders the public empty state", async () => {

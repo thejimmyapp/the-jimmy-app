@@ -1968,6 +1968,11 @@ button.onboarding-entry-node { cursor: pointer; }
 .notes-board-card dd { margin: 0; color: #c9d6e4; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .notes-board-card footer { display: flex; justify-content: space-between; gap: 12px; color: #71859d; font-size: 9px; }
 .notes-board-card time { margin-left: auto; text-align: right; }
+.notes-board-vote { display: flex; align-items: center; gap: 9px; padding-top: 10px; border-top: 1px solid #24354a; }
+.notes-board-vote button { min-height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #36516b; border-radius: 3px; background: #101d2b; color: #9fb2c7; font-size: 10px; font-weight: 800; cursor: pointer; }
+.notes-board-vote button.voted { border-color: #2b8796; background: #14303d; color: var(--cyan); }
+.notes-board-vote button:disabled { opacity: .6; cursor: wait; }
+.notes-board-vote [role="alert"] { color: #ff9eaa; font-size: 9px; }
 @media (max-width: 1180px) { .notes-board-grid { grid-template-columns: 1fr; } }
 
 .session-expiry-wipe { position: fixed; inset: 0; z-index: 1000; background: #000; pointer-events: all; animation: session-expiry-fade 800ms ease-in forwards; }

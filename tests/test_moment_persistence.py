@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sqlite3
 
 from fastapi.testclient import TestClient
+import pytest
 
 import backend.main as main_module
 from backend.services import GameService
@@ -400,6 +402,78 @@ def test_delete_removes_only_the_authors_private_copy(tmp_path, monkeypatch) -> 
     assert deleted.json() == {"deleted": True}
     assert service.list_private_moments(1) == []
     assert len(service.list_public_moments()) == 1
+
+
+def test_public_moment_vote_toggles_without_mutating_frozen_row(tmp_path, monkeypatch) -> None:
+    service, client, game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        created = _create(client, game_id)
+        public_id = created.json()["public_moment"]["id"]
+        with service.db.connect() as conn:
+            public_before = json.dumps(
+                dict(conn.execute("SELECT * FROM public_moments WHERE id = ?", (public_id,)).fetchone()),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+            table_sql = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'moment_votes'"
+            ).fetchone()["sql"]
+            foreign_keys = conn.execute("PRAGMA foreign_key_list(moment_votes)").fetchall()
+
+        voted = client.post(f"/api/moments/public/{public_id}/vote")
+        listed = client.get("/api/moments/public").json()["moments"][0]
+        with service.db.connect() as conn:
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(
+                    """
+                    INSERT INTO moment_votes (
+                        public_moment_id, voter_guest_number, created_at
+                    ) VALUES (?, ?, ?)
+                    """,
+                    (public_id, 1, "2026-08-11T00:00:00+00:00"),
+                )
+            conn.rollback()
+
+        unvoted = client.post(f"/api/moments/public/{public_id}/vote")
+        with service.db.connect() as conn:
+            public_after = json.dumps(
+                dict(conn.execute("SELECT * FROM public_moments WHERE id = ?", (public_id,)).fetchone()),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+            vote_total = conn.execute("SELECT COUNT(*) AS total FROM moment_votes").fetchone()["total"]
+
+    assert voted.status_code == 200
+    assert voted.json() == {"voted": True, "vote_count": 1}
+    assert listed["vote_count"] == 1
+    assert listed["voted"] is True
+    assert unvoted.status_code == 200
+    assert unvoted.json() == {"voted": False, "vote_count": 0}
+    assert vote_total == 0
+    assert public_after == public_before
+    assert "INTEGER PRIMARY KEY AUTOINCREMENT" in table_sql
+    assert "UNIQUE(public_moment_id, voter_guest_number)" in table_sql
+    assert {(row["table"], row["from"], row["to"]) for row in foreign_keys} == {
+        ("public_moments", "public_moment_id", "id"),
+        ("guest_identities", "voter_guest_number", "guest_number"),
+    }
+
+
+def test_public_moment_vote_refuses_missing_identity_and_unknown_moment(tmp_path, monkeypatch) -> None:
+    _service, client, _game_id = _client_with_game(tmp_path, monkeypatch)
+
+    with client:
+        unknown = client.post("/api/moments/public/999/vote")
+        client.cookies.clear()
+        missing_identity = client.post("/api/moments/public/999/vote")
+
+    assert unknown.status_code == 404
+    assert unknown.json()["detail"]["code"] == "public_moment_not_found"
+    assert missing_identity.status_code == 409
+    assert missing_identity.json()["detail"]["code"] == "guest_identity_missing"
 
 
 def test_server_engine_gate_flips_at_exactly_ten_private_moments(tmp_path, monkeypatch) -> None:
