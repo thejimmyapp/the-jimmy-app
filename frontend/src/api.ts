@@ -89,6 +89,7 @@ export const api = {
       body: JSON.stringify(request),
     })),
   listMyMoments: () => json<{ moments: MomentRecord[] }>(fetch("/api/moments/mine")),
+  listPublicMoments: () => json<{ moments: MomentRecord[] }>(fetch("/api/moments/public")),
   deleteMoment: (momentId: number) =>
     json<{ deleted: true }>(fetch(`/api/moments/${momentId}`, { method: "DELETE" })),
   guestMatchups: ({ refresh = false, excludeGameIds = [] }: { refresh?: boolean; excludeGameIds?: number[] } = {}) => {
