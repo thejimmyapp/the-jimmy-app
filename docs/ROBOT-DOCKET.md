@@ -3,7 +3,8 @@
 This docket celebrates evidence, not optimism. Completed, failed, blocked, and
 abandoned work all stays visible.
 
-**Current route:** Restore -> Sync -> Private UI library -> One polished slice
+**Current route:** Preserve -> Verify handoff -> Golden build -> Fresh Ryan-owned
+deployment -> Backup/domain -> Private UI library
 
 ## 🥳 Benchmarks completed
 
@@ -17,19 +18,31 @@ abandoned work all stays visible.
 - [x] Converted Evan's role into optional, bounded portfolio opportunities.
 - [x] Opened and pinned GitHub issue #19 as the robot communication channel.
 - [x] Proposed a one-time dental-office concept reminder for 2026-09-07.
+- [x] Received and hash-preserved Jimmy's reconstruction handoff and archaeology.
+- [x] Validated the archaeology JSON, all cited commits, and all cited source/test
+  paths against commit `7bf611c`.
+- [x] Classified the supplied `message.txt` as an older Railway audit rather than
+  the advertised takeover prompt.
+- [x] Replaced the active UI-library task with the A5 takeover sequence.
 
 ## 🚧 Active
 
-- [ ] Activate the proposed reminder card in the app if it is not already active.
+- [x] Reproduced the handoff's backend/frontend test counts from a clean worktree:
+  179 backend tests and 42 files / 202 frontend tests passed.
+- [x] Reproduced ESLint and the production Vite build.
+- [x] Reproduced the repository's actual pinned Ruff CI gate; contradicted the
+  handoff's broader unpinned Ruff command.
+- [ ] Build and smoke-test one local Docker image with Qwen disabled.
+- [ ] Prepare one fresh Ryan-owned, single-instance deployment with durable data.
 
 ## ⛔ Blocked
 
-- [ ] Restore the public website.
-  - Evidence: `railway redeploy --from-source -y` returned
-    `Your trial has expired. Please select a plan to continue using Railway.`
-  - Owner action: choose a Railway plan.
-  - Resume condition: Railway accepts a source deployment.
-- [ ] Verify `/health`, the Railway URL, and `thejimmyapp.com`.
+- [ ] Restore the public website on fresh Ryan-owned infrastructure.
+  - Evidence: Jimmy declined to reactivate/transfer the old Railway project and
+    supplied a source-reconstruction handoff instead.
+  - Decision: do not revive or transfer Jimmy's Railway project.
+  - Resume condition: Gate 2 local golden build passes, then create a new service.
+- [ ] Verify `/health`, the new provider-generated URL, and `thejimmyapp.com`.
   - Depends on a running deployment.
 
 ## 🧯 Failed attempts
@@ -50,9 +63,9 @@ abandoned work all stays visible.
 
 ## 🔭 Next benchmark
 
-**A5 — Private UI-library inventory.** Read the current product, inventory every
-existing specimen/template/screenshot surface, identify duplicates and gaps, and
-propose the smallest private information architecture. Do not edit product UI.
+**A5 — Takeover and fresh deployment.** Verify Jimmy's reconstruction handoff,
+prove a clean local golden build, and establish a fresh Ryan-owned single-instance
+deployment with tested persistence. UI-library work remains parked until Gate 3.
 
 ## Update format
 

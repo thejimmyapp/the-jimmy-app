@@ -10,7 +10,10 @@ the current truth instead of becoming another sprawling project diary.
   what is blocked.
 - [Robot docket](docs/ROBOT-DOCKET.md) — completed, active, failed, blocked, and
   abandoned benchmarks.
-- [A5 kickoff](docs/A5-KICKOFF.md) — the next implementation-task prompt.
+- [A5 takeover kickoff — 2XL](docs/A5-TAKEOVER-KICKOFF-2XL.md) — the active
+  recovery, verification, and fresh-deployment command.
+- [Parked UI-library kickoff](docs/A5-KICKOFF.md) — retained as a later product
+  task; it is not the current priority.
 - [Historical project state](docs/PROJECT-STATE.md) — detailed decisions and task
   history; verify operational claims before relying on them.
 
