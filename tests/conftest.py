@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 
-import backend.main as main_module
+# Never let the test app warm the guest list against live Chess.com.
+os.environ.setdefault("CHESSCOM_GUEST_WARM_ON_STARTUP", "false")
+
+import backend.main as main_module  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
