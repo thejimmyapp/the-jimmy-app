@@ -316,7 +316,7 @@
 </aside>
 <h1>thejimmyapp — UI building blocks</h1>
 <p class="identifier-note">Numbers are fixed identifiers, not reading order.</p>
-<p class="sub">The chess.com patterns we borrow, redrawn in our own skin (dark navy + cyan, per the wireframe). Skeleton imitated, assets not copied. Each block notes its chess.com analog, its zone (RAIL / STAGE / DOCK), and its lock behavior in the capability map.</p>
+<p class="sub">Project-owned components in the dark navy + cyan wireframe skin. Each block notes its zone (RAIL / STAGE / DOCK) and lock behavior in the capability map.</p>
 
 <div class="grid">
 
@@ -350,7 +350,7 @@
     <span class="specimen-title">23 · Study glyph picker</span>
   </summary>
   <div class="specimen-body">
-      <p class="specimen-copy">Live fixture component: number keys 1–6 follow the required NAG mapping, with a native dropdown as the pointer fallback and an announced selection. Reimplemented from the interaction pattern only; no Lichess markup, CSS, or code is used.</p>
+      <p class="specimen-copy">Live fixture component: number keys 1–6 follow the required NAG mapping, with a native dropdown as the pointer fallback and an announced selection. The implementation is project-owned.</p>
       <div id="glyph-picker-fixture"><p class="specimen-meta">Loading glyph-picker fixture…</p></div>
       <noscript><p class="specimen-meta">JavaScript is required to render the live glyph-picker fixture.</p></noscript>
       <p class="specimen-meta">Fixture data only · The former screenshot remains in the specimen archive but is no longer rendered for block 23.</p>
@@ -382,7 +382,7 @@
     <div class="ric lk">🔍</div>
     <div class="ric lk">✉</div>
   </div></div>
-  <div class="meta"><span class="tag">RAIL</span><b>chess.com analog:</b> left sidebar collapsed state. Three states: <b>active</b> (cyan outline), <b>unlocked</b>, <b>locked</b> (greyed, <code>inert</code>, absent from a11y tree). Legal lives behind the ▾ overflow — never a top-level icon.</div>
+  <div class="meta"><span class="tag">RAIL</span><b>Navigation model:</b> collapsed left sidebar. Three states: <b>active</b> (cyan outline), <b>unlocked</b>, <b>locked</b> (greyed, <code>inert</code>, absent from a11y tree). Legal lives behind the ▾ overflow — never a top-level icon.</div>
 
 </details>
 
@@ -397,7 +397,7 @@
     </div>
     <div class="subtabs"><span class="ok">Moves</span><span class="on">Partner</span><span class="lk">Info</span><span class="lk">Openings</span></div>
   </div></div>
-  <div class="meta"><span class="tag">DOCK</span><b>chess.com analog:</b> the analysis side panel's tab strip. Locked tabs render greyed as teasers, not hidden. Known issue on record: 8 tabs in 2 rows is a taxonomy problem, deferred — do not let styling "solve" it.</div>
+  <div class="meta"><span class="tag">DOCK</span><b>Analysis side-panel model:</b> a compact tab strip. Locked tabs render greyed as teasers, not hidden. Known issue on record: 8 tabs in 2 rows is a taxonomy problem, deferred — do not let styling "solve" it.</div>
 
 </details>
 
@@ -407,11 +407,11 @@
     <div class="x">✕</div>
     <div class="kicker">GREETINGS PUNY HUMAN</div>
     <h3>Review what I command you to review</h3>
-    <div class="fl">CHESS.COM USERNAME</div>
+    <div class="fl">PLAYER USERNAME</div>
     <div class="inp focus">enter username or bughouse game url…</div>
     <div class="keys"><b>↑↓</b> switch node &nbsp; <b>⏎</b> commit &nbsp; no pointer targets</div>
   </div></div>
-  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> their dark modal cards (game-over / trial dialogs) — top accent line, kicker, heavy title. Keyboard-only: focus-trapped, everything outside is <code>inert</code>. Kicker copy is placeholder — flagged for the copy pass.</div>
+  <div class="meta"><span class="tag">STAGE</span><b>Modal model:</b> dark card, top accent line, kicker, and heavy title. Keyboard-only: focus-trapped, everything outside is <code>inert</code>. Kicker copy is placeholder — flagged for the copy pass.</div>
 
 </details>
 
@@ -421,7 +421,7 @@
     <div class="k">GUEST SPAWN</div>
     <div class="t">Start</div>
   </div></div></div>
-  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> the big green "Play" CTA panel — theirs is green + skewed banner, ours is cyan + angled clip. Entry node A, default-focused on load. Commits to the guest pipeline (Thread A, Task 4b).</div>
+  <div class="meta"><span class="tag">STAGE</span><b>Entry CTA model:</b> cyan panel with an angled clip. Entry node A, default-focused on load. Commits to the guest pipeline (Thread A, Task 4b).</div>
 
 </details>
 
@@ -432,7 +432,7 @@
     <div class="mc"><span>RyanTime<span style="color:var(--txt3)">(2124)</span></span><span class="res l">LOST</span><span class="why">— partner resigned</span></div>
     <div class="mc"><span>bugmaster7<span style="color:var(--txt3)">(1987)</span></span><span class="res w">WON</span><span class="why">— oppo flagged</span></div>
   </div></div>
-  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> game-archive row. Your spec verbatim: <code>[{highest-rated}({rating}) WON|LOST — {seat} {action}]</code>. Silent filter: ≥10 moves on both boards. Arrow-select, Enter opens review.</div>
+  <div class="meta"><span class="tag">STAGE</span><b>Archive-row model:</b> <code>[{highest-rated}({rating}) WON|LOST — {seat} {action}]</code>. Silent filter: ≥10 moves on both boards. Arrow-select, Enter opens review.</div>
 
 </details>
 
@@ -442,7 +442,7 @@
     <div class="pbar"><div class="av">🐸</div><span class="nm">fearingforfreddy</span><span class="rt">(1843)</span><div class="pocket">♙♙♗</div><div class="clock">1:47</div></div>
     <div class="pbar"><div class="av">🦀</div><span class="nm">Acurat</span><span class="rt">(2124)</span><div class="pocket">♞</div><div class="clock low">0:09</div></div>
   </div></div>
-  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> board player strip — avatar, name, rating, clock. Bughouse addition: the <b>pocket</b> (pieces in hand) sits inline. Board A internals are Thread A no-touch territory until further notice.</div>
+  <div class="meta"><span class="tag">STAGE</span><b>Player-strip model:</b> avatar, name, rating, clock, and inline <b>pocket</b> (pieces in hand). Board A internals are Thread A no-touch territory until further notice.</div>
 
 </details>
 
@@ -453,7 +453,7 @@
     <span class="n">13.</span><span class="cur">Kg1</span><span class="drop">P@h3</span>
     <span class="n">14.</span><span>gxh3</span><span>Qg5+</span>
   </div></div>
-  <div class="meta"><span class="tag">DOCK · Moves</span><b>chess.com analog:</b> analysis move list. Drops (<code>@</code>) get the cyan accent — they're the bughouse-specific vocabulary. First unlock for guests: Moves tab only. Global arrow-key nav stays mounted regardless of tab (Task 2 ruling).</div>
+  <div class="meta"><span class="tag">DOCK · Moves</span><b>Move-list model:</b> drops (<code>@</code>) get the cyan accent — they're the bughouse-specific vocabulary. First unlock for guests: Moves tab only. Global arrow-key nav stays mounted regardless of tab (Task 2 ruling).</div>
 
 </details>
 
@@ -463,7 +463,7 @@
     <div class="lcard"><div class="doc"><i></i><i></i><i style="width:60%"></i></div><div class="nm2">Flashcards</div><div class="badge">🔒</div></div>
     <div class="lcard"><div class="doc"><i></i><i></i><i style="width:60%"></i></div><div class="nm2">Top 12 Victories</div><div class="badge">🔒</div></div>
   </div>
-  <div class="meta"><span class="tag">DOCK</span><b>chess.com analog:</b> locked-lesson / premium teaser cards. The visible-but-locked doctrine: chrome for future features ships day one, greyed with lock badge, and un-greys live when the capability map flips.</div>
+  <div class="meta"><span class="tag">DOCK</span><b>Locked-feature model:</b> chrome for future features ships day one, greyed with a lock badge, and un-greys live when the capability map flips.</div>
 
 </details>
 
@@ -475,7 +475,7 @@
     <div class="node">2</div><div class="edge"></div>
     <div class="node">🔒</div>
   </div></div>
-  <div class="meta"><span class="tag">STAGE</span><b>chess.com analog:</b> lessons path / puzzle-journey trail. S = spawn, numbered milestones drive capability unlocks. Current node gets the glow. The map artwork around it is the onboarding STAGE surface.</div>
+  <div class="meta"><span class="tag">STAGE</span><b>Progression model:</b> S = spawn, numbered milestones drive capability unlocks. Current node gets the glow. The map artwork around it is the onboarding STAGE surface.</div>
 
 </details>
 
@@ -486,7 +486,7 @@
     <button class="btn sec">Export BPGN</button>
     <button class="btn lk">🔒 Queue Engine</button>
   </div></div>
-  <div class="meta"><span class="tag">shared</span><b>chess.com analog:</b> primary green CTA → our cyan; ghost secondary; locked state matches the capability-map treatment everywhere. "Queue Engine" ships locked until Fairy-Stockfish feasibility (Thread B, item 7) clears.</div>
+  <div class="meta"><span class="tag">shared</span><b>Button model:</b> cyan primary, ghost secondary, and a locked state matching the capability-map treatment everywhere. "Queue Engine" ships locked until Fairy-Stockfish feasibility (Thread B, item 7) clears.</div>
 
 </details>
 
@@ -506,220 +506,8 @@
 </details>
 </div>
 
-<section class="specimen-section" aria-labelledby="temporary-specimens">
-  <h2 id="temporary-specimens">14–22 + 24–25 · Screenshot specimens — temporary references</h2>
-    <p class="specimen-intro">Captured third-party UI is retained here only as a build target. These pixels never migrate into app components. Registry: 1–11 canonical · 12–16 Bv2 · 17–21 curated · 22–24 Bv2 annotation · 25 Bv2 paired viewer · next specimen is 26.</p>
-    <p class="license-boundary"><strong>License boundary:</strong> Lichess code references are AGPL-3.0 and exist only as clearly headed excerpts in <code>docs/specimens/</code>. No Lichess code is embedded on this page or elsewhere under <code>frontend/</code> or <code>backend/</code>; any future feature must be reimplemented from behavior, never pasted.</p>
-</section>
-
-<div class="specimen-group">
-<details class="specimen" data-block="14">
-  <summary class="specimen-head">
-    <span class="specimen-title">14 · Lichess analysis module</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">UI of interest: a narrow, self-contained analysis column with pocket rails, engine status and controls, a deep content well, and compact bottom navigation. The structural lesson is modular stacking beside a primary board, not Lichess's graphics or skin.</p>
-      <div class="specimen-window"><a class="specimen-image-link" href="./specimens/specimen-14-lichess-analysis.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 14"><img src="./specimens/specimen-14-lichess-analysis.png" width="1440" height="1000" loading="lazy" alt="Public Lichess Crazyhouse analysis page showing a chessboard and the modular engine and pocket column at right"></a></div>
-      <p class="specimen-meta">Source: <a href="https://lichess.org/analysis/crazyhouse">lichess.org/analysis/crazyhouse</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="15">
-  <summary class="specimen-head">
-    <span class="specimen-title">15 · Chess.com notification settings patterns</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">UI of interest: notification categories as collapsible rows, one expanded category, global and per-event toggles, and explicit delivery-channel checkboxes. The reference is for hierarchy and state density only; icons, palette, type, and controls must be redrawn.</p>
-      <div class="specimen-window"><a class="specimen-image-link" href="./specimens/specimen-15-chesscom-notification-settings.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 15"><img src="./specimens/specimen-15-chesscom-notification-settings.png" width="1099" height="1647" loading="lazy" alt="Chess.com notification settings with category accordions, toggles, and web, mobile, and email channel checkboxes"></a></div>
-      <p class="specimen-meta">Source: <a href="https://support.chess.com/en/articles/8618508-how-do-i-manage-my-notifications">Chess.com Help Center — How do I manage my notifications?</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="16">
-  <summary class="specimen-head">
-    <span class="specimen-title">16 · Typography hierarchy — H1 / H2</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">UI of interest: a light, sentence-case page H1 with generous separation from body copy, followed by a similarly weighted but smaller H2. Target: a restrained content hierarchy for reference and settings pages, rebuilt with project tokens.</p>
-      <div class="specimen-window"><a class="specimen-image-link" href="./specimens/specimen-16-lichess-typography-h1-h2.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 16"><img src="./specimens/specimen-16-lichess-typography-h1-h2.png" width="1280" height="900" loading="lazy" alt="Lichess About page showing the About lichess.org H1 and Press Kit H2 hierarchy"></a></div>
-      <p class="specimen-meta">Source: <a href="https://lichess.org/about">lichess.org/about</a> · Captured 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="17">
-  <summary class="specimen-head">
-    <span class="specimen-title">17 · Archive favorites rows</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">Row anatomy combines variant and time-control cues, stacked opponents and results, a Review action, move count, date, favorite heart, and selection checkbox beneath a filter tab strip. Target: refine canonical block 5 and its flashcard-adjacent bookmark state.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-17-archive-favorites-rows.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 17"><img src="./specimens/specimen-17-archive-favorites-rows.jpg" width="1300" height="523" loading="lazy" alt="Chess.com Favorites archive with four game rows, player pairs, results, review buttons, dates, hearts, and checkboxes"></a>
-      <p class="specimen-meta">Source: <a href="https://www.chess.com/member/fearingforfreddy/games?activeTab=favorites">Chess.com Favorites archive</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="18">
-  <summary class="specimen-head">
-    <span class="specimen-title">18 · Player stats table</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">Type icon and label, rating with delta, blurred premium columns, row chevrons, and a Show More disclosure demonstrate dense statistics with visible-but-locked depth. Target: the Statistics STAGE without copying icons, blur treatment, or skin.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-18-stats-table.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 18"><img src="./specimens/specimen-18-stats-table.jpg" width="1300" height="478" loading="lazy" alt="Chess.com player stats table with ratings, deltas, blurred premium columns, row chevrons, and Show More control"></a>
-      <p class="specimen-meta">Source: <a href="https://www.chess.com/member/fearingforfreddy/stats">Chess.com member stats</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="19">
-  <summary class="specimen-head">
-    <span class="specimen-title">19 · Player clock — inactive / dimmed</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">The inactive player bar recedes through a dark clock face and reduced contrast while identity and rating remain readable. Pair with block 20 to document turn-state fading for Board A/B player bars.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-19-clock-top.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 19"><img src="./specimens/specimen-19-clock-top.jpg" width="1300" height="87" loading="lazy" alt="Chess.com analysis player bar with an inactive dark one-minute clock"></a>
-      <p class="specimen-meta">Source: <a href="https://www.chess.com/analysis/game/live/172758001776/analysis">Chess.com game analysis</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="20">
-  <summary class="specimen-head">
-    <span class="specimen-title">20 · Player clock — active / bright</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">The active player bar makes the clock the brightest object while preserving the same identity strip. Together blocks 19–20 isolate the fade/brighten-by-turn behavior rather than a one-off visual state.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-20-clock-bottom-active.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 20"><img src="./specimens/specimen-20-clock-bottom-active.jpg" width="1300" height="92" loading="lazy" alt="Chess.com analysis player bar with an active bright one-minute clock"></a>
-      <p class="specimen-meta">Source: <a href="https://www.chess.com/analysis/game/live/172758001776/analysis">Chess.com game analysis</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="21">
-  <summary class="specimen-head">
-    <span class="specimen-title">21 · Full analysis dock</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">Tab triplet, engine header, ranked eval lines, game result header, move classifications, per-move time bars, jump controls, and New/Save/Review footer form one vertically ordered dock. Target: the engine-card group and Moves-tab upgrade, rebuilt in project tokens.</p>
-      <div class="specimen-window"><a class="specimen-image-link" href="./specimens/specimen-21-analysis-panel.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 21"><img src="./specimens/specimen-21-analysis-panel.jpg" width="1265" height="3239" loading="lazy" alt="Tall Chess.com analysis dock with tabs, engine lines, classified move list, time bars, navigation, and action footer"></a></div>
-      <p class="specimen-meta">Source: <a href="https://www.chess.com/analysis/game/live/172758001776/analysis">Chess.com game analysis</a> · Curated 2026-08-09 · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="22">
-  <summary class="specimen-head">
-    <span class="specimen-title">22 · Position-bound comment display</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">The selected position carries authored prose with visible attribution and edit/delete affordances. Target lesson only: a learning-moment note belongs to one position in one game, rather than to the game as an unanchored whole.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-22-lichess-position-comments.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 22"><img src="./specimens/specimen-22-lichess-position-comments.png" width="800" height="326" loading="lazy" alt="Historical Lichess study capture showing two comments attached to the selected move, each with author attribution and editing controls"></a>
-      <p class="specimen-meta">Source: <a href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA">Lichess — Study chess, the lichess way</a> · Official historical capture · Temporary structure reference only · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="24">
-  <summary class="specimen-head">
-    <span class="specimen-title">24 · Alternate lines at the current position</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">A tightly cropped historical study view shows alternate continuations presented as sibling choices beneath the move panel at the current path. Target lesson only: related lines branch from a position and remain navigable as alternatives.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-24-lichess-position-variations.png" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 24"><img src="./specimens/specimen-24-lichess-position-variations.png" width="220" height="470" loading="lazy" alt="Cropped historical Lichess study move panel with two alternate continuation choices attached below the current variation"></a>
-      <p class="specimen-meta">Source: <a href="https://lichess.org/forum/lichess-feedback/showing-of-possible-options-gone-from-studies">Lichess forum — Showing of possible options gone from studies</a> · Historical community capture, cropped to the variation control · Temporary structure reference only · Do not migrate this asset.</p>
-
-  </div>
-</details>
-
-<details class="specimen" data-block="25">
-  <summary class="specimen-head">
-    <span class="specimen-title">25 · Loaded two-board Bughouse viewer</span>
-  </summary>
-  <div class="specimen-body">
-    <span class="temporary">Temporary reference</span>
-      <p class="specimen-copy">One loaded match keeps both boards, four player identities and ratings, clocks, pockets, paired navigation, a position-address URL, variations, and a position comment in one utilitarian surface. Target lesson only: retain the coupled-board context around a learning moment. The viewer's piece graphics have unclear provenance and must never migrate into the app.</p>
-      <a class="specimen-image-link" href="./specimens/specimen-25-bmacho-loaded-match.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open full image for block 25"><img src="./specimens/specimen-25-bmacho-loaded-match.jpg" width="1300" height="896" loading="lazy" alt="bmacho Bughouse Viewer with match 180616071971 loaded, both boards visible, four players and ratings, clocks, pockets, paired controls, position URL, variations, and comment"></a>
-      <p class="specimen-meta">Source: <a href="https://bmacho.github.io/bughouse-viewer/view.html?game_id=180616071971">bmacho Bughouse Viewer — match 180616071971</a> · Captured 2026-08-09 · Temporary structure reference only · Do not migrate this asset.</p>
-
-  </div>
-</details>
 </div>
 
-</div>
-
-<aside class="sources" aria-labelledby="inspiration-sources">
-  <h2 id="inspiration-sources">Inspiration sources — the reference set</h2>
-  <ul>
-    <li>· <b>chess.com member profile</b> — <a href="https://www.chess.com/member/beemoor">chess.com/member/beemoor</a> (profile/stats data shapes)</li>
-    <li>· <b>chess.com games archive</b> — <a href="https://www.chess.com/member/beemoor/games?activeTab=live">chess.com/member/beemoor/games?activeTab=live</a> (row anatomy → block 5)</li>
-    <li>· <b>chess.com live game URLs</b> — <a href="https://www.chess.com/game/live/180616071971?username=beemoor">chess.com/game/live/180616071971?username=beemoor</a> (id + perspective param)</li>
-    <li>· <b>bmacho bughouse-viewer</b> — <a href="https://bmacho.github.io/bughouse-viewer/view.html">bmacho.github.io/bughouse-viewer/view.html</a> (+ <code>?game_id=…&amp;move=23b</code> deep links; hy.js is MIT — audit: <code>docs/bughouse-viewer-audit.md</code>)</li>
-    <li>· <b>bughouse-viewer source</b> — <a href="https://github.com/bmacho/bughouse-viewer">github.com/bmacho/bughouse-viewer</a> (callback API technique, TCN decoding, BPGN export)</li>
-    <li>· <b>dropchess Fairy-Stockfish</b> — <a href="https://online-dropchess-stockfish.onrender.com/analysis.html">online-dropchess-stockfish.onrender.com/analysis.html</a> (BFEN handoff; eval rows → block 12)</li>
-    <li>· <b>RyanTime blog puzzle embed</b> — <a href="https://www.chess.com/blog/RyanTime/dear-lord-someone-please-explain-this-to-me-a-two-star-puzzle-rated-3600">Chess.com blog study embed supplied by the owner</a> (annotated study card → block 13, the flashcard model)</li>
-  </ul>
-  <div class="note">This page is the vocabulary + spec sheet. Third-party screenshots below are temporary visual evidence only; they are never app-component assets.</div>
-</aside>
-
-<section class="source-matrix-section" aria-labelledby="sources-matrix-title">
-  <header class="source-matrix-head">
-    <div>
-      <h2 id="sources-matrix-title">6×6 clickable sources matrix</h2>
-      <p>Filled cells open the cited design reference in a new tab. Empty cells remain visibly reserved so the catalog records its own growth.</p>
-    </div>
-    <span class="source-matrix-count">21 filled · 15 reserved</span>
-  </header>
-  <div class="source-matrix">
-    <a class="source-cell filled" href="https://www.chess.com/member/beemoor" target="_blank" rel="noopener noreferrer"><b>profile</b><span>01</span></a>
-    <a class="source-cell filled" href="https://www.chess.com/member/beemoor/games?activeTab=live" target="_blank" rel="noopener noreferrer"><b>archive rows</b><span>02</span></a>
-    <a class="source-cell filled" href="https://www.chess.com/game/live/180616071971?username=beemoor" target="_blank" rel="noopener noreferrer"><b>live URL</b><span>03</span></a>
-    <a class="source-cell filled" href="https://bmacho.github.io/bughouse-viewer/view.html" target="_blank" rel="noopener noreferrer"><b>viewer</b><span>04</span></a>
-    <a class="source-cell filled" href="https://github.com/bmacho/bughouse-viewer" target="_blank" rel="noopener noreferrer"><b>viewer source</b><span>05</span></a>
-    <a class="source-cell filled" href="https://online-dropchess-stockfish.onrender.com/analysis.html" target="_blank" rel="noopener noreferrer"><b>BFEN handoff</b><span>06</span></a>
-    <a class="source-cell filled" href="https://online-dropchess-stockfish.onrender.com/analysis.html" target="_blank" rel="noopener noreferrer"><b>eval lines</b><span>07</span></a>
-    <a class="source-cell filled" href="https://www.chess.com/blog/RyanTime/dear-lord-someone-please-explain-this-to-me-a-two-star-puzzle-rated-3600" target="_blank" rel="noopener noreferrer"><b>flashcard</b><span>08</span></a>
-    <a class="source-cell filled" href="https://lichess.org/analysis/crazyhouse" target="_blank" rel="noopener noreferrer"><b>lichess modules</b><span>09</span></a>
-    <a class="source-cell filled" href="https://support.chess.com/en/articles/8618508-how-do-i-manage-my-notifications" target="_blank" rel="noopener noreferrer"><b>notifications</b><span>10</span></a>
-    <a class="source-cell filled" href="https://lichess.org/about" target="_blank" rel="noopener noreferrer"><b>H1 H2</b><span>11</span></a>
-    <a class="source-cell filled" href="https://www.chess.com/member/fearingforfreddy/games?activeTab=favorites" target="_blank" rel="noopener noreferrer"><b>favorite rows</b><span>12</span></a>
-    <a class="source-cell filled" href="https://www.chess.com/member/fearingforfreddy/stats" target="_blank" rel="noopener noreferrer"><b>stats table</b><span>13</span></a>
-    <a class="source-cell filled" href="https://www.chess.com/analysis/game/live/172758001776/analysis" target="_blank" rel="noopener noreferrer"><b>clock fade</b><span>14</span></a>
-    <a class="source-cell filled" href="https://www.chess.com/analysis/game/live/172758001776/analysis" target="_blank" rel="noopener noreferrer"><b>active clock</b><span>15</span></a>
-    <a class="source-cell filled" href="https://www.chess.com/analysis/game/live/172758001776/analysis" target="_blank" rel="noopener noreferrer"><b>analysis dock</b><span>16</span></a>
-    <a class="source-cell filled" href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA" target="_blank" rel="noopener noreferrer"><b>position notes</b><span>17</span></a>
-    <a class="source-cell filled" href="https://lichess.org/@/lichess/blog/study-chess-the-lichess-way/V0KrLSkA" target="_blank" rel="noopener noreferrer"><b>glyph picker</b><span>18</span></a>
-    <a class="source-cell filled" href="https://lichess.org/forum/lichess-feedback/showing-of-possible-options-gone-from-studies" target="_blank" rel="noopener noreferrer"><b>variation fork</b><span>19</span></a>
-    <a class="source-cell filled" href="https://github.com/lichess-org/lila/tree/9d0e1761e0841b1018a0b2b19e08fc9b397f5689/ui/analyse/src/study" target="_blank" rel="noopener noreferrer"><b>AGPL source</b><span>20</span></a>
-    <a class="source-cell filled" href="https://bmacho.github.io/bughouse-viewer/view.html?game_id=180616071971" target="_blank" rel="noopener noreferrer"><b>paired viewer</b><span>21</span></a>
-    <div class="source-cell reserved" aria-label="Reserved source slot 22"><b>reserved</b><span>22</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 23"><b>reserved</b><span>23</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 24"><b>reserved</b><span>24</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 25"><b>reserved</b><span>25</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 26"><b>reserved</b><span>26</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 27"><b>reserved</b><span>27</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 28"><b>reserved</b><span>28</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 29"><b>reserved</b><span>29</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 30"><b>reserved</b><span>30</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 31"><b>reserved</b><span>31</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 32"><b>reserved</b><span>32</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 33"><b>reserved</b><span>33</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 34"><b>reserved</b><span>34</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 35"><b>reserved</b><span>35</span></div>
-    <div class="source-cell reserved" aria-label="Reserved source slot 36"><b>reserved</b><span>36</span></div>
-  </div>
-</section>
 <script type="module">
   import("/assets/blocks.js").catch(() => import("/src/blocks.tsx"));
 </script>
