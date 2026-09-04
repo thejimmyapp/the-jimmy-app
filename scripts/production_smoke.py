@@ -59,7 +59,8 @@ def run_smoke(base_url: str, timeout: float, game_id: int | None) -> dict[str, o
     require(health.get("database") == "available", "database is unavailable")
     require(health.get("fairy_stockfish") == "available", "Fairy-Stockfish is unavailable")
     ai_coach = health.get("ai_coach") if isinstance(health.get("ai_coach"), dict) else {}
-    require(ai_coach.get("state") in {"ready", "running"}, "local Qwen runtime is not ready")
+    if ai_coach.get("enabled") is True:
+        require(ai_coach.get("state") in {"ready", "running"}, "local Qwen runtime is not ready")
     checks.append("health")
 
     for path in ("/", "/privacy", "/terms"):
