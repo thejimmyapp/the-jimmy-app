@@ -122,6 +122,25 @@ class GameService:
             raise MomentPersistenceError("guest number must be a positive integer")
         return self.db.private_moment_count(author_guest_number)
 
+    def review_private_moment(
+        self,
+        moment_id: int,
+        author_guest_number: int,
+        grade: str,
+    ) -> dict[str, object] | None:
+        if (
+            isinstance(moment_id, bool)
+            or not isinstance(moment_id, int)
+            or moment_id <= 0
+            or isinstance(author_guest_number, bool)
+            or not isinstance(author_guest_number, int)
+            or author_guest_number <= 0
+        ):
+            raise MomentPersistenceError("moment and guest numbers must be positive integers")
+        if grade not in {"again", "hard", "good", "easy"}:
+            raise MomentPersistenceError("unknown moment review grade")
+        return self.db.review_private_moment(moment_id, author_guest_number, grade)
+
     def list_public_moments(self, voter_guest_number: int | None = None) -> list[dict[str, object]]:
         if voter_guest_number is not None and (
             isinstance(voter_guest_number, bool) or voter_guest_number <= 0

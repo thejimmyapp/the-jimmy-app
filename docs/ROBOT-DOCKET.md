@@ -24,6 +24,9 @@ deployment -> Backup/domain -> Private UI library
 - [x] Classified the supplied `message.txt` as an older Railway audit rather than
   the advertised takeover prompt.
 - [x] Replaced the active UI-library task with the A5 takeover sequence.
+- [x] FLASHCARD-01 added private saved-moment review state, an author-scoped
+  grading endpoint, the documented scheduler stub, and accessible grading
+  controls without modifying frozen public moments.
 
 ## 🚧 Active
 

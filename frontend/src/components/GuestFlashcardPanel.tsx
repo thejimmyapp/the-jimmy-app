@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { BookOpen, X } from "lucide-react";
-import { api, ApiError, type AccountSummary, type MomentRecord } from "../api";
+import { api, ApiError, type AccountSummary, type MomentRecord, type MomentReviewGrade } from "../api";
 import { formatQuestCountdown, QUEST_DURATION_MS } from "../quest";
 
 interface Props {
@@ -26,6 +26,9 @@ export function GuestFlashcardPanel({ guestNumber, remainingSeconds, questComple
   const [momentsError, setMomentsError] = useState(false);
   const [cardIndex, setCardIndex] = useState(0);
   const [cardFlipped, setCardFlipped] = useState(false);
+  const [reviewPending, setReviewPending] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
   const displayedAccount = claimedAccount ?? account;
   const countdown = questCompleted
     ? "Complete"
@@ -51,6 +54,8 @@ export function GuestFlashcardPanel({ guestNumber, remainingSeconds, questComple
     if (!moments?.length) return;
     setCardIndex((current) => (current + offset + moments.length) % moments.length);
     setCardFlipped(false);
+    setReviewError(null);
+    setReviewMessage(null);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -91,6 +96,29 @@ export function GuestFlashcardPanel({ guestNumber, remainingSeconds, questComple
 
   const activeMoment = moments?.[cardIndex];
   const activeBoard = activeMoment?.move_token.at(-1)?.toUpperCase();
+
+  const gradeMoment = async (grade: MomentReviewGrade) => {
+    if (!activeMoment || reviewPending) return;
+    setReviewPending(true);
+    setReviewError(null);
+    setReviewMessage(null);
+    try {
+      const review = await api.reviewMoment(activeMoment.id, grade);
+      setMoments((current) => current?.map((moment) => moment.id === activeMoment.id ? {
+        ...moment,
+        due: review.due,
+        attempted: review.attempted,
+        failed_last: review.failed_last,
+        due_at: review.due_at,
+        attempts: review.attempts,
+      } : moment) ?? current);
+      setReviewMessage(`Review recorded: ${grade}.`);
+    } catch {
+      setReviewError("Review grade could not be saved. Try again.");
+    } finally {
+      setReviewPending(false);
+    }
+  };
 
   const submitClaim = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -134,6 +162,11 @@ export function GuestFlashcardPanel({ guestNumber, remainingSeconds, questComple
           </div>
         ) : (
           <section className="guest-flashcard-deck" aria-label="Saved moment flashcards">
+            <div className="guest-flashcard-review-badges" aria-label="Review state">
+              <span className={activeMoment.due ? "is-due" : "is-scheduled"}>{activeMoment.due ? "Due" : "Not due"}</span>
+              <span>{activeMoment.attempted ? "Attempted" : "Not attempted"}</span>
+              {activeMoment.failed_last && <span className="is-failed">Failed last</span>}
+            </div>
             <article className={`guest-flashcard ${cardFlipped ? "is-flipped" : ""}`} aria-live="polite">
               {!cardFlipped ? (
                 <div className="guest-flashcard-face">
@@ -157,6 +190,19 @@ export function GuestFlashcardPanel({ guestNumber, remainingSeconds, questComple
               <span aria-label="Flashcard position">{cardIndex + 1} of {moments.length}</span>
               <button type="button" onClick={() => setCardFlipped((flipped) => !flipped)}>{cardFlipped ? "Show front" : "Flip"}</button>
               <button type="button" onClick={() => moveCard(1)}>Next</button>
+            </div>
+            <fieldset className="guest-flashcard-grades" disabled={reviewPending} aria-busy={reviewPending}>
+              <legend>How well did you remember?</legend>
+              {(["again", "hard", "good", "easy"] as const).map((grade) => (
+                <button key={grade} type="button" onClick={() => void gradeMoment(grade)} aria-label={`Grade ${grade}`}>
+                  {grade[0].toUpperCase() + grade.slice(1)}
+                </button>
+              ))}
+            </fieldset>
+            <div className="guest-flashcard-review-feedback" aria-live="polite">
+              {reviewPending && <span role="status">Saving review…</span>}
+              {reviewMessage && <span role="status">{reviewMessage}</span>}
+              {reviewError && <span role="alert">{reviewError}</span>}
             </div>
           </section>
         )}
