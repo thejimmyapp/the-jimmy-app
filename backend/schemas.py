@@ -81,6 +81,12 @@ class MomentCreateRequest(BaseModel):
         return self
 
 
+class MomentReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    grade: Literal["again", "hard", "good", "easy"]
+
+
 class AccountClaimRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

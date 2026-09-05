@@ -29,7 +29,7 @@ const json = async <T>(responsePromise: Promise<Response>): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
-export interface MomentRecord {
+interface BaseMomentRecord {
   id: number;
   save_order: number;
   game_id: number;
@@ -51,7 +51,33 @@ export interface MomentRecord {
   created_at: string;
 }
 
-export interface PublicMomentRecord extends MomentRecord {
+export interface MomentRecord extends BaseMomentRecord {
+  due: boolean;
+  attempted: boolean;
+  failed_last: boolean;
+  due_at: string | null;
+  attempts: number;
+}
+
+export type MomentReviewGrade = "again" | "hard" | "good" | "easy";
+
+export interface MomentReviewState {
+  id: number;
+  private_moment_id: number;
+  attempts: number;
+  last_result: "pass" | "fail";
+  last_grade: MomentReviewGrade;
+  interval_days: number;
+  ease: number;
+  due_at: string;
+  reviewed_at: string;
+  created_at: string;
+  due: boolean;
+  attempted: boolean;
+  failed_last: boolean;
+}
+
+export interface PublicMomentRecord extends BaseMomentRecord {
   vote_count: number;
   voted: boolean;
 }
@@ -88,12 +114,18 @@ export const api = {
   storeChessComGuestMatch: (gameId: number) =>
     json<{ game_id: number }>(fetch(`/api/chesscom/matches/${gameId}/store`, { method: "POST" })),
   createMoment: (request: CreateMomentRequest) =>
-    json<{ private_moment: MomentRecord; public_moment: MomentRecord }>(fetch("/api/moments", {
+    json<{ private_moment: MomentRecord; public_moment: PublicMomentRecord }>(fetch("/api/moments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
     })),
   listMyMoments: () => json<{ moments: MomentRecord[] }>(fetch("/api/moments/mine")),
+  reviewMoment: (momentId: number, grade: MomentReviewGrade) =>
+    json<MomentReviewState>(fetch(`/api/moments/${momentId}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grade }),
+    })),
   listPublicMoments: () => json<{ moments: PublicMomentRecord[] }>(fetch("/api/moments/public")),
   togglePublicMomentVote: (momentId: number) =>
     json<{ voted: boolean; vote_count: number }>(fetch(`/api/moments/public/${momentId}/vote`, { method: "POST" })),

@@ -47,6 +47,7 @@ from backend.schemas import (
     ExplorationSanMoveRequest,
     LeakMapAnalysisRequest,
     MomentCreateRequest,
+    MomentReviewRequest,
     NoteCreateRequest,
     PgnImportRequest,
     PuzzleHistoryRequest,
@@ -453,6 +454,38 @@ async def toggle_public_moment_vote(moment_id: int, request: Request) -> dict[st
             detail={"code": "public_moment_not_found", "message": "Public moment was not found."},
         )
     return result
+
+
+@app.post("/api/moments/{moment_id}/review")
+async def review_moment(
+    moment_id: int,
+    payload: MomentReviewRequest,
+    request: Request,
+) -> dict[str, object]:
+    guest_number = await _guest_number_from_request(request)
+    if guest_number is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "guest_identity_missing", "message": "Open the guest landing page first."},
+        )
+    try:
+        review = await asyncio.to_thread(
+            games.review_private_moment,
+            moment_id,
+            guest_number,
+            payload.grade,
+        )
+    except MomentPersistenceError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "moment_review_refused", "message": str(exc)},
+        ) from exc
+    if review is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "moment_not_found", "message": "Moment not found."},
+        )
+    return review
 
 
 @app.delete("/api/moments/{moment_id}")

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, type AccountSummary, type MomentRecord } from "../api";
 import { GuestFlashcardPanel } from "./GuestFlashcardPanel";
 
-const apiMock = vi.hoisted(() => ({ listMyMoments: vi.fn() }));
+const apiMock = vi.hoisted(() => ({ listMyMoments: vi.fn(), reviewMoment: vi.fn() }));
 
 vi.mock("../api", async (importOriginal) => {
   const original = await importOriginal<typeof import("../api")>();
@@ -39,6 +39,11 @@ const moment = (overrides: Partial<MomentRecord> = {}): MomentRecord => ({
   board_b_white_clock: "00:54",
   board_b_black_clock: "00:48",
   created_at: "2026-08-11T00:00:00+00:00",
+  due: true,
+  attempted: false,
+  failed_last: false,
+  due_at: null,
+  attempts: 0,
   ...overrides,
 });
 
@@ -60,6 +65,21 @@ const renderPanel = (overrides: Partial<Parameters<typeof GuestFlashcardPanel>[0
 
 beforeEach(() => {
   apiMock.listMyMoments.mockResolvedValue({ moments: [] });
+  apiMock.reviewMoment.mockResolvedValue({
+    id: 1,
+    private_moment_id: 1,
+    attempts: 1,
+    last_result: "pass",
+    last_grade: "good",
+    interval_days: 1,
+    ease: 2.5,
+    due_at: "2026-08-12T00:00:00+00:00",
+    reviewed_at: "2026-08-11T00:00:00+00:00",
+    created_at: "2026-08-11T00:00:00+00:00",
+    due: false,
+    attempted: true,
+    failed_last: false,
+  });
 });
 
 afterEach(() => {
@@ -118,6 +138,43 @@ describe("saved moment flashcard deck", () => {
     renderPanel();
     expect((await screen.findByRole("alert")).textContent).toContain("Flashcards could not be loaded.");
     expect(screen.queryByLabelText("Saved moment flashcards")).toBeNull();
+  });
+
+  it("shows due, attempted, and failed-last review badges from the server", async () => {
+    apiMock.listMyMoments.mockResolvedValue({
+      moments: [moment({ due: false, attempted: true, failed_last: true, attempts: 3 })],
+    });
+    renderPanel();
+
+    const state = await screen.findByLabelText("Review state");
+    expect(state.textContent).toContain("Not due");
+    expect(state.textContent).toContain("Attempted");
+    expect(state.textContent).toContain("Failed last");
+  });
+
+  it("grades a card and refreshes review badges only from the server response", async () => {
+    apiMock.listMyMoments.mockResolvedValue({ moments: [moment()] });
+    renderPanel();
+    await screen.findByText("17A · Board A · !!");
+
+    fireEvent.click(screen.getByRole("button", { name: "Grade good" }));
+
+    await waitFor(() => expect(apiMock.reviewMoment).toHaveBeenCalledWith(1, "good"));
+    expect(await screen.findByText("Not due")).toBeTruthy();
+    expect(screen.getByText("Attempted")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Review recorded: good.");
+  });
+
+  it("keeps the current card and reports a failed grade write accessibly", async () => {
+    apiMock.listMyMoments.mockResolvedValue({ moments: [moment()] });
+    apiMock.reviewMoment.mockRejectedValue(new ApiError(503, "unavailable"));
+    renderPanel();
+    await screen.findByText("17A · Board A · !!");
+
+    fireEvent.click(screen.getByRole("button", { name: "Grade again" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Review grade could not be saved. Try again.");
+    expect(screen.getByText("17A · Board A · !!")).toBeTruthy();
   });
 });
 

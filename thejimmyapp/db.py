@@ -4,7 +4,7 @@ import json
 import secrets
 import sqlite3
 from contextlib import closing
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +44,10 @@ _MOMENT_FIELDS = (
 )
 
 _MOMENT_SELECT = ", ".join(("id", "save_order", *_MOMENT_FIELDS, "created_at"))
+_PRIVATE_MOMENT_REVIEW_SELECT = ", ".join(
+    f"private_moments.{field} AS {field}"
+    for field in ("id", "save_order", *_MOMENT_FIELDS, "created_at")
+)
 
 
 class Database:
@@ -169,6 +173,20 @@ class Database:
                     voter_guest_number INTEGER NOT NULL REFERENCES guest_identities(guest_number),
                     created_at TEXT NOT NULL,
                     UNIQUE(public_moment_id, voter_guest_number)
+                );
+
+                CREATE TABLE IF NOT EXISTS moment_reviews (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    private_moment_id INTEGER NOT NULL REFERENCES private_moments(id),
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    last_result TEXT CHECK(last_result IN ('pass', 'fail')),
+                    last_grade TEXT CHECK(last_grade IN ('again', 'hard', 'good', 'easy')),
+                    interval_days REAL NOT NULL DEFAULT 0,
+                    ease REAL NOT NULL DEFAULT 2.5,
+                    due_at TEXT,
+                    reviewed_at TEXT,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(private_moment_id)
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_private_moments_author_order
@@ -1180,20 +1198,104 @@ class Database:
             except Exception:
                 conn.rollback()
                 raise
-        return _moment_row(private_row), _moment_row(public_row)
+        private_moment = _moment_row(private_row)
+        private_moment.update(
+            {"due": True, "attempted": False, "failed_last": False, "due_at": None, "attempts": 0}
+        )
+        return private_moment, _moment_row(public_row)
 
     def list_private_moments(self, author_guest_number: int) -> list[dict[str, object]]:
         with closing(self.connect()) as conn:
             rows = conn.execute(
                 f"""
-                SELECT {_MOMENT_SELECT}
+                SELECT {_PRIVATE_MOMENT_REVIEW_SELECT},
+                    CASE
+                        WHEN moment_reviews.private_moment_id IS NULL
+                            OR moment_reviews.due_at IS NULL
+                            OR datetime(moment_reviews.due_at) <= datetime('now')
+                        THEN 1 ELSE 0
+                    END AS due,
+                    CASE WHEN COALESCE(moment_reviews.attempts, 0) > 0 THEN 1 ELSE 0 END AS attempted,
+                    CASE WHEN moment_reviews.last_result = 'fail' THEN 1 ELSE 0 END AS failed_last,
+                    moment_reviews.due_at AS due_at,
+                    COALESCE(moment_reviews.attempts, 0) AS attempts
                 FROM private_moments
-                WHERE author_guest_number = ?
-                ORDER BY save_order ASC
+                LEFT JOIN moment_reviews
+                    ON moment_reviews.private_moment_id = private_moments.id
+                WHERE private_moments.author_guest_number = ?
+                ORDER BY private_moments.save_order ASC
                 """,
                 (author_guest_number,),
             ).fetchall()
         return [_moment_row(row) for row in rows]
+
+    def review_private_moment(
+        self,
+        moment_id: int,
+        author_guest_number: int,
+        grade: str,
+    ) -> dict[str, object] | None:
+        """Upsert one private-card review using the server-owned scheduler.
+
+        ``again`` fails and is due now. ``hard`` uses ``max(1, previous * 1.2)``;
+        ``good`` uses ``max(1, previous * ease)``; and ``easy`` uses
+        ``max(2, previous * ease * 1.3)``. Passing grades are due at the review
+        time plus their computed interval. The stored ease is deliberately stable
+        in this first scheduler stub.
+        """
+        now = _utc_now()
+        with closing(self.connect()) as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                moment = conn.execute(
+                    """
+                    SELECT private_moments.id, moment_reviews.interval_days, moment_reviews.ease
+                    FROM private_moments
+                    LEFT JOIN moment_reviews
+                        ON moment_reviews.private_moment_id = private_moments.id
+                    WHERE private_moments.id = ? AND private_moments.author_guest_number = ?
+                    """,
+                    (moment_id, author_guest_number),
+                ).fetchone()
+                if moment is None:
+                    conn.rollback()
+                    return None
+                interval_days, result = _next_moment_review(
+                    grade,
+                    float(moment["interval_days"] or 0),
+                    float(moment["ease"] or 2.5),
+                )
+                due_at = (
+                    datetime.fromisoformat(now) + timedelta(days=interval_days)
+                ).isoformat(timespec="seconds")
+                conn.execute(
+                    """
+                    INSERT INTO moment_reviews (
+                        private_moment_id, attempts, last_result, last_grade,
+                        interval_days, ease, due_at, reviewed_at, created_at
+                    )
+                    VALUES (?, 1, ?, ?, ?, 2.5, ?, ?, ?)
+                    ON CONFLICT(private_moment_id) DO UPDATE SET
+                        attempts = moment_reviews.attempts + 1,
+                        last_result = excluded.last_result,
+                        last_grade = excluded.last_grade,
+                        interval_days = excluded.interval_days,
+                        due_at = excluded.due_at,
+                        reviewed_at = excluded.reviewed_at
+                    """,
+                    (moment_id, result, grade, interval_days, due_at, now, now),
+                )
+                row = conn.execute(
+                    "SELECT * FROM moment_reviews WHERE private_moment_id = ?",
+                    (moment_id,),
+                ).fetchone()
+                if row is None:
+                    raise RuntimeError("moment review could not be read after storage")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return _moment_review_row(row, now)
 
     def private_moment_count(self, author_guest_number: int) -> int:
         with closing(self.connect()) as conn:
@@ -1328,14 +1430,29 @@ class Database:
 
     def delete_private_moment(self, moment_id: int, author_guest_number: int) -> bool:
         with closing(self.connect()) as conn:
-            cursor = conn.execute(
-                """
-                DELETE FROM private_moments
-                WHERE id = ? AND author_guest_number = ?
-                """,
-                (moment_id, author_guest_number),
-            )
-            conn.commit()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                conn.execute(
+                    """
+                    DELETE FROM moment_reviews
+                    WHERE private_moment_id IN (
+                        SELECT id FROM private_moments
+                        WHERE id = ? AND author_guest_number = ?
+                    )
+                    """,
+                    (moment_id, author_guest_number),
+                )
+                cursor = conn.execute(
+                    """
+                    DELETE FROM private_moments
+                    WHERE id = ? AND author_guest_number = ?
+                    """,
+                    (moment_id, author_guest_number),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
         return cursor.rowcount == 1
 
     def record_import(
@@ -2774,7 +2891,30 @@ def _moment_row(row: sqlite3.Row) -> dict[str, object]:
     moment["author"] = f"guest_{int(moment['author_guest_number'])}"
     if "voted" in moment:
         moment["voted"] = bool(moment["voted"])
+    for field in ("due", "attempted", "failed_last"):
+        if field in moment:
+            moment[field] = bool(moment[field])
     return moment
+
+
+def _next_moment_review(grade: str, previous_interval: float, ease: float) -> tuple[float, str]:
+    if grade == "again":
+        return 0, "fail"
+    if grade == "hard":
+        return max(1, previous_interval * 1.2), "pass"
+    if grade == "good":
+        return max(1, previous_interval * ease), "pass"
+    if grade == "easy":
+        return max(2, previous_interval * ease * 1.3), "pass"
+    raise ValueError("unknown moment review grade")
+
+
+def _moment_review_row(row: sqlite3.Row, now: str) -> dict[str, object]:
+    review = dict(row)
+    review["due"] = datetime.fromisoformat(str(review["due_at"])) <= datetime.fromisoformat(now)
+    review["attempted"] = int(review["attempts"]) > 0
+    review["failed_last"] = review["last_result"] == "fail"
+    return review
 
 
 def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
