@@ -47,10 +47,13 @@ deployment -> Backup/domain -> Private UI library
 - [x] Three-for-five loop verified on production as a fresh guest: three moments
   saved inside the window, `completed=true`, `completion_ordinal=1`, review
   grading persisted (`attempts=1`, `due=false`).
-- [ ] LIBRARY-01: the flashcard library overlay is visible but unclickable by mouse
+- [x] LIBRARY-01: the flashcard library overlay was visible but unclickable by mouse
   (`#app-stage-panel` is `pointer-events: none`; `.guest-library-backdrop` never
-  restores it). One-line CSS fix on `codex/library-pointer-events`; merge, then
-  re-verify with `document.elementFromPoint` over the grade buttons on production.
+  restored it). One-line CSS fix merged as `adb2989`; re-verified on production
+  with a real click: "Grade hard" -> `Review recorded: hard`, `attempts=2`.
+- [x] Task 52 (guest list warm-up) merged as `a843dd6`. Production before: 2 games,
+  `partial=true`, ~15 s cold. After: 5 games in ~114 ms, `cached=true`,
+  `pool_size=23`, background build 25 s at startup with 110 upstream requests.
 
 ## ⛔ Blocked
 
@@ -85,10 +88,11 @@ deployment -> Backup/domain -> Private UI library
 
 ## 🔭 Next benchmark
 
-**A6 — A new user can finish the loop with a mouse.** Merge LIBRARY-01, re-verify
-the library controls on production, then close the remaining gaps in the
-save-moment -> account-unlock loop that do not depend on the held
-credential-intake decision (see `docs/GATE-4-HANDOFF.md`).
+**A6 — Return path.** A new user can now land, load a game in under a second,
+save three moments, grade them, and reach the claim form with a mouse. What is
+missing is the way back (credential intake, held P0) and a definition of what an
+account unlocks (see `docs/GATE-4-HANDOFF.md` §4). Nothing to build until the
+owner rules.
 
 ## Update format
 
