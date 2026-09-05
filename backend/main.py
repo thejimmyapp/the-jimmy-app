@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
 import re
@@ -27,7 +28,7 @@ from backend.chesscom_matchups import (
 )
 from backend.coach import prepare_coach_context
 from backend.coach_jobs import CoachJobs
-from backend.config import get_settings
+from backend.config import get_settings, runtime_data_dir
 from backend.leak_map_jobs import LeakMapJobs
 from backend.job_control import JobCapacityError
 from backend.database import Base, SessionLocal, engine, get_session
@@ -75,7 +76,25 @@ chesscom_matchups = ChessComMatchupService(settings)
 GUEST_IDENTITY_COOKIE = "jimmy_guest_identity"
 ACCOUNT_IDENTITY_COOKIE = "jimmy_account_token"
 ENGINE_UNLOCK_MOMENT_COUNT = 10
-app = FastAPI(title=settings.app_name, version="0.1.0")
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Warm the guest list before the first visitor and keep it fresh in the background.
+    # `chesscom_matchups` is looked up at call time so tests can swap in a fake.
+    starter = getattr(chesscom_matchups, "start_background_refresh", None)
+    if starter and settings.chesscom_guest_warm_on_startup and settings.chesscom_match_proxy_enabled:
+        chesscom_matchups.cache_path = settings.chesscom_guest_cache_path or runtime_data_dir() / "guest_matchups_cache.json"
+        starter()
+    try:
+        yield
+    finally:
+        closer = getattr(chesscom_matchups, "aclose", None)
+        if closer:
+            await closer()
+
+
+app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=_lifespan)
 
 
 @app.exception_handler(RequestValidationError)

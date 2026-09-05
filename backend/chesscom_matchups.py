@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+import json
 import logging
+import os
+from pathlib import Path
 import math
 import re
 import time
@@ -66,6 +69,7 @@ class _MatchCacheEntry:
 class _GuestListCacheEntry:
     stored_at: float
     payload: dict[str, Any]
+    pool: list[_QualifiedGuestMatch] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -92,10 +96,178 @@ class ChessComMatchupService:
         self._guest_build_lock = asyncio.Lock()
         self._match_cache: dict[int, _MatchCacheEntry] = {}
         self._guest_cache: _GuestListCacheEntry | None = None
+        self._candidate_cache: dict[str, tuple[float, list[_GuestCandidate]]] = {}
+        self._player_last_active: dict[str, int] = {}
+        self._client: httpx.AsyncClient | None = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
+        self._refresh_task: asyncio.Task[None] | None = None
+        self._refresh_loop_task: asyncio.Task[None] | None = None
+        self._upstream_requests = 0
+        self.cache_path: Path | None = None
 
     def clear_caches(self) -> None:
         self._match_cache.clear()
+        self._candidate_cache.clear()
         self._guest_cache = None
+
+    # ---- shared upstream client -------------------------------------------------
+
+    def _client_for_loop(self) -> httpx.AsyncClient:
+        loop = asyncio.get_running_loop()
+        if self._client is None or self._client_loop is not loop:
+            timeout = httpx.Timeout(
+                self.settings.chesscom_match_timeout_seconds,
+                connect=min(8.0, self.settings.chesscom_match_timeout_seconds),
+            )
+            headers = {"User-Agent": self.settings.chesscom_user_agent, "Accept": "application/json"}
+            self._client = httpx.AsyncClient(
+                headers=headers,
+                timeout=timeout,
+                follow_redirects=False,
+                transport=self._transport,
+            )
+            self._client_loop = loop
+        return self._client
+
+    async def aclose(self) -> None:
+        for task in (self._refresh_loop_task, self._refresh_task):
+            if task and not task.done():
+                task.cancel()
+        self._refresh_loop_task = None
+        self._refresh_task = None
+        client, self._client, self._client_loop = self._client, None, None
+        if client is not None:
+            try:
+                await client.aclose()
+            except Exception:  # pragma: no cover - best effort on shutdown
+                logger.debug("Chess.com client close failed", exc_info=True)
+
+    # ---- background warm-up and refresh -----------------------------------------
+
+    def start_background_refresh(self) -> None:
+        """Load any persisted list, then keep the cache warm ahead of visitors."""
+        if self._refresh_loop_task and not self._refresh_loop_task.done():
+            return
+        self._load_persisted()
+        self._refresh_loop_task = asyncio.get_running_loop().create_task(self._refresh_loop())
+
+    async def _refresh_loop(self) -> None:
+        ttl = self.settings.chesscom_match_cache_ttl_seconds
+        margin = self.settings.chesscom_guest_refresh_margin_seconds
+        while True:
+            entry = self._guest_cache
+            age = time.monotonic() - entry.stored_at if entry else None
+            if age is not None and age < ttl - margin:
+                await asyncio.sleep(ttl - margin - age)
+                continue
+            await self._background_rebuild()
+            await asyncio.sleep(max(60.0, float(ttl - margin)))
+
+    def _schedule_refresh(self) -> None:
+        if self._refresh_task and not self._refresh_task.done():
+            return
+        self._refresh_task = asyncio.get_running_loop().create_task(self._background_rebuild())
+
+    async def _background_rebuild(self) -> None:
+        try:
+            async with self._guest_build_lock:
+                payload, pool = await self._build_guest_matchups(set(), background=True)
+                self._store_entry(payload, pool)
+        except MatchProxyDisabledError:
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning("Background guest matchup rebuild failed; keeping the last good list", exc_info=True)
+
+    def _store_entry(self, payload: dict[str, Any], pool: list[_QualifiedGuestMatch]) -> None:
+        self._guest_cache = _GuestListCacheEntry(time.monotonic(), deepcopy(payload), list(pool))
+        self._persist()
+
+    # ---- on-disk persistence so a restart serves the last good list ------------
+
+    def _persist(self) -> None:
+        entry = self._guest_cache
+        path = self.cache_path
+        if entry is None or path is None:
+            return
+        record = {
+            "version": 1,
+            "saved_at": time.time(),
+            "payload": entry.payload,
+            "pool": [{"match": item.match, "seed_username": item.seed_username} for item in entry.pool],
+            "player_last_active": self._player_last_active,
+        }
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(record), encoding="utf-8")
+            os.replace(tmp, path)
+        except OSError:
+            logger.warning("Could not persist guest matchup cache to %s", path, exc_info=True)
+
+    def _load_persisted(self) -> bool:
+        path = self.cache_path
+        if path is None or not path.is_file():
+            return False
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+            age = time.time() - float(record["saved_at"])
+            if age < 0 or age > self.settings.chesscom_guest_stale_max_seconds:
+                return False
+            payload = record["payload"]
+            pool = [
+                _QualifiedGuestMatch(match=item["match"], seed_username=str(item["seed_username"]), was_currently_shown=False)
+                for item in record.get("pool", [])
+                if isinstance(item, dict) and isinstance(item.get("match"), dict)
+            ]
+            if not isinstance(payload, dict) or not isinstance(payload.get("matches"), list):
+                return False
+        except (OSError, ValueError, KeyError, TypeError):
+            logger.warning("Ignoring unreadable guest matchup cache at %s", path, exc_info=True)
+            return False
+        activity = record.get("player_last_active")
+        if isinstance(activity, dict):
+            self._player_last_active.update(
+                {str(name).lower(): int(value) for name, value in activity.items() if isinstance(value, (int, float))}
+            )
+        self._guest_cache = _GuestListCacheEntry(time.monotonic() - age, payload, pool)
+        return True
+
+    def _order_by_recent_activity(self, usernames: list[str]) -> list[str]:
+        """Recently active seeds first; unknown players keep their configured order."""
+        if not self._player_last_active:
+            return list(usernames)
+        return sorted(usernames, key=lambda name: -self._player_last_active.get(name.lower(), 0))
+
+    # ---- regenerate without touching Chess.com ----------------------------------
+
+    def _rotate_from_pool(self, excluded_ids: set[int]) -> dict[str, Any] | None:
+        entry = self._guest_cache
+        if entry is None or not entry.pool:
+            return None
+        selected: list[_QualifiedGuestMatch] = []
+        per_player: dict[str, int] = {}
+        for item in entry.pool:
+            if excluded_ids & set(item.match["game_ids"].values()):
+                continue
+            player_key = item.seed_username.lower()
+            if per_player.get(player_key, 0) >= _MAX_MATCHES_PER_SEED_PLAYER:
+                continue
+            per_player[player_key] = per_player.get(player_key, 0) + 1
+            selected.append(item)
+            if len(selected) == _GUEST_MATCH_TARGET:
+                break
+        if len(selected) < _GUEST_MATCH_TARGET or len(per_player) < _MIN_REPRESENTED_SEED_PLAYERS:
+            return None
+        payload = deepcopy(entry.payload)
+        payload["matches"] = [deepcopy(item.match) for item in selected]
+        payload["players_represented"] = list(dict.fromkeys(item.seed_username for item in selected))
+        payload["partial"] = False
+        payload["cached"] = True
+        payload["regenerated_from_pool"] = True
+        payload["upstream_requests"] = 0
+        return payload
 
     def _ensure_enabled(self) -> None:
         if not self.settings.chesscom_match_proxy_enabled:
@@ -162,21 +334,36 @@ class ChessComMatchupService:
             value for value in exclude_game_ids
             if isinstance(value, int) and not isinstance(value, bool) and value > 0
         }
-        cached = self._guest_cache
-        if not refresh and cached and time.monotonic() - cached.stored_at < self.settings.chesscom_match_cache_ttl_seconds:
-            payload = deepcopy(cached.payload)
-            payload["cached"] = True
-            return payload
+        ttl = self.settings.chesscom_match_cache_ttl_seconds
+        if refresh:
+            rotated = self._rotate_from_pool(excluded_ids)
+            if rotated is not None:
+                return rotated
+        else:
+            cached = self._guest_cache
+            if cached:
+                age = time.monotonic() - cached.stored_at
+                if age < ttl:
+                    payload = deepcopy(cached.payload)
+                    payload["cached"] = True
+                    return payload
+                if age < self.settings.chesscom_guest_stale_max_seconds:
+                    # Serve the last good list right away; rebuild behind the visitor.
+                    self._schedule_refresh()
+                    payload = deepcopy(cached.payload)
+                    payload["cached"] = True
+                    payload["stale"] = True
+                    return payload
 
         async with self._guest_build_lock:
             self._ensure_enabled()
             cached = self._guest_cache
-            if not refresh and cached and time.monotonic() - cached.stored_at < self.settings.chesscom_match_cache_ttl_seconds:
+            if not refresh and cached and time.monotonic() - cached.stored_at < ttl:
                 payload = deepcopy(cached.payload)
                 payload["cached"] = True
                 return payload
-            payload = await self._build_guest_matchups(excluded_ids)
-            self._guest_cache = _GuestListCacheEntry(time.monotonic(), deepcopy(payload))
+            payload, pool = await self._build_guest_matchups(excluded_ids)
+            self._store_entry(payload, pool)
             return payload
 
     def _fresh_match_cache(self, numeric_id: int) -> _MatchCacheEntry | None:
@@ -188,10 +375,17 @@ class ChessComMatchupService:
             return None
         return cached
 
-    async def _build_guest_matchups(self, currently_shown_ids: set[int] | None = None) -> dict[str, Any]:
+    async def _build_guest_matchups(
+        self,
+        currently_shown_ids: set[int] | None = None,
+        *,
+        background: bool = False,
+    ) -> tuple[dict[str, Any], list[_QualifiedGuestMatch]]:
         currently_shown_ids = currently_shown_ids or set()
         now = int(time.time())
-        usernames = self._configured_seed_usernames()
+        started = time.monotonic()
+        requests_before = self._upstream_requests
+        usernames = self._order_by_recent_activity(self._configured_seed_usernames())
         configured_count = len(usernames)
         seed_source = "players_of_interest" if usernames else "leaderboard_top_50"
 
@@ -206,25 +400,24 @@ class ChessComMatchupService:
 
         async def collect_candidates(username: str) -> None:
             players_sampled.append(username)
-            try:
-                archive_index = await self._get_json(
-                    f"https://api.chess.com/pub/player/{username.lower()}/games/archives"
-                )
-            except MatchUpstreamError:
+            remembered = self._candidate_cache.get(username.lower())
+            if remembered and time.monotonic() - remembered[0] < self.settings.chesscom_match_cache_ttl_seconds:
+                for candidate in remembered[1]:
+                    if candidate.numeric_id not in seen_public_ids:
+                        seen_public_ids.add(candidate.numeric_id)
+                        candidates.append(candidate)
                 return
-            archive_urls = archive_index.get("archives")
-            if not isinstance(archive_urls, list):
-                _count(excluded, "archive_shape")
-                return
-            recent_urls = _recent_archive_urls(
-                archive_urls,
+            player_candidates: list[_GuestCandidate] = []
+            # Monthly archive URLs are deterministic, so skip the archive-index round-trip and
+            # only fetch months that can still hold games inside the freshness window.
+            recent_urls = _archive_urls_for_window(
                 username,
+                now,
+                _GUEST_FRESHNESS_WINDOWS_HOURS[-1],
                 self.settings.chesscom_guest_max_archives_per_player,
             )
+            latest_end_time = 0
             for archive_url in recent_urls:
-                if not _official_archive_url(archive_url, username):
-                    _count(excluded, "archive_url")
-                    continue
                 try:
                     archive = await self._get_json(archive_url)
                 except MatchUpstreamError:
@@ -251,7 +444,13 @@ class ChessComMatchupService:
                     if age_seconds > _GUEST_FRESHNESS_WINDOWS_HOURS[-1] * 3600:
                         _count(excluded, "outside_48h")
                         continue
-                    candidates.append(_GuestCandidate(numeric_id, end_time, username))
+                    candidate = _GuestCandidate(numeric_id, end_time, username)
+                    candidates.append(candidate)
+                    player_candidates.append(candidate)
+                    latest_end_time = max(latest_end_time, end_time)
+            self._candidate_cache[username.lower()] = (time.monotonic(), player_candidates)
+            if latest_end_time:
+                self._player_last_active[username.lower()] = latest_end_time
 
         async def process_window(window_hours: int, *, include_known_current: bool = False) -> None:
             nonlocal examined
@@ -314,34 +513,19 @@ class ChessComMatchupService:
         selection_window_hours = _GUEST_FRESHNESS_WINDOWS_HOURS[0]
         assembly_budget_exhausted = False
 
-        async def assemble() -> None:
-            nonlocal seed_source, selected, selection_window_hours
-            for username in usernames:
+        async def ladder(names: list[str]) -> bool:
+            # Collect each seed and stop as soon as the freshest window fills the list,
+            # then widen the window over everything collected so far before asking for
+            # more players. Widening is free; every extra player costs upstream requests.
+            nonlocal selected, selection_window_hours
+            selection_window_hours = _GUEST_FRESHNESS_WINDOWS_HOURS[0]
+            for username in names:
                 await collect_candidates(username)
                 await process_window(selection_window_hours)
                 selected = select_matches()
                 if selected:
-                    return
-
-            leaderboard_usernames = await self._leaderboard_seed_usernames()
-            known = {username.lower() for username in usernames}
-            fallback_usernames = [username for username in leaderboard_usernames if username.lower() not in known]
-            usernames.extend(fallback_usernames)
-            seed_source = "players_of_interest_then_leaderboard_top_50" if configured_count else "leaderboard_top_50"
-            for username in fallback_usernames:
-                await collect_candidates(username)
-                await process_window(selection_window_hours)
-                selected = select_matches()
-                if selected:
-                    return
-
-            logger.info(
-                "Guest matchup freshness window: hours=%d qualifying=%d selected=%d",
-                selection_window_hours,
-                len(qualified),
-                len(selected or []),
-            )
-            for selection_window_hours in _GUEST_FRESHNESS_WINDOWS_HOURS[1:]:
+                    return True
+            for selection_window_hours in _GUEST_FRESHNESS_WINDOWS_HOURS:
                 await process_window(selection_window_hours)
                 selected = select_matches()
                 logger.info(
@@ -351,23 +535,67 @@ class ChessComMatchupService:
                     len(selected or []),
                 )
                 if selected:
-                    return
+                    return True
+            return False
+
+        async def assemble() -> None:
+            nonlocal seed_source, selected, selection_window_hours
+            if await ladder(usernames):
+                return
+
+            leaderboard_usernames = await self._leaderboard_seed_usernames()
+            known = {username.lower() for username in usernames}
+            fallback_usernames = [username for username in leaderboard_usernames if username.lower() not in known]
+            usernames.extend(fallback_usernames)
+            seed_source = "players_of_interest_then_leaderboard_top_50" if configured_count else "leaderboard_top_50"
+            if await ladder(fallback_usernames):
+                return
 
             if currently_shown_ids:
                 selection_window_hours = _GUEST_FRESHNESS_WINDOWS_HOURS[-1]
                 await process_window(selection_window_hours, include_known_current=True)
                 selected = select_matches(include_current=True)
 
+        async def top_up() -> None:
+            # Background builds keep sampling inside the chosen window so "Regenerate"
+            # can rotate from this pool without new upstream requests.
+            target = self.settings.chesscom_guest_pool_target
+            limit = self.settings.chesscom_guest_max_matches_examined
+            sampled = {name.lower() for name in players_sampled}
+            for username in list(usernames):
+                if len(qualified) >= target or examined >= limit:
+                    return
+                if username.lower() not in sampled:
+                    sampled.add(username.lower())
+                    await collect_candidates(username)
+                await process_window(selection_window_hours)
+            # The displayed selection keeps its window; the spare pool may reach further back.
+            for hours in _GUEST_FRESHNESS_WINDOWS_HOURS:
+                if hours <= selection_window_hours:
+                    continue
+                if len(qualified) >= target or examined >= limit:
+                    return
+                await process_window(hours)
+
+        budget = self.settings.chesscom_guest_background_budget_seconds if background else _GUEST_ASSEMBLY_BUDGET_SECONDS
         try:
-            async with asyncio.timeout(_GUEST_ASSEMBLY_BUDGET_SECONDS):
+            async with asyncio.timeout(budget):
                 await assemble()
         except TimeoutError:
             assembly_budget_exhausted = True
             logger.warning(
                 "Guest matchup assembly reached the %.1fs budget with %d validated matches",
-                _GUEST_ASSEMBLY_BUDGET_SECONDS,
+                budget,
                 len(qualified),
             )
+        if background and selected and not assembly_budget_exhausted:
+            remaining = budget - (time.monotonic() - started)
+            if remaining > 0:
+                try:
+                    async with asyncio.timeout(remaining):
+                        await top_up()
+                except TimeoutError:
+                    logger.info("Guest matchup pool top-up stopped at the budget with %d validated matches", len(qualified))
 
         if selected is None and qualified:
             partial_selection: list[_QualifiedGuestMatch] = []
@@ -399,7 +627,7 @@ class ChessComMatchupService:
                 f"(qualifying={len(qualified)}, examined={examined}, window_hours={selection_window_hours})"
             )
         players_represented = list(dict.fromkeys(item.seed_username for item in selected))
-        return {
+        payload = {
             "matches": [item.match for item in selected],
             "examined": examined,
             "excluded": excluded_total,
@@ -411,7 +639,12 @@ class ChessComMatchupService:
             "partial": len(selected) < _GUEST_MATCH_TARGET,
             "assembly_budget_exhausted": assembly_budget_exhausted,
             "cached": False,
+            "regenerated_from_pool": False,
+            "pool_size": len(qualified),
+            "upstream_requests": self._upstream_requests - requests_before,
+            "build_seconds": round(time.monotonic() - started, 3),
         }
+        return payload, list(qualified)
 
     def _configured_seed_usernames(self) -> list[str]:
         configured = self.settings.chesscom_players_of_interest_list
@@ -441,17 +674,11 @@ class ChessComMatchupService:
 
     async def _get_json(self, url: str) -> dict[str, Any]:
         self._ensure_enabled()
-        timeout = httpx.Timeout(self.settings.chesscom_match_timeout_seconds, connect=min(8.0, self.settings.chesscom_match_timeout_seconds))
-        headers = {"User-Agent": self.settings.chesscom_user_agent, "Accept": "application/json"}
+        client = self._client_for_loop()
         try:
             async with self._upstream_lock:
-                async with httpx.AsyncClient(
-                    headers=headers,
-                    timeout=timeout,
-                    follow_redirects=False,
-                    transport=self._transport,
-                ) as client:
-                    response = await client.get(url)
+                self._upstream_requests += 1
+                response = await client.get(url)
             response.raise_for_status()
             payload = response.json()
         except (httpx.HTTPError, ValueError) as exc:
@@ -705,6 +932,31 @@ def _official_archive_url(value: Any, username: str) -> bool:
         and not parsed.query
         and not parsed.fragment
     )
+
+
+def _archive_urls_for_window(username: str, now: int, window_hours: int, limit: int) -> list[str]:
+    """Newest month first: the month containing `now`, then earlier months whose end is still inside the window."""
+    urls: list[str] = []
+    year, month = datetime.fromtimestamp(now, UTC).year, datetime.fromtimestamp(now, UTC).month
+    while len(urls) < limit:
+        urls.append(f"https://api.chess.com/pub/player/{username.lower()}/games/{year:04d}/{month:02d}")
+        year, month = (year - 1, 12) if month == 1 else (year, month - 1)
+        if not _archive_may_hold_recent_games(urls[-1].rsplit("/", 2)[0] + f"/{year:04d}/{month:02d}", now, window_hours):
+            break
+    return urls
+
+
+def _archive_may_hold_recent_games(archive_url: str, now: int, window_hours: int) -> bool:
+    """A monthly archive can only hold games inside the window if the month ended recently."""
+    match = re.search(r"/games/(\d{4})/(\d{2})$", urlsplit(archive_url).path, re.I)
+    if not match:
+        return True
+    year, month = int(match.group(1)), int(match.group(2))
+    if not 1 <= month <= 12:
+        return True
+    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+    month_end = int(datetime(next_year, next_month, 1, tzinfo=UTC).timestamp())
+    return now - month_end <= window_hours * 3600
 
 
 def _recent_archive_urls(values: list[Any], username: str, limit: int) -> list[str]:

@@ -218,6 +218,10 @@ def test_guest_list_widens_to_three_hours_filters_short_match_and_reuses_cache(m
             payload = {"archives": [] if username == "nogames" else [f"https://api.chess.com/pub/player/{username}/games/2026/08"]}
         elif path.endswith("/games/2026/08"):
             username = path.split("/")[3]
+            if username == "missing":
+                return httpx.Response(404, json={"code": 0, "message": "User not found"}, request=request)
+            if username == "nogames":
+                return httpx.Response(200, json={"games": []}, request=request)
             payload = {"games": [
                 {
                     "rules": "bughouse",
@@ -293,9 +297,9 @@ def test_guest_endpoint_returns_validated_partial_list_within_cold_budget(tmp_pa
                 {"rules": "bughouse", "url": f"https://www.chess.com/game/live/{game_id}", "end_time": NOW - 600}
                 for game_id in (101, 102)
             ]}
-        elif path.endswith("/beta/games/archives"):
+        elif path.endswith("/beta/games/2026/08"):
             await asyncio.sleep(0.2)
-            payload = {"archives": []}
+            payload = {"games": []}
         else:
             payload = callback_payloads[path.rsplit("/", 1)[-1]]
         return httpx.Response(200, json=payload, request=request)
@@ -425,3 +429,180 @@ def test_kill_switch_disables_match_and_guest_routes_before_network_access() -> 
         asyncio.run(service.normalized_match(42))
     with pytest.raises(MatchProxyDisabledError):
         asyncio.run(service.guest_matchups())
+
+
+def _five_player_fixture(requests: list[str]):
+    players = {
+        "alpha": [301, 302],
+        "beta": [303, 304],
+        "gamma": [305, 306],
+        "delta": [307, 308],
+        "epsilon": [309, 310],
+    }
+    callbacks: dict[str, dict[str, Any]] = {}
+    for game_id in range(301, 311):
+        primary_uuid = f"{game_id:08x}-0000-4000-8000-{game_id:012x}"
+        partner_id = game_id + 1000
+        partner_uuid = f"{partner_id:08x}-0000-4000-8000-{partner_id:012x}"
+        callbacks[str(game_id)] = callback_board(
+            game_id, primary_uuid, partner_uuid,
+            white=(f"High{game_id}", 2500), black=(f"Low{game_id}", 2100),
+            winner="white", reason="checkmated",
+        )
+        callbacks[partner_uuid] = callback_board(
+            partner_id, partner_uuid, primary_uuid,
+            white=(f"PartnerOpponent{game_id}", 2000), black=(f"Partner{game_id}", 2200),
+            winner="black", reason="bughousepartnerlose",
+        )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(str(request.url))
+        path = request.url.path
+        if path.endswith("/games/archives"):
+            username = path.split("/")[3]
+            payload = {"archives": [
+                f"https://api.chess.com/pub/player/{username}/games/2026/07",
+                f"https://api.chess.com/pub/player/{username}/games/2026/08",
+            ]}
+        elif path.endswith("/games/2026/08"):
+            username = path.split("/")[3]
+            payload = {"games": [
+                {"rules": "bughouse", "url": f"https://www.chess.com/game/live/{game_id}", "end_time": NOW - 10 * 60}
+                for game_id in players[username]
+            ]}
+        elif path.endswith("/games/2026/07"):
+            raise AssertionError("July archive cannot hold games from the last 48 hours and must not be fetched")
+        elif path == "/pub/leaderboards":
+            payload = {"live_bughouse": [{"username": name} for name in players]}
+        else:
+            payload = callbacks[path.rsplit("/", 1)[-1]]
+        return httpx.Response(200, json=payload, request=request)
+
+    settings = Settings(
+        chesscom_players_of_interest="Alpha, Beta, Gamma, Delta, Epsilon",
+        chesscom_guest_max_archives_per_player=2,
+        chesscom_guest_max_matches_examined=20,
+        chesscom_guest_pool_target=10,
+    )
+    return ChessComMatchupService(settings, transport=httpx.MockTransport(handler))
+
+
+def test_background_build_fills_a_pool_so_regenerate_needs_no_upstream_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.chesscom_matchups.time.time", lambda: NOW)
+    requests: list[str] = []
+    service = _five_player_fixture(requests)
+
+    async def scenario() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], int]:
+        await service._background_rebuild()
+        first = await service.guest_matchups()
+        after_build = len(requests)
+        current_ids = {game_id for match in first["matches"] for game_id in match["game_ids"].values()}
+        rotated = await service.guest_matchups(refresh=True, exclude_game_ids=current_ids)
+        rotated_ids = {game_id for match in rotated["matches"] for game_id in match["game_ids"].values()}
+        after_rotate = len(requests)
+        exhausted = await service.guest_matchups(refresh=True, exclude_game_ids=current_ids | rotated_ids)
+        return first, rotated, exhausted, after_build, after_rotate
+
+    first, rotated, exhausted, after_build, after_rotate = asyncio.run(scenario())
+
+    assert first["cached"] is True
+    assert first["pool_size"] == 10
+    assert first["upstream_requests"] == 5 + 20  # one August archive per player, two callbacks per match
+    assert not any(url.endswith("/games/archives") for url in requests)
+    assert not any(url.endswith("/games/2026/07") for url in requests)
+    assert len(rotated["matches"]) == 5
+    assert rotated["regenerated_from_pool"] is True
+    assert rotated["cached"] is True
+    assert rotated["upstream_requests"] == 0
+    assert rotated["players_represented"] == ["Gamma", "Delta", "Epsilon"]
+    assert after_rotate == after_build
+    # Pool exhausted: falls back to a real rebuild that honours the exclusions.
+    assert exhausted["regenerated_from_pool"] is False
+    assert exhausted["cached"] is False
+    assert len(requests) > after_rotate
+
+
+def test_expired_list_is_served_stale_while_a_background_rebuild_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.chesscom_matchups.time.time", lambda: NOW)
+    requests: list[str] = []
+    service = _five_player_fixture(requests)
+
+    async def scenario() -> tuple[dict[str, Any], int, dict[str, Any]]:
+        await service.guest_matchups()
+        service._guest_cache.stored_at -= service.settings.chesscom_match_cache_ttl_seconds + 1
+        before = len(requests)
+        stale = await service.guest_matchups()
+        assert len(requests) == before  # returned without waiting on Chess.com
+        assert service._refresh_task is not None
+        await service._refresh_task
+        fresh = await service.guest_matchups()
+        return stale, before, fresh
+
+    stale, before, fresh = asyncio.run(scenario())
+    assert stale["cached"] is True and stale["stale"] is True
+    assert len(stale["matches"]) == 5
+    assert fresh["cached"] is True and "stale" not in fresh
+    assert len(requests) > before
+
+
+def test_upstream_client_is_shared_across_requests_in_one_loop() -> None:
+    requests: list[str] = []
+    service = _five_player_fixture(requests)
+
+    async def scenario() -> tuple[int, int]:
+        await service._get_json("https://api.chess.com/pub/leaderboards")
+        first = id(service._client)
+        await service._get_json("https://api.chess.com/pub/leaderboards")
+        second = id(service._client)
+        await service.aclose()
+        return first, second
+
+    first, second = asyncio.run(scenario())
+    assert first == second
+    assert service._client is None
+
+
+def test_persisted_list_survives_a_restart(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    requests: list[str] = []
+    service = _five_player_fixture(requests)
+    service.cache_path = tmp_path / "guest_matchups_cache.json"
+    monkeypatch.setattr("backend.chesscom_matchups.time.time", lambda: NOW)
+    asyncio.run(service._background_rebuild())
+    assert service.cache_path.is_file()
+
+    restarted: list[str] = []
+    fresh_process = _five_player_fixture(restarted)
+    fresh_process.cache_path = service.cache_path
+    assert fresh_process._load_persisted() is True
+    served = asyncio.run(fresh_process.guest_matchups())
+    assert served["cached"] is True
+    assert len(served["matches"]) == 5
+    assert len(fresh_process._guest_cache.pool) == 10
+    assert restarted == []
+
+
+def test_app_lifespan_skips_warm_up_when_disabled_and_closes_the_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fastapi.testclient import TestClient
+
+    calls: list[str] = []
+
+    class FakeMatchups:
+        cache_path = None
+
+        def start_background_refresh(self) -> None:
+            calls.append("start")
+
+        async def aclose(self) -> None:
+            calls.append("close")
+
+    monkeypatch.setattr(main_module, "chesscom_matchups", FakeMatchups())
+    monkeypatch.setattr(main_module.settings, "chesscom_guest_warm_on_startup", False)
+    with TestClient(main_module.app):
+        pass
+    assert calls == ["close"]
+
+    calls.clear()
+    monkeypatch.setattr(main_module.settings, "chesscom_guest_warm_on_startup", True)
+    with TestClient(main_module.app):
+        pass
+    assert calls == ["start", "close"]

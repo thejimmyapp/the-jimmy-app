@@ -53,6 +53,11 @@ def _runtime_data_dir() -> Path:
     return Path(mount) if mount else ROOT_DIR / "data"
 
 
+def runtime_data_dir() -> Path:
+    """Public alias used by the app lifespan for on-disk caches."""
+    return _runtime_data_dir()
+
+
 def _default_fairy_stockfish_path() -> Path:
     binary_name = (
         "fairy-stockfish.exe" if platform.system() == "Windows" else "fairy-stockfish"
@@ -85,6 +90,12 @@ class Settings(BaseSettings):
     chesscom_players_of_interest: str = DEFAULT_CHESSCOM_PLAYERS_OF_INTEREST
     chesscom_guest_max_archives_per_player: int = Field(default=2, ge=1, le=6)
     chesscom_guest_max_matches_examined: int = Field(default=40, ge=5, le=200)
+    chesscom_guest_warm_on_startup: bool = True
+    chesscom_guest_refresh_margin_seconds: int = Field(default=90, ge=15, le=600)
+    chesscom_guest_pool_target: int = Field(default=15, ge=5, le=40)
+    chesscom_guest_background_budget_seconds: float = Field(default=60.0, ge=5, le=300)
+    chesscom_guest_stale_max_seconds: int = Field(default=86_400, ge=60, le=604_800)
+    chesscom_guest_cache_path: Path | None = None
     chesscom_oauth_callback_url: str = (
         "https://jimmyapp-production.up.railway.app/api/oauth/chesscom/callback"
     )
