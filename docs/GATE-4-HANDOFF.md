@@ -27,8 +27,9 @@ as an unpushed local branch. Lesson stays: **push the instant you commit.**
 | Library grade (`POST /api/moments/1/review good`) | `attempts=1`, `due=false`; badges update |
 | Claim-identity form | Rendered, email input, not submitted (owner's call) |
 
-**Defect LIBRARY-01 (P0 for the loop).** The library overlay renders, but every
-control in it (Flip / Next / Grade / Claim / Close) is unreachable by mouse:
+**Defect LIBRARY-01 (P0 for the loop) — fixed, merged `adb2989`, verified on
+production with a real click.** The library overlay rendered, but every
+control in it (Flip / Next / Grade / Claim / Close) was unreachable by mouse:
 `document.elementFromPoint` over the "Grade good" button returns a board square.
 `.app-stage > #app-stage-panel { pointer-events: none }` (styles.css:1534) and
 `.guest-library-backdrop` (styles.css:1919) never restores it — unlike
@@ -37,9 +38,9 @@ declaration; branch `codex/library-pointer-events` (frontend suites green).
 Re-verify after deploy: open the library, run
 `document.elementFromPoint(...)` over a grade button → must be the button.
 
-Other observations (not acted on): matchup list cold-load time; `Regenerate
-list` exists; local branch `claude/task-52-guest-list-warm` (`c7bdb43`,
-unpushed, unmerged) claims to keep the list warm — verify before use.
+Matchup list cold-load time: fixed by Task 52 (`claude/task-52-guest-list-warm`,
+merged `a843dd6`, pytest 191). Production after deploy: 5 games in ~114 ms,
+`cached=true`, `pool_size=23`, background build 25 s at startup.
 
 ## 3. Custom domain — BLOCKED, owner decision
 
@@ -82,8 +83,8 @@ rules on credential intake.
 
 | Local branch | SHA | vs `main` | On origin |
 |---|---|---|---|
-| `claude/task-52-guest-list-warm` | `c7bdb43` | unmerged, +1 | no |
-| `codex/review-layout-results` | `b0f96a8` | unmerged, +1 | no (remote branch was deleted) |
+| `claude/task-52-guest-list-warm` | `c7bdb43` | merged `a843dd6` | yes (pushed 2026-09-05) |
+| `codex/review-layout-results` | `b0f96a8` | unmerged, +1, stale (base `d6e8ced`) | yes (pushed 2026-09-05) |
 | `codex/task-14-guest-bridge` | `1efcfcb` | merged | no |
 | `codex/task-26-headline-split` | `cb35370` | merged | no |
 
