@@ -36,17 +36,36 @@ deployment -> Backup/domain -> Private UI library
 - [x] Reproduced the repository's actual pinned Ruff CI gate; contradicted the
   handoff's broader unpinned Ruff command.
 - [ ] Build and smoke-test one local Docker image with Qwen disabled.
-- [ ] Prepare one fresh Ryan-owned, single-instance deployment with durable data.
+- [x] Prepare one fresh Ryan-owned, single-instance deployment with durable data.
+  - Evidence (Gate 4, 2026-09-05): Railway project `thejimmyapp-ryan`
+    (`65513c12-b3af-4d42-ac78-cdb3c34a9ae5`), service `thejimmyapp`, volume
+    `/app/data`, GitHub-connected to `main`; `/health` = `ok`, database and
+    Fairy-Stockfish available, Qwen disabled.
+- [x] FLASHCARD-01 recovered and shipped. The "lost" build survived as an unpushed
+  local branch (`codex/flashcard-review-state` @ `765acc5`); pushed, merged
+  `--no-ff` as `1c56971`, auto-deployed, `/api/moments/{id}/review` live.
+- [x] Three-for-five loop verified on production as a fresh guest: three moments
+  saved inside the window, `completed=true`, `completion_ordinal=1`, review
+  grading persisted (`attempts=1`, `due=false`).
+- [ ] LIBRARY-01: the flashcard library overlay is visible but unclickable by mouse
+  (`#app-stage-panel` is `pointer-events: none`; `.guest-library-backdrop` never
+  restores it). One-line CSS fix on `codex/library-pointer-events`; merge, then
+  re-verify with `document.elementFromPoint` over the grade buttons on production.
 
 ## ⛔ Blocked
 
-- [ ] Restore the public website on fresh Ryan-owned infrastructure.
-  - Evidence: Jimmy declined to reactivate/transfer the old Railway project and
-    supplied a source-reconstruction handoff instead.
-  - Decision: do not revive or transfer Jimmy's Railway project.
-  - Resume condition: Gate 2 local golden build passes, then create a new service.
-- [ ] Verify `/health`, the new provider-generated URL, and `thejimmyapp.com`.
-  - Depends on a running deployment.
+- [x] Restore the public website on fresh Ryan-owned infrastructure.
+  - Resolved 2026-09-02..05: live at `https://thejimmyapp-production.up.railway.app`.
+- [ ] Point `thejimmyapp.com` at the Ryan-owned service.
+  - Evidence (2026-09-05): `railway domain thejimmyapp.com --service thejimmyapp`
+    fails twice with the generic "Failed to create custom domain". The apex is
+    still a custom domain on Jimmy's project (`alfaswing's Projects` /
+    `thorough-celebration`, domain id `4e8df60a-db18-40b5-bece-d79daec5c129`,
+    stuck in verification since July). Public DNS: apex A -> Railway edge
+    (fallback 404), NS = Namecheap.
+  - Decision: never touch Jimmy's project. Owner call: (a) ask Jimmy to delete the
+    custom domain from his project, then re-run the CLI add; or (b) cut over to
+    `www.thejimmyapp.com` on Ryan's service and forward the apex.
 
 ## 🧯 Failed attempts
 
@@ -66,9 +85,10 @@ deployment -> Backup/domain -> Private UI library
 
 ## 🔭 Next benchmark
 
-**A5 — Takeover and fresh deployment.** Verify Jimmy's reconstruction handoff,
-prove a clean local golden build, and establish a fresh Ryan-owned single-instance
-deployment with tested persistence. UI-library work remains parked until Gate 3.
+**A6 — A new user can finish the loop with a mouse.** Merge LIBRARY-01, re-verify
+the library controls on production, then close the remaining gaps in the
+save-moment -> account-unlock loop that do not depend on the held
+credential-intake decision (see `docs/GATE-4-HANDOFF.md`).
 
 ## Update format
 
